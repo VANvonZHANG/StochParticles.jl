@@ -11,4 +11,5 @@ using Test
     include("test_emission.jl")
     include("test_dilution.jl")
     include("test_integration.jl")
+    include("test_diagnostics.jl")
 end
