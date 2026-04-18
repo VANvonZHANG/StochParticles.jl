@@ -8,4 +8,6 @@ using Test
     include("test_condensation.jl")
     include("test_coagulation.jl")
     include("test_cnmc.jl")
+    include("test_emission.jl")
+    include("test_dilution.jl")
 end

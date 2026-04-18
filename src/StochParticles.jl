@@ -35,5 +35,6 @@ export apply_drift, make_ode_func
 export compute_majorant, majorant_rate
 export cnmc_merge!, cnmc_clone!, cnmc_volume_rescale!, cnmc_coagulate!
 export make_coagulation_jump, make_emission_jump
+export dilution_death_affect!, dilution_birth_affect!, make_dilution_jumps
 
 end
