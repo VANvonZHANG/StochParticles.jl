@@ -40,6 +40,7 @@ end
 struct MockIntegrator
     u::Vector{Float64}
     p::ParticleSystem
+    t::Float64
 end
 
 @testset "CoagulationProcess" begin
@@ -67,7 +68,7 @@ end
         for _ in 1:10
             rate = jump.rate(u0, sys, 0.0)
             if rate > 0
-                mock_int = MockIntegrator(u0, sys)
+                mock_int = MockIntegrator(u0, sys, 0.0)
                 jump.affect!(mock_int)
                 u0 = mock_int.u
             end
