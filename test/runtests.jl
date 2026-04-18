@@ -10,4 +10,5 @@ using Test
     include("test_cnmc.jl")
     include("test_emission.jl")
     include("test_dilution.jl")
+    include("test_integration.jl")
 end
