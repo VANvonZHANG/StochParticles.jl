@@ -6,4 +6,5 @@ using Test
     include("test_particle_system.jl")
     include("test_process_trait.jl")
     include("test_condensation.jl")
+    include("test_coagulation.jl")
 end
