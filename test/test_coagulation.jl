@@ -35,3 +35,49 @@ using StaticArrays
         end
     end
 end
+
+# Minimal mock integrator for testing jump affect! functions
+struct MockIntegrator
+    u::Vector{Float64}
+    p::ParticleSystem
+end
+
+@testset "CoagulationProcess" begin
+    @testset "provides no drift" begin
+        kernel = BrownianKernel(293.15, 1.81e-5, SVector(1000.0))
+        proc = CoagulationProcess(kernel, GlobalMajorant())
+        @test provides_drift(proc) == false
+    end
+
+    @testset "coagulation jump preserves mass and n_sim" begin
+        kernel = BrownianKernel(293.15, 1.81e-5, SVector(1000.0))
+        sampling = GlobalMajorant()
+        proc = CoagulationProcess(kernel, sampling)
+
+        gas_fn = t -> SVector(0.0)
+        sys = ParticleSystem(Val(1), 20, 1.0, gas_fn)
+        particles = fill(SVector(1.0e-18), 20)
+        u0 = make_u0(particles)
+
+        mass_before = total_mass(u0, Val(1), sys.n_active)
+        vol_before = sys.volume
+
+        # Manually trigger the affect! function 10 times via a mock integrator
+        jump = make_coagulation_jump(kernel, sampling)
+        for _ in 1:10
+            rate = jump.rate(u0, sys, 0.0)
+            if rate > 0
+                mock_int = MockIntegrator(u0, sys)
+                jump.affect!(mock_int)
+                u0 = mock_int.u
+            end
+        end
+
+        @test sys.n_active == sys.n_sim
+        mass_after = total_mass(u0, Val(1), sys.n_active)
+        # Mass concentration = mass/volume should be conserved
+        conc_before = mass_before / vol_before
+        conc_after = mass_after / sys.volume
+        @test conc_after ≈ conc_before rtol=1e-10
+    end
+end

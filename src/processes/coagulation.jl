@@ -97,3 +97,59 @@ function majorant_rate(sampling, kernel, u, sys)
     N = sys.n_active
     return K_max / sys.volume * N * (N - 1) / 2
 end
+
+# ---- Coagulation Process ----
+
+struct CoagulationProcess{A, K<:CoagulationKernel, S<:CoagulationSampling} <: PhysicsProcess
+    kernel::K
+    sampling::S
+end
+
+provides_drift(::CoagulationProcess) = false
+
+# Convenience constructor
+CoagulationProcess(kernel::K, sampling::S) where {A, K<:BrownianKernel{A}, S<:CoagulationSampling} =
+    CoagulationProcess{A, K, S}(kernel, sampling)
+
+"""
+    make_coagulation_jump(kernel, sampling) -> ConstantRateJump
+
+Create a SciML ConstantRateJump for the coagulation process using
+the Majorant/Null-event method.
+"""
+function make_coagulation_jump(kernel, sampling)
+    rate = (u, p, t) -> begin
+        if p.n_active < 2
+            return 0.0
+        end
+        return majorant_rate(sampling, kernel, u, p)
+    end
+
+    affect! = (integrator) -> begin
+        u = integrator.u
+        p = integrator.p
+        N = p.n_active
+        if N < 2
+            return nothing
+        end
+
+        # Select random pair
+        i = rand(1:N)
+        j = rand(1:(N-1))
+        j = j >= i ? j + 1 : j
+
+        A_val = species_val(p)
+        μ_i = get_particle(u, i, A_val)
+        μ_j = get_particle(u, j, A_val)
+
+        # Accept/reject
+        K_actual = kernel(μ_i, μ_j)
+        K_max = compute_majorant(sampling, kernel, u, p)
+        if K_max > 0 && rand() < K_actual / K_max
+            cnmc_coagulate!(u, p, A_val, i, j)
+        end
+        nothing
+    end
+
+    return ConstantRateJump(rate, affect!)
+end
