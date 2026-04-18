@@ -1,0 +1,15 @@
+name = "StochParticles"
+uuid = "48f1789a-3b45-4590-abaa-0579032d20b3"
+version = "0.1.0"
+
+[deps]
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+JumpProcesses = "ccbc3e58-028d-4f4c-8cd5-9ae44345cda5"
+OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+
+[compat]
+julia = "1.10"
+StaticArrays = "1.9"
+JumpProcesses = "9"
+OrdinaryDiffEq = "6.78"
