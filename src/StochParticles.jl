@@ -28,6 +28,7 @@ include("diagnostics/moments.jl")
 # Public API
 export ParticleSystem, ParticleProblem, species_val
 export get_particle, set_particle!, make_u0, total_mass
+export PhysicsProcess, provides_drift
 export BrownianKernel, GlobalMajorant
 export CoagulationProcess, CondensationProcess, EmissionProcess, DilutionProcess
 
