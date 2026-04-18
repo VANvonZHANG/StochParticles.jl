@@ -31,5 +31,6 @@ export get_particle, set_particle!, make_u0, total_mass
 export PhysicsProcess, provides_drift
 export BrownianKernel, GlobalMajorant
 export CoagulationProcess, CondensationProcess, EmissionProcess, DilutionProcess
+export apply_drift, make_ode_func
 
 end
