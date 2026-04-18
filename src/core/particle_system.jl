@@ -6,12 +6,19 @@
 Mutable parameter struct (the `p` in SciML's `f(u, p, t)`).
 Holds simulation metadata that changes during PDMP evolution.
 
+# Unit Convention
+
+All masses are in **kg**, volumes in **m³**, temperatures in **K**,
+viscosities in **Pa·s**, and densities in **kg/m³**. Particle
+compositions `μ` in the ODE state vector `u` use these SI units.
+
 Fields:
 - `n_active::Int` — current number of active particles
 - `volume::Float64` — computational volume V_comp(t)
 - `gas_phase::F` — external function g(t) returning gas-phase concentrations
 - `n_sim::Int` — target particle count for CNMC
 - `_mass_total_cache::Float64` — internal: cached total mass for CNMC volume rescale
+- `_cached_majorant::Float64` — internal: cached K_max for coagulation accept/reject
 """
 mutable struct ParticleSystem{A, F}
     n_active::Int
@@ -19,6 +26,7 @@ mutable struct ParticleSystem{A, F}
     gas_phase::F
     n_sim::Int
     _mass_total_cache::Float64
+    _cached_majorant::Float64
 end
 
 """
@@ -27,7 +35,7 @@ end
 Construct a ParticleSystem with `n_sim` active particles.
 """
 ParticleSystem(::Val{A}, n_sim::Int, volume::Float64, gas_phase_fn::F) where {A, F} =
-    ParticleSystem{A, F}(n_sim, volume, gas_phase_fn, n_sim, 0.0)
+    ParticleSystem{A, F}(n_sim, volume, gas_phase_fn, n_sim, 0.0, 0.0)
 
 """
     species_val(sys::ParticleSystem{A}) -> Val{A}

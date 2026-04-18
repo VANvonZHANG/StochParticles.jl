@@ -3,12 +3,6 @@ using StochParticles
 using Test
 using StaticArrays
 
-struct MockIntegrator
-    u::Vector{Float64}
-    p::ParticleSystem
-    t::Float64
-end
-
 @testset "DilutionProcess" begin
     @testset "dilution death jump removes a particle" begin
         dilution_rate = (t) -> 0.5

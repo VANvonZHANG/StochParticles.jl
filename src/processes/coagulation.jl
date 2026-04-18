@@ -100,7 +100,7 @@ end
 
 # ---- Coagulation Process ----
 
-struct CoagulationProcess{A, K<:CoagulationKernel, S<:CoagulationSampling} <: PhysicsProcess
+struct CoagulationProcess{K<:CoagulationKernel, S<:CoagulationSampling} <: PhysicsProcess
     kernel::K
     sampling::S
 end
@@ -108,8 +108,8 @@ end
 provides_drift(::CoagulationProcess) = false
 
 # Convenience constructor
-CoagulationProcess(kernel::K, sampling::S) where {A, K<:BrownianKernel{A}, S<:CoagulationSampling} =
-    CoagulationProcess{A, K, S}(kernel, sampling)
+CoagulationProcess(kernel::K, sampling::S) where {K<:CoagulationKernel, S<:CoagulationSampling} =
+    CoagulationProcess{K, S}(kernel, sampling)
 
 """
     make_coagulation_jump(kernel, sampling) -> ConstantRateJump
@@ -122,7 +122,9 @@ function make_coagulation_jump(kernel, sampling)
         if p.n_active < 2
             return 0.0
         end
-        return majorant_rate(sampling, kernel, u, p)
+        K_max = compute_majorant(sampling, kernel, u, p)
+        p._cached_majorant = K_max
+        return K_max / p.volume * p.n_active * (p.n_active - 1) / 2
     end
 
     affect! = (integrator) -> begin
@@ -142,9 +144,9 @@ function make_coagulation_jump(kernel, sampling)
         μ_i = get_particle(u, i, A_val)
         μ_j = get_particle(u, j, A_val)
 
-        # Accept/reject
+        # Accept/reject using cached K_max from rate evaluation
         K_actual = kernel(μ_i, μ_j)
-        K_max = compute_majorant(sampling, kernel, u, p)
+        K_max = p._cached_majorant
         if K_max > 0 && rand() < K_actual / K_max
             cnmc_coagulate!(u, p, A_val, i, j)
         end

@@ -3,12 +3,6 @@ using StochParticles
 using Test
 using StaticArrays
 
-struct MockIntegrator
-    u::Vector{Float64}
-    p::ParticleSystem
-    t::Float64
-end
-
 @testset "EmissionProcess" begin
     @testset "emission jump adds a particle" begin
         rate_density = (μ, t) -> 1.0

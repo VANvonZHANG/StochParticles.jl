@@ -2,6 +2,13 @@
 using StochParticles
 using Test
 
+# Shared test helper: minimal mock integrator for testing jump affect! functions
+struct MockIntegrator
+    u::Vector{Float64}
+    p::ParticleSystem
+    t::Float64
+end
+
 @testset "StochParticles.jl" begin
     include("test_particle_system.jl")
     include("test_process_trait.jl")

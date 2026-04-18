@@ -36,13 +36,6 @@ using StaticArrays
     end
 end
 
-# Minimal mock integrator for testing jump affect! functions
-struct MockIntegrator
-    u::Vector{Float64}
-    p::ParticleSystem
-    t::Float64
-end
-
 @testset "CoagulationProcess" begin
     @testset "provides no drift" begin
         kernel = BrownianKernel(293.15, 1.81e-5, SVector(1000.0))

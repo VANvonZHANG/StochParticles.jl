@@ -32,7 +32,7 @@ function make_ode_func(processes::Tuple)
             set_particle!(du, i, A, dμ)
         end
         # Zero out inactive particle slots
-        if n < p.n_sim
+        if n < p.n_sim && n > 0
             zero_μ = zero(get_particle(u, 1, A))
             for i in (n + 1):p.n_sim
                 set_particle!(du, i, A, zero_μ)
