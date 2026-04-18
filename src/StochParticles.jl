@@ -33,5 +33,6 @@ export BrownianKernel, GlobalMajorant, CompositeKernel
 export CoagulationProcess, CondensationProcess, EmissionProcess, DilutionProcess
 export apply_drift, make_ode_func
 export compute_majorant, majorant_rate
+export cnmc_merge!, cnmc_clone!, cnmc_volume_rescale!, cnmc_coagulate!
 
 end
