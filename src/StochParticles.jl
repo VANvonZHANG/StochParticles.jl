@@ -27,8 +27,15 @@ include("diagnostics/moments.jl")
 
 # Public API
 export ParticleSystem, ParticleProblem, species_val
-export get_particle, set_particle!
-export BrownianKernel, GlobalMajorant
+export get_particle, set_particle!, make_u0, total_mass
+export PhysicsProcess, provides_drift
+export BrownianKernel, GlobalMajorant, CompositeKernel
 export CoagulationProcess, CondensationProcess, EmissionProcess, DilutionProcess
+export apply_drift, make_ode_func
+export compute_majorant, majorant_rate
+export cnmc_merge!, cnmc_clone!, cnmc_volume_rescale!, cnmc_coagulate!
+export make_coagulation_jump, make_emission_jump
+export dilution_death_affect!, dilution_birth_affect!, make_dilution_jumps
+export number_concentration, mass_concentration, species_mass_concentration
 
 end
