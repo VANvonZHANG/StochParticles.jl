@@ -3,5 +3,5 @@ using StochParticles
 using Test
 
 @testset "StochParticles.jl" begin
-    # Tests added in subsequent tasks
+    include("test_particle_system.jl")
 end
