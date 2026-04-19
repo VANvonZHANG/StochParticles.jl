@@ -2,6 +2,14 @@
 
 # ---- Kernel trait ----
 
+"""
+    abstract type CoagulationKernel
+
+Supertype for coagulation rate kernels. A kernel computes the coagulation rate
+between two particles: `K(μ_i, μ_j) -> Float64` [m³/s].
+
+Subtypes must implement the callable interface `(kernel)(μ_i, μ_j)`.
+"""
 abstract type CoagulationKernel end
 
 """
@@ -59,6 +67,14 @@ end
 
 # ---- Sampling strategy trait ----
 
+"""
+    abstract type CoagulationSampling
+
+Supertype for coagulation pair-selection sampling strategies.
+Different strategies trade off between per-event cost and acceptance rate.
+
+Subtypes must implement `compute_majorant(sampling, kernel, u, sys)`.
+"""
 abstract type CoagulationSampling end
 
 """
@@ -100,16 +116,21 @@ end
 
 # ---- Coagulation Process ----
 
+"""
+    CoagulationProcess{K, S} <: PhysicsProcess
+
+Stochastic coagulation process that merges particle pairs via Majorant/Null-event sampling.
+
+# Fields
+- `kernel::K` — coagulation rate kernel (e.g. `BrownianKernel`)
+- `sampling::S` — pair-selection strategy (e.g. `GlobalMajorant`)
+"""
 struct CoagulationProcess{K<:CoagulationKernel, S<:CoagulationSampling} <: PhysicsProcess
     kernel::K
     sampling::S
 end
 
 provides_drift(::CoagulationProcess) = false
-
-# Convenience constructor
-CoagulationProcess(kernel::K, sampling::S) where {K<:CoagulationKernel, S<:CoagulationSampling} =
-    CoagulationProcess{K, S}(kernel, sampling)
 
 """
     make_coagulation_jump(kernel, sampling) -> ConstantRateJump

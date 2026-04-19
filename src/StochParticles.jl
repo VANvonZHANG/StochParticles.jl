@@ -29,6 +29,7 @@ include("diagnostics/moments.jl")
 export ParticleSystem, ParticleProblem, species_val
 export get_particle, set_particle!, make_u0, total_mass
 export PhysicsProcess, provides_drift
+export CoagulationKernel, CoagulationSampling
 export BrownianKernel, GlobalMajorant, CompositeKernel
 export CoagulationProcess, CondensationProcess, EmissionProcess, DilutionProcess
 export apply_drift, make_ode_func
