@@ -1,0 +1,5 @@
+[deps]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+StochParticles = "48f1789a-3b45-4590-abaa-0579032d20b3"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"

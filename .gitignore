@@ -2,6 +2,8 @@
 *.jl.cov
 *.jl.*.cov
 *.jl.mem
+Manifest.toml
+**/Manifest.toml
 deps/deps.jl
 /build/
 /dev/
@@ -19,3 +21,6 @@ docs/superpowers/
 # OS
 .DS_Store
 Thumbs.db
+
+# Claude Code worktrees
+.claude/worktrees/
