@@ -1,16 +1,6 @@
 # src/processes/coagulation.jl
 
-# ---- Kernel trait ----
-
-"""
-    abstract type CoagulationKernel
-
-Supertype for coagulation rate kernels. A kernel computes the coagulation rate
-between two particles: `K(μ_i, μ_j) -> Float64` [m³/s].
-
-Subtypes must implement the callable interface `(kernel)(μ_i, μ_j)`.
-"""
-abstract type CoagulationKernel end
+# ---- Kernel implementations ----
 
 """
     BrownianKernel{A} <: CoagulationKernel
@@ -65,17 +55,7 @@ function (kernel::CompositeKernel{A})(μ_i::SVector{A, Float64}, μ_j::SVector{A
     return kernel.k1(μ_i, μ_j) + kernel.k2(μ_i, μ_j)
 end
 
-# ---- Sampling strategy trait ----
-
-"""
-    abstract type CoagulationSampling
-
-Supertype for coagulation pair-selection sampling strategies.
-Different strategies trade off between per-event cost and acceptance rate.
-
-Subtypes must implement `compute_majorant(sampling, kernel, u, sys)`.
-"""
-abstract type CoagulationSampling end
+# ---- Sampling strategy implementations ----
 
 """
     GlobalMajorant <: CoagulationSampling

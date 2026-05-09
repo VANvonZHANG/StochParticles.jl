@@ -15,3 +15,25 @@ abstract type PhysicsProcess end
 Does this process contribute an ODE drift term? Default: false.
 """
 provides_drift(::PhysicsProcess) = false
+
+# ---- Coagulation traits ----
+
+"""
+    abstract type CoagulationKernel
+
+Supertype for coagulation rate kernels. A kernel computes the coagulation rate
+between two particles: `K(μ_i, μ_j) -> Float64` [m³/s].
+
+Subtypes must implement the callable interface `(kernel)(μ_i, μ_j)`.
+"""
+abstract type CoagulationKernel end
+
+"""
+    abstract type CoagulationSampling
+
+Supertype for coagulation pair-selection sampling strategies.
+Different strategies trade off between per-event cost and acceptance rate.
+
+Subtypes must implement `compute_majorant(sampling, kernel, u, sys)`.
+"""
+abstract type CoagulationSampling end
