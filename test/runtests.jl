@@ -1,12 +1,17 @@
 # test/runtests.jl
 using StochParticles
 using Test
+using Aqua
 
 # Shared test helper: minimal mock integrator for testing jump affect! functions
 struct MockIntegrator
     u::Vector{Float64}
     p::ParticleSystem
     t::Float64
+end
+
+@testset "Code quality (Aqua.jl)" begin
+    Aqua.test_all(StochParticles)
 end
 
 @testset "StochParticles.jl" begin

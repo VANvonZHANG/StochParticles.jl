@@ -1,0 +1,18 @@
+name: JuliaFormatter
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+      - run: |
+          julia -e 'using Pkg; Pkg.add("JuliaFormatter")'
+          julia -e 'using JuliaFormatter; format(".", verbose=true)'
+      - run: |
+          git diff --exit-code || (echo "::error::Code is not formatted. Run 'julia -e '"'"'using JuliaFormatter; format(\".\")'"'"'"; exit 1)
