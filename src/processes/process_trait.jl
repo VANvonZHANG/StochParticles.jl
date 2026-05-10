@@ -19,14 +19,16 @@ provides_drift(::PhysicsProcess) = false
 # ---- Coagulation traits ----
 
 """
-    abstract type CoagulationKernel
+    abstract type CoagulationKernel{A}
 
 Supertype for coagulation rate kernels. A kernel computes the coagulation rate
 between two particles: `K(μ_i, μ_j) -> Float64` [m³/s].
 
+`A` is the number of species (dimension of the mass vector).
+
 Subtypes must implement the callable interface `(kernel)(μ_i, μ_j)`.
 """
-abstract type CoagulationKernel end
+abstract type CoagulationKernel{A} end
 
 """
     abstract type CoagulationSampling

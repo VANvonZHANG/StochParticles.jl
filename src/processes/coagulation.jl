@@ -14,7 +14,7 @@ Brownian diffusion coagulation kernel:
 - `densities::SVector{A, Float64}` — per-species densities [kg/m³]
 - `kb::Float64` — Boltzmann constant
 """
-struct BrownianKernel{A} <: CoagulationKernel
+struct BrownianKernel{A} <: CoagulationKernel{A}
     T::Float64
     mu_f::Float64
     densities::SVector{A, Float64}
@@ -29,7 +29,7 @@ BrownianKernel(T::Float64, mu_f::Float64, densities::SVector{A, Float64}) where 
 
 Sum of two kernels: K(μ_i, μ_j) = K1(μ_i, μ_j) + K2(μ_i, μ_j).
 """
-struct CompositeKernel{A, K1<:CoagulationKernel, K2<:CoagulationKernel} <: CoagulationKernel
+struct CompositeKernel{A, K1<:CoagulationKernel{A}, K2<:CoagulationKernel{A}} <: CoagulationKernel{A}
     k1::K1
     k2::K2
 end
@@ -84,13 +84,16 @@ K_grav = π (a_i + a_j)² |v_i - v_j|
 - `g::Float64` — gravity [m/s²]
 - `densities::SVector{A, Float64}` — per-species densities [kg/m³]
 """
-struct GravitationalKernel{A} <: CoagulationKernel
+struct GravitationalKernel{A} <: CoagulationKernel{A}
     mu_f::Float64
     rho_f::Float64
     rho_p::Float64
     g::Float64
     densities::SVector{A, Float64}
 end
+
+CompositeKernel(k1::GravitationalKernel{A}, k2::GravitationalKernel{A}) where {A} =
+    CompositeKernel{A, GravitationalKernel{A}, GravitationalKernel{A}}(k1, k2)
 
 function (kernel::GravitationalKernel{A})(μ_i::SVector{A, Float64}, μ_j::SVector{A, Float64}) where {A}
     a_i = particle_diameter(μ_i, kernel.densities) / 2.0
@@ -171,26 +174,6 @@ Longitudinal velocity correlation f₂(R) (Ayala 2008 Part 2, Eq. 63).
 function longitudinal_correlation_f2(R::Float64, Le::Float64, a_0::Float64)
     R_over_L = R / Le
     return 1.0 - a_0 * R_over_L^2 + (a_0 / 2.0) * R_over_L^4
-end
-
-"""
-    Phi_func(alpha, phi, vp1, vp2, tau_p1, tau_p2) -> Float64
-
-Helper Φ for variance computation (Ayala 2008 Part 2, Eq. 75-76).
-"""
-function Phi_func(alpha::Float64, phi::Float64, vp1::Float64, vp2::Float64, tau_p1::Float64, tau_p2::Float64)
-    term1 = (vp1 * tau_p1 + vp2 * tau_p2) * alpha / (alpha^2 + phi^2)
-    term2 = (vp1 * tau_p1 - vp2 * tau_p2) * phi / (alpha^2 + phi^2)
-    return term1 + term2
-end
-
-"""
-    Psi_func(alpha, phi, vpk, tau_pk) -> Float64
-
-Helper Ψ for variance computation (Ayala 2008 Part 2, Eq. 78).
-"""
-function Psi_func(alpha::Float64, phi::Float64, vpk::Float64, tau_pk::Float64)
-    return vpk * tau_pk * phi / (alpha^2 + phi^2)
 end
 
 """
@@ -295,7 +278,7 @@ Turbulence-enhanced geometric collision kernel following Ayala et al. (2008).
 - `g::Float64` — gravity [m/s²]
 - `densities::SVector{A, Float64}` — per-species densities [kg/m³]
 """
-struct AyalaTurbulentKernel{A} <: CoagulationKernel
+struct AyalaTurbulentKernel{A} <: CoagulationKernel{A}
     epsilon::Float64
     R_lambda::Float64
     nu::Float64
@@ -314,6 +297,9 @@ end
 
 AyalaTurbulentKernel(epsilon, R_lambda, nu, rho_f, rho_p, g, densities::SVector{A, Float64}) where {A} =
     AyalaTurbulentKernel{A}(epsilon, R_lambda, nu, rho_f, rho_p, g, densities)
+
+CompositeKernel(k1::AyalaTurbulentKernel{A}, k2::AyalaTurbulentKernel{A}) where {A} =
+    CompositeKernel{A, AyalaTurbulentKernel{A}, AyalaTurbulentKernel{A}}(k1, k2)
 
 function (kernel::AyalaTurbulentKernel{A})(μ_i::SVector{A, Float64}, μ_j::SVector{A, Float64}) where {A}
     # Error handling
@@ -377,6 +363,63 @@ function (kernel::AyalaTurbulentKernel{A})(μ_i::SVector{A, Float64}, μ_j::SVec
     return 2.0 * π * R^2 * wr * g12
 end
 
+# ---- Atmospheric parameters and kernel factory ----
+
+"""
+    AtmosphericParameters
+
+Container for consistent fluid and environmental parameters used
+across all coagulation kernels.
+
+# Fields
+- `T::Float64` — temperature [K]
+- `p::Float64` — pressure [Pa]
+- `rho_f::Float64` — air density [kg/m³]
+- `mu_f::Float64` — dynamic viscosity [Pa·s]
+- `nu::Float64` — kinematic viscosity [m²/s]
+- `rho_p::Float64` — particle density [kg/m³]
+- `g::Float64` — gravity [m/s²]
+"""
+struct AtmosphericParameters
+    T::Float64
+    p::Float64
+    rho_f::Float64
+    mu_f::Float64
+    nu::Float64
+    rho_p::Float64
+    g::Float64
+end
+
+"""
+    AtmosphericParameters(T, p; rho_f=1.225, mu_f=1.81e-5, nu=1.48e-5, rho_p=1000.0, g=9.81)
+
+Convenience constructor with standard atmospheric defaults.
+"""
+function AtmosphericParameters(T::Float64, p::Float64;
+                                rho_f::Float64=1.225,
+                                mu_f::Float64=1.81e-5,
+                                nu::Float64=1.48e-5,
+                                rho_p::Float64=1000.0,
+                                g::Float64=9.81)
+    return AtmosphericParameters(T, p, rho_f, mu_f, nu, rho_p, g)
+end
+
+"""
+    make_kernel(params, epsilon, R_lambda, densities) -> CompositeKernel
+
+Create a composite kernel combining Brownian, gravitational, and turbulent
+coagulation with consistent physical parameters.
+
+Returns: `CompositeKernel(K_brown, CompositeKernel(K_grav, K_turb))`
+"""
+function make_kernel(params::AtmosphericParameters, epsilon::Float64, R_lambda::Float64,
+                      densities::SVector{A, Float64}) where {A}
+    K_brown = BrownianKernel(params.T, params.mu_f, densities)
+    K_grav = GravitationalKernel(params.mu_f, params.rho_f, params.rho_p, params.g, densities)
+    K_turb = AyalaTurbulentKernel(epsilon, R_lambda, params.nu, params.rho_f, params.rho_p, params.g, densities)
+    return CompositeKernel(K_brown, CompositeKernel(K_grav, K_turb))
+end
+
 # ---- Sampling strategy implementations ----
 
 """
@@ -427,7 +470,7 @@ Stochastic coagulation process that merges particle pairs via Majorant/Null-even
 - `kernel::K` — coagulation rate kernel (e.g. `BrownianKernel`)
 - `sampling::S` — pair-selection strategy (e.g. `GlobalMajorant`)
 """
-struct CoagulationProcess{K<:CoagulationKernel, S<:CoagulationSampling} <: PhysicsProcess
+struct CoagulationProcess{K<:CoagulationKernel{<:Any}, S<:CoagulationSampling} <: PhysicsProcess
     kernel::K
     sampling::S
 end

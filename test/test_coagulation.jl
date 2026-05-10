@@ -93,6 +93,46 @@ using StaticArrays
         K_small_val = K_turb_small(μ_10um, μ_20um)
         @test K_small_val > 0.0
     end
+
+    @testset "AtmosphericParameters + make_kernel" begin
+        params = AtmosphericParameters(293.15, 1.0e5)
+        densities = SVector(1000.0)
+        epsilon = 0.01
+        R_lambda = 50.0
+
+        K_total = make_kernel(params, epsilon, R_lambda, densities)
+        @test K_total isa CoagulationKernel
+
+        μ_small = SVector(1.0e-18)  # aerosol scale
+        μ_large = SVector(1.0e-12)  # cloud droplet scale
+
+        # Total kernel should be positive for all size pairs
+        @test K_total(μ_small, μ_small) > 0.0
+        @test K_total(μ_large, μ_large) > 0.0
+        @test K_total(μ_small, μ_large) > 0.0
+
+        # Type stability
+        @test @inferred(K_total(μ_small, μ_large)) > 0.0
+    end
+
+    @testset "Three-kernel CompositeKernel" begin
+        params = AtmosphericParameters(293.15, 1.0e5)
+        densities = SVector(1000.0)
+
+        K_brown = BrownianKernel(params.T, params.mu_f, densities)
+        K_grav = GravitationalKernel(params.mu_f, params.rho_f, params.rho_p, params.g, densities)
+        K_turb = AyalaTurbulentKernel(0.01, 50.0, params.nu, params.rho_f, params.rho_p, params.g, densities)
+
+        K_combined = CompositeKernel(K_brown, CompositeKernel(K_grav, K_turb))
+
+        μ_10um = SVector(5.0e-16)
+        μ_20um = SVector(4.0e-15)
+
+        K_total = K_combined(μ_10um, μ_20um)
+        K_sum = K_brown(μ_10um, μ_20um) + K_grav(μ_10um, μ_20um) + K_turb(μ_10um, μ_20um)
+
+        @test K_total ≈ K_sum
+    end
 end
 
 @testset "CoagulationProcess" begin
