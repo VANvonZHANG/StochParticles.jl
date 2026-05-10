@@ -303,7 +303,17 @@ struct AyalaTurbulentKernel{A} <: CoagulationKernel
     rho_p::Float64
     g::Float64
     densities::SVector{A, Float64}
+
+    function AyalaTurbulentKernel{A}(epsilon, R_lambda, nu, rho_f, rho_p, g, densities::SVector{A, Float64}) where {A}
+        if epsilon <= 0.0
+            throw(DomainError(epsilon, "epsilon must be positive"))
+        end
+        new{A}(epsilon, R_lambda, nu, rho_f, rho_p, g, densities)
+    end
 end
+
+AyalaTurbulentKernel(epsilon, R_lambda, nu, rho_f, rho_p, g, densities::SVector{A, Float64}) where {A} =
+    AyalaTurbulentKernel{A}(epsilon, R_lambda, nu, rho_f, rho_p, g, densities)
 
 function (kernel::AyalaTurbulentKernel{A})(μ_i::SVector{A, Float64}, μ_j::SVector{A, Float64}) where {A}
     # Error handling

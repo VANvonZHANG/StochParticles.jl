@@ -58,6 +58,41 @@ using StaticArrays
         # Type stability
         @test @inferred(kernel(μ_small, μ_large)) > 0.0
     end
+
+    @testset "AyalaTurbulentKernel" begin
+        kernel = AyalaTurbulentKernel(0.01, 50.0, 1.48e-5, 1.225, 1000.0, 9.81, SVector(1000.0))
+
+        # epsilon <= 0 throws
+        @test_throws DomainError AyalaTurbulentKernel(-0.01, 50.0, 1.48e-5, 1.225, 1000.0, 9.81, SVector(1000.0))
+        @test_throws DomainError AyalaTurbulentKernel(0.0, 50.0, 1.48e-5, 1.225, 1000.0, 9.81, SVector(1000.0))
+
+        # Zero-size particles -> K = 0
+        μ_zero = SVector(0.0)
+        μ_nonzero = SVector(1.0e-12)
+        @test kernel(μ_zero, μ_nonzero) == 0.0
+        @test kernel(μ_nonzero, μ_zero) == 0.0
+
+        # Monodisperse: same-size droplets have K > 0 (turbulence causes same-size collisions)
+        μ_20um = SVector(4.0e-15)   # ~20 μm
+        K_mono = kernel(μ_20um, μ_20um)
+        @test K_mono > 0.0
+
+        # Bidisperse: K > 0
+        μ_10um = SVector(5.0e-16)   # ~10 μm
+        K_bi = kernel(μ_10um, μ_20um)
+        @test K_bi > 0.0
+
+        # Symmetry
+        @test K_bi ≈ kernel(μ_20um, μ_10um)
+
+        # Type stability
+        @test @inferred(kernel(μ_10um, μ_20um)) > 0.0
+
+        # Stagnant limit: small epsilon should produce positive K
+        K_turb_small = AyalaTurbulentKernel(1e-6, 50.0, 1.48e-5, 1.225, 1000.0, 9.81, SVector(1000.0))
+        K_small_val = K_turb_small(μ_10um, μ_20um)
+        @test K_small_val > 0.0
+    end
 end
 
 @testset "CoagulationProcess" begin
