@@ -9,12 +9,32 @@ export lognormal_masses, diameters_from_masses
 export bin_size_distribution, extract_diagnostics
 export standard_aerosol_atmosphere, standard_cloud_atmosphere
 
-function lognormal_masses(N, d_g, sigma_g, rho)
-    error("not implemented")
+"""
+    lognormal_masses(N, d_g, sigma_g, rho) -> Vector{SVector{1,Float64}}
+
+Generate `N` particle masses drawn from a log-normal diameter distribution.
+
+- `d_g`: geometric mean diameter [m]
+- `sigma_g`: geometric standard deviation
+- `rho`: particle density [kg/m³]
+
+Returns a vector of single-species mass vectors in kg.
+"""
+function lognormal_masses(N::Int, d_g::Float64, sigma_g::Float64, rho::Float64)
+    ln_dg = log(d_g)
+    ln_sigma = log(sigma_g)
+    diameters = exp.(ln_dg .+ ln_sigma .* randn(N))
+    masses = @. (π / 6.0) * diameters^3 * rho
+    return [SVector{1,Float64}(m) for m in masses]
 end
 
-function diameters_from_masses(masses, rho)
-    error("not implemented")
+"""
+    diameters_from_masses(masses, rho) -> Vector{Float64}
+
+Convert particle mass vectors back to diameters [m].
+"""
+function diameters_from_masses(masses::Vector{SVector{1,Float64}}, rho::Float64)
+    return [(6.0 * m[1] / (π * rho))^(1.0 / 3.0) for m in masses]
 end
 
 function bin_size_distribution(diams, bin_edges)
