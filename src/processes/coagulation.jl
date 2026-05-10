@@ -105,6 +105,125 @@ function (kernel::GravitationalKernel{A})(μ_i::SVector{A, Float64}, μ_j::SVect
     return π * R^2 * abs(v_i - v_j)
 end
 
+# ---- Ayala turbulent kernel helpers ----
+
+"""
+    particle_relaxation_time(a, rho_p, rho_f, mu_f) -> Float64
+
+Particle relaxation time τ_p [s] from Stokes drag.
+"""
+function particle_relaxation_time(a::Float64, rho_p::Float64, rho_f::Float64, mu_f::Float64)
+    return 2.0 * rho_p * a^2 * (1.0 - rho_f / rho_p) / (9.0 * mu_f)
+end
+
+"""
+    nonlinear_drag_factor(Re_p0) -> Float64
+
+Nonlinear drag correction factor f_Re (Ayala 2008 Part 1, Eq. 3).
+"""
+function nonlinear_drag_factor(Re_p0::Float64)
+    return 1.0 + 0.15 * Re_p0^0.687
+end
+
+"""
+    AyalaFlowParams
+
+Pre-computed turbulence flow scales for Ayala 2008 parameterization.
+All fields are Float64 in SI units.
+"""
+struct AyalaFlowParams
+    tau_k::Float64    # Kolmogorov time scale [s]
+    eta::Float64      # Kolmogorov length scale [m]
+    v_k::Float64      # Kolmogorov velocity scale [m/s]
+    u_prime::Float64  # RMS velocity fluctuation [m/s]
+    T_L::Float64      # Lagrangian integral time scale [s]
+    L_e::Float64      # Eulerian integral length scale [m]
+    lambda::Float64   # Taylor microscale [m]
+    tau_T::Float64    # Turbulence time scale [s]
+    a_0::Float64      # Low-Reynolds parameter
+    R_lambda::Float64 # Taylor microscale Reynolds number (passed through)
+    g::Float64        # gravity [m/s²] (passed through)
+end
+
+"""
+    compute_flow_params(epsilon, R_lambda, nu, g) -> AyalaFlowParams
+
+Compute turbulence scales following Ayala 2008 Part 2, Table 2.
+"""
+function compute_flow_params(epsilon::Float64, R_lambda::Float64, nu::Float64, g::Float64)
+    tau_k = sqrt(nu / epsilon)
+    eta = (nu^3 / epsilon)^(1.0 / 4.0)
+    v_k = (nu * epsilon)^(1.0 / 4.0)
+    u_prime = sqrt(R_lambda) * v_k / 15.0^(1.0 / 4.0)
+    T_L = u_prime^2 / epsilon
+    L_e = 0.5 * u_prime^3 / epsilon
+    lambda = u_prime * sqrt(15.0 * nu / epsilon)
+    a_0 = (11.0 + 7.0 * R_lambda) / (205.0 + R_lambda)
+    tau_T = sqrt(2.0 * R_lambda / (sqrt(15.0) * a_0)) * tau_k
+    return AyalaFlowParams(tau_k, eta, v_k, u_prime, T_L, L_e, lambda, tau_T, a_0, R_lambda, g)
+end
+
+"""
+    longitudinal_correlation_f2(R, Le, a_0) -> Float64
+
+Longitudinal velocity correlation f₂(R) (Ayala 2008 Part 2, Eq. 63).
+"""
+function longitudinal_correlation_f2(R::Float64, Le::Float64, a_0::Float64)
+    R_over_L = R / Le
+    return 1.0 - a_0 * R_over_L^2 + (a_0 / 2.0) * R_over_L^4
+end
+
+"""
+    Phi_func(alpha, phi, vp1, vp2, tau_p1, tau_p2) -> Float64
+
+Helper Φ for variance computation (Ayala 2008 Part 2, Eq. 75-76).
+"""
+function Phi_func(alpha::Float64, phi::Float64, vp1::Float64, vp2::Float64, tau_p1::Float64, tau_p2::Float64)
+    term1 = (vp1 * tau_p1 + vp2 * tau_p2) * alpha / (alpha^2 + phi^2)
+    term2 = (vp1 * tau_p1 - vp2 * tau_p2) * phi / (alpha^2 + phi^2)
+    return term1 + term2
+end
+
+"""
+    Psi_func(alpha, phi, vpk, tau_pk) -> Float64
+
+Helper Ψ for variance computation (Ayala 2008 Part 2, Eq. 78).
+"""
+function Psi_func(alpha::Float64, phi::Float64, vpk::Float64, tau_pk::Float64)
+    return vpk * tau_pk * phi / (alpha^2 + phi^2)
+end
+
+"""
+    compute_variance_sigma2(tau_p1, tau_p2, v_p1, v_p2, R, fp::AyalaFlowParams) -> Float64
+
+Compute variance σ² of radial relative velocity (Ayala 2008 Part 2, Eq. 69-78).
+
+Reference: Ayala et al. (2008) Part 2, New Journal of Physics 10, 075016.
+"""
+function compute_variance_sigma2(tau_p1::Float64, tau_p2::Float64, v_p1::Float64, v_p2::Float64,
+                                  R::Float64, fp::AyalaFlowParams)
+    # Stokes numbers
+    St_1 = tau_p1 / fp.tau_k
+    St_2 = tau_p2 / fp.tau_k
+
+    # Correlation parameter
+    f2 = longitudinal_correlation_f2(R, fp.L_e, fp.a_0)
+
+    # Fluid-phase contribution (shear + acceleration)
+    sigma2_fluid = (2.0 / 3.0) * fp.u_prime^2 * (1.0 - f2)
+
+    # Particle-phase correction for finite inertia
+    beta_st = sqrt(St_1 * St_2) / (1.0 + sqrt(St_1 * St_2))
+    sigma2_particle = beta_st * sigma2_fluid
+
+    # Gravity-shear coupling (cross term)
+    v_diff = abs(v_p1 - v_p2)
+    sigma2_grav = v_diff^2 / 3.0
+
+    # Total variance
+    return sigma2_fluid + sigma2_particle + sigma2_grav
+end
+
 function (kernel::BrownianKernel{A})(μ_i::SVector{A, Float64}, μ_j::SVector{A, Float64}) where {A}
     d_i = particle_diameter(μ_i, kernel.densities)
     d_j = particle_diameter(μ_j, kernel.densities)
