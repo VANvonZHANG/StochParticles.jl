@@ -44,6 +44,67 @@ function particle_diameter(μ::SVector{A, Float64}, densities::SVector{A, Float6
     return (6.0 * V_p / π)^(1.0 / 3.0)
 end
 
+"""
+    terminal_velocity_stokes(a, rho_p, rho_f, mu_f, g) -> Float64
+
+Stokes terminal settling velocity for a spherical particle [m/s].
+Formula: v_g = 2 ρ_p g a² (1 - ρ_f/ρ_p) / (9 μ_f)
+"""
+function terminal_velocity_stokes(a::Float64, rho_p::Float64, rho_f::Float64, mu_f::Float64, g::Float64)
+    return 2.0 * rho_p * g * a^2 * (1.0 - rho_f / rho_p) / (9.0 * mu_f)
+end
+
+"""
+    terminal_velocity_nld(a, rho_p, rho_f, mu_f, g, nu) -> Float64
+
+Terminal velocity with Nonlinear Drag (NLD) correction (Ayala 2008 Part 1, Eq. 3-4).
+For a < 30 μm uses Stokes velocity; for a ≥ 30 μm applies NLD factor.
+"""
+function terminal_velocity_nld(a::Float64, rho_p::Float64, rho_f::Float64, mu_f::Float64, g::Float64, nu::Float64)
+    v_g = terminal_velocity_stokes(a, rho_p, rho_f, mu_f, g)
+    if a < 30.0e-6
+        return v_g
+    end
+    Re_p0 = 2.0 * a * abs(v_g) / nu
+    f_Re = 1.0 + 0.15 * Re_p0^0.687
+    return v_g / f_Re
+end
+
+"""
+    GravitationalKernel{A} <: CoagulationKernel
+
+Geometric collision kernel due to differential gravitational settling.
+
+K_grav = π (a_i + a_j)² |v_i - v_j|
+
+# Fields
+- `mu_f::Float64` — dynamic viscosity [Pa·s]
+- `rho_f::Float64` — air density [kg/m³]
+- `rho_p::Float64` — particle density [kg/m³]
+- `g::Float64` — gravity [m/s²]
+- `densities::SVector{A, Float64}` — per-species densities [kg/m³]
+"""
+struct GravitationalKernel{A} <: CoagulationKernel
+    mu_f::Float64
+    rho_f::Float64
+    rho_p::Float64
+    g::Float64
+    densities::SVector{A, Float64}
+end
+
+function (kernel::GravitationalKernel{A})(μ_i::SVector{A, Float64}, μ_j::SVector{A, Float64}) where {A}
+    a_i = particle_diameter(μ_i, kernel.densities) / 2.0
+    a_j = particle_diameter(μ_j, kernel.densities) / 2.0
+    if a_i <= 0.0 || a_j <= 0.0
+        return 0.0
+    end
+    nu = kernel.mu_f / kernel.rho_f
+    v_i = terminal_velocity_nld(a_i, kernel.rho_p, kernel.rho_f, kernel.mu_f, kernel.g, nu)
+    v_j = terminal_velocity_nld(a_j, kernel.rho_p, kernel.rho_f, kernel.mu_f, kernel.g, nu)
+    R = a_i + a_j
+    return π * R^2 * abs(v_i - v_j)
+end
+
 function (kernel::BrownianKernel{A})(μ_i::SVector{A, Float64}, μ_j::SVector{A, Float64}) where {A}
     d_i = particle_diameter(μ_i, kernel.densities)
     d_j = particle_diameter(μ_j, kernel.densities)
