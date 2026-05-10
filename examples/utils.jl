@@ -37,12 +37,45 @@ function diameters_from_masses(masses::Vector{SVector{1,Float64}}, rho::Float64)
     return [(6.0 * m[1] / (π * rho))^(1.0 / 3.0) for m in masses]
 end
 
-function bin_size_distribution(diams, bin_edges)
-    error("not implemented")
+"""
+    bin_size_distribution(diams, bin_edges) -> Vector{Int}
+
+Histogram particle diameters into bins defined by `bin_edges`.
+"""
+function bin_size_distribution(diams::Vector{Float64}, bin_edges::Vector{Float64})
+    counts = zeros(Int, length(bin_edges) - 1)
+    for d in diams
+        for i in 1:(length(bin_edges) - 1)
+            if bin_edges[i] <= d < bin_edges[i + 1]
+                counts[i] += 1
+                break
+            end
+        end
+    end
+    return counts
 end
 
-function extract_diagnostics(sol, sys, A)
-    error("not implemented")
+"""
+    extract_diagnostics(sol, sys, A) -> (t, N_conc, M_conc)
+
+Extract time-series diagnostics from a SciML solution.
+
+Returns:
+- `t`: time points
+- `N_conc`: number concentration [particles/m³] at each time
+- `M_conc`: mass concentration [kg/m³] at each time
+"""
+function extract_diagnostics(sol, sys::ParticleSystem{A}, ::Val{A}) where {A}
+    t = sol.t
+    n = length(t)
+    N_conc = Vector{Float64}(undef, n)
+    M_conc = Vector{Float64}(undef, n)
+    for i in 1:n
+        u = sol.u[i]
+        N_conc[i] = sys.n_sim / sys.volume
+        M_conc[i] = mass_concentration(u, Val(A), sys)
+    end
+    return t, N_conc, M_conc
 end
 
 """
