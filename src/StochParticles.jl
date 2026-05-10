@@ -5,6 +5,7 @@ using StaticArrays
 using JumpProcesses
 using OrdinaryDiffEq
 using Random
+using SpecialFunctions
 
 # ---- Trait layer (abstract types) ----
 include("processes/process_trait.jl")
