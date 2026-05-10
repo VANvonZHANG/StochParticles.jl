@@ -25,12 +25,44 @@ function extract_diagnostics(sol, sys, A)
     error("not implemented")
 end
 
+"""
+    standard_aerosol_atmosphere() -> AtmosphericParameters
+
+Standard atmospheric conditions for near-surface aerosol simulations.
+- T = 293.15 K
+- P = 101325 Pa
+- rho_p = 1800 kg/m³ (sulfate-like aerosol)
+"""
 function standard_aerosol_atmosphere()
-    error("not implemented")
+    return AtmosphericParameters(
+        293.15,      # T [K]
+        101325.0,    # P [Pa]
+        1.225,       # rho_f [kg/m³]
+        1.81e-5,     # mu_f [Pa·s]
+        1.48e-5,     # nu [m²/s]
+        1800.0,      # rho_p [kg/m³]
+        9.81         # g [m/s²]
+    )
 end
 
+"""
+    standard_cloud_atmosphere() -> AtmosphericParameters
+
+Standard atmospheric conditions for cumulus cloud simulations (~2 km altitude).
+- T = 288.15 K
+- P = 80000 Pa
+- rho_p = 1000 kg/m³ (liquid water)
+"""
 function standard_cloud_atmosphere()
-    error("not implemented")
+    return AtmosphericParameters(
+        288.15,      # T [K]
+        80000.0,     # P [Pa]
+        1.06,        # rho_f [kg/m³] (lower pressure)
+        1.75e-5,     # mu_f [Pa·s]
+        1.65e-5,     # nu [m²/s]
+        1000.0,      # rho_p [kg/m³]
+        9.81         # g [m/s²]
+    )
 end
 
 end
