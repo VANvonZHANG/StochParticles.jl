@@ -34,6 +34,30 @@ using StaticArrays
             @test K_max >= K_ij
         end
     end
+
+    @testset "GravitationalKernel" begin
+        kernel = GravitationalKernel(1.81e-5, 1.225, 1000.0, 9.81, SVector(1000.0))
+
+        # Stagnant air limit: g = 0 -> K = 0
+        kernel_zero_g = GravitationalKernel(1.81e-5, 1.225, 1000.0, 0.0, SVector(1000.0))
+        μ = SVector(1.0e-15)  # ~12 μm droplet
+        @test kernel_zero_g(μ, μ) == 0.0
+
+        # Monodisperse case: identical sizes -> Δv = 0 -> K = 0
+        @test kernel(μ, μ) == 0.0
+
+        # Bidisperse case: different sizes -> K > 0
+        μ_small = SVector(1.0e-15)   # ~12 μm
+        μ_large = SVector(1.0e-12)   # ~124 μm
+        K = kernel(μ_small, μ_large)
+        @test K > 0.0
+
+        # Symmetry
+        @test kernel(μ_small, μ_large) ≈ kernel(μ_large, μ_small)
+
+        # Type stability
+        @test @inferred(kernel(μ_small, μ_large)) > 0.0
+    end
 end
 
 @testset "CoagulationProcess" begin
