@@ -235,6 +235,138 @@ function (kernel::CompositeKernel{A})(μ_i::SVector{A, Float64}, μ_j::SVector{A
     return kernel.k1(μ_i, μ_j) + kernel.k2(μ_i, μ_j)
 end
 
+"""
+    compute_rdf_g12(St_1, St_2, R, eta, fp::AyalaFlowParams) -> Float64
+
+Radial distribution function g₁₂ (Ayala 2008 Part 2, Eq. 87-90).
+"""
+function compute_rdf_g12(St_1::Float64, St_2::Float64, R::Float64, eta::Float64, fp::AyalaFlowParams)
+    St = max(St_1, St_2)
+
+    # y_St polynomial fit (Part 2, p.38)
+    y_St = -0.1988 * St^4 + 1.5275 * St^3 - 4.2942 * St^2 + 5.3406 * St
+    if y_St < 0.0
+        y_St = 0.0
+    end
+
+    # f3_R and C1 (Eq. 88-89)
+    f3_R = 0.1886 * exp(20.306 / fp.R_lambda)
+    g_ratio = fp.g / (fp.v_k / fp.tau_k)
+    C1 = y_St / g_ratio^f3_R
+
+    # rc computation (Eq. 90)
+    a_0g = fp.a_0 + (π / 8.0) * g_ratio^2
+    F_val = 20.115 * sqrt(a_0g / fp.R_lambda)
+    rc_over_eta_sq = abs(St_2 - St_1) * F_val
+    rc = eta * sqrt(rc_over_eta_sq)
+
+    # g12 (Eq. 87)
+    R_sq = R^2
+    return ((eta^2 + rc^2) / (R_sq + rc^2))^(C1 / 2.0)
+end
+
+"""
+    f_ayala(b) -> Float64
+
+Auxiliary function for folded-normal mean (Ayala 2008 Part 2, Eq. 80).
+f(b) = 0.5 √π (b + 0.5/b) erf(b) + 0.5 exp(-b²)
+"""
+function f_ayala(b::Float64)
+    if b < 1e-8
+        # Series expansion for small b: f(b) ≈ 1 + b²/3 + O(b⁴)
+        return 1.0 + b^2 / 3.0
+    end
+    return 0.5 * sqrt(π) * (b + 0.5 / b) * erf(b) + 0.5 * exp(-b^2)
+end
+
+"""
+    AyalaTurbulentKernel{A} <: CoagulationKernel
+
+Turbulence-enhanced geometric collision kernel following Ayala et al. (2008).
+
+Γ = 2π R² ⟨|w_r|⟩ g₁₂
+
+# Fields
+- `epsilon::Float64` — turbulent dissipation rate [m²/s³]
+- `R_lambda::Float64` — Taylor microscale Reynolds number
+- `nu::Float64` — kinematic viscosity [m²/s]
+- `rho_f::Float64` — air density [kg/m³]
+- `rho_p::Float64` — particle (water) density [kg/m³]
+- `g::Float64` — gravity [m/s²]
+- `densities::SVector{A, Float64}` — per-species densities [kg/m³]
+"""
+struct AyalaTurbulentKernel{A} <: CoagulationKernel
+    epsilon::Float64
+    R_lambda::Float64
+    nu::Float64
+    rho_f::Float64
+    rho_p::Float64
+    g::Float64
+    densities::SVector{A, Float64}
+end
+
+function (kernel::AyalaTurbulentKernel{A})(μ_i::SVector{A, Float64}, μ_j::SVector{A, Float64}) where {A}
+    # Error handling
+    if kernel.epsilon <= 0.0
+        throw(DomainError(kernel.epsilon, "epsilon must be positive"))
+    end
+    if kernel.R_lambda < 1.0
+        @warn "R_lambda < 1 is outside DNS validation range" R_lambda=kernel.R_lambda
+    end
+
+    a_1 = particle_diameter(μ_i, kernel.densities) / 2.0
+    a_2 = particle_diameter(μ_j, kernel.densities) / 2.0
+    if a_1 <= 0.0 || a_2 <= 0.0
+        return 0.0
+    end
+
+    R = a_1 + a_2
+
+    # Step 1: Particle parameters (with NLD)
+    mu_f = kernel.nu * kernel.rho_f
+    tau_p1_stokes = particle_relaxation_time(a_1, kernel.rho_p, kernel.rho_f, mu_f)
+    tau_p2_stokes = particle_relaxation_time(a_2, kernel.rho_p, kernel.rho_f, mu_f)
+
+    v_g1 = terminal_velocity_stokes(a_1, kernel.rho_p, kernel.rho_f, mu_f, kernel.g)
+    v_g2 = terminal_velocity_stokes(a_2, kernel.rho_p, kernel.rho_f, mu_f, kernel.g)
+
+    Re_p0_1 = 2.0 * a_1 * abs(v_g1) / kernel.nu
+    Re_p0_2 = 2.0 * a_2 * abs(v_g2) / kernel.nu
+    f_Re1 = nonlinear_drag_factor(Re_p0_1)
+    f_Re2 = nonlinear_drag_factor(Re_p0_2)
+
+    tau_p1 = tau_p1_stokes / f_Re1
+    tau_p2 = tau_p2_stokes / f_Re2
+    v_p1 = v_g1 / f_Re1
+    v_p2 = v_g2 / f_Re2
+
+    # Step 2: Turbulence scales
+    fp = compute_flow_params(kernel.epsilon, kernel.R_lambda, kernel.nu, kernel.g)
+
+    # Step 3: Radial relative velocity
+    St_1 = tau_p1 / fp.tau_k
+    St_2 = tau_p2 / fp.tau_k
+
+    if max(St_1, St_2) > 10.0
+        @warn "St > 10 is outside weak-inertia assumption" St_1=St_1 St_2=St_2
+    end
+
+    sigma2 = compute_variance_sigma2(tau_p1, tau_p2, v_p1, v_p2, R, fp)
+    if sigma2 <= 0.0
+        # Fallback: pure gravitational settling (no turbulence)
+        return π * R^2 * abs(v_p1 - v_p2)
+    end
+
+    b = kernel.g * abs(tau_p1 - tau_p2) / (sqrt(sigma2) * sqrt(2.0))
+    wr = sqrt(2.0 / π) * sqrt(sigma2) * f_ayala(b)
+
+    # Step 4: RDF
+    g12 = compute_rdf_g12(St_1, St_2, R, fp.eta, fp)
+
+    # Step 5: Return kernel value
+    return 2.0 * π * R^2 * wr * g12
+end
+
 # ---- Sampling strategy implementations ----
 
 """
