@@ -92,6 +92,37 @@ println("Mass concentration:   ", mass_concentration(u_final, A_val, sys), " kg/
 
 All quantities use SI units: masses in **kg**, volumes in **m³**, temperatures in **K**, viscosities in **Pa·s**, densities in **kg/m³**.
 
+## Examples
+
+The `examples/` directory contains runnable demonstration scripts.
+
+### Setup
+
+```bash
+cd examples
+julia --project=. -e 'using Pkg; Pkg.develop(path=".."); Pkg.instantiate()'
+```
+
+### Aerosol Brownian Coagulation
+
+Simulates 5000 sulfate aerosol particles (d_g = 0.1 μm) undergoing Brownian coagulation for 1 hour.
+
+```bash
+julia --project=. aerosol_brownian_coagulation.jl
+```
+
+Output: `aerosol_brownian_coagulation.png`
+
+### Cloud Droplet Turbulent Coagulation
+
+Simulates 5000 cloud droplets (d_g = 10 μm) with composite coagulation (Brownian + gravitational + turbulent) for 10 minutes.
+
+```bash
+julia --project=. cloud_droplet_turbulent_coagulation.jl
+```
+
+Output: `cloud_droplet_turbulent_coagulation.png`
+
 ## Testing
 
 ```bash
