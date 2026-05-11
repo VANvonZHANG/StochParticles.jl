@@ -32,6 +32,7 @@ export particle_diameters, compute_size_distribution
 export bin_size_distribution
 export standard_aerosol_atmosphere, standard_cloud_atmosphere
 export lognormal_masses, diameters_from_masses
+export plot_concentration_evolution, plot_size_distribution_heatmap, plot_kernel_contributions
 
 # ---- Core implementations ----
 include("core/particle_system.jl")
@@ -51,6 +52,9 @@ include("diagnostics/moments.jl")
 include("diagnostics/reconstruction.jl")
 include("diagnostics/distributions.jl")
 include("diagnostics/validation.jl")
+
+# ---- Plotting ----
+include("plotting/core.jl")
 
 # ---- Utils ----
 include("utils/binning.jl")
