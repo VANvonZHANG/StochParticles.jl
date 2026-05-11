@@ -27,6 +27,7 @@ export make_coagulation_jump, make_emission_jump
 export dilution_death_affect!, dilution_birth_affect!, make_dilution_jumps
 export number_concentration, mass_concentration, species_mass_concentration
 export reconstruct_volumes, extract_concentrations
+export check_mass_conservation
 export particle_diameters, compute_size_distribution
 export bin_size_distribution
 export standard_aerosol_atmosphere, standard_cloud_atmosphere
@@ -49,6 +50,7 @@ include("core/assembly.jl")
 include("diagnostics/moments.jl")
 include("diagnostics/reconstruction.jl")
 include("diagnostics/distributions.jl")
+include("diagnostics/validation.jl")
 
 # ---- Utils ----
 include("utils/binning.jl")

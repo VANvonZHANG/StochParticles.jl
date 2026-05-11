@@ -75,4 +75,21 @@ using StaticArrays
         @test size(matrix) == (2, 3)
         @test all(matrix .>= 0)
     end
+
+    @testset "check_mass_conservation" begin
+        n_sim = 50
+        kernel = BrownianKernel(293.15, 1.81e-5, SVector(1800.0))
+        coag = CoagulationProcess(kernel, GlobalMajorant())
+
+        gas_fn = t -> SVector(0.0)
+        particles = fill(SVector(1.0e-15), n_sim)
+        tspan = (0.0, 1.0)
+
+        prob = ParticleProblem(particles, 1.0, gas_fn, (coag,); tspan=tspan, n_sim=n_sim)
+        sol = solve(prob, Tsit5(); saveat = 0.1)
+
+        passed, rel_error = check_mass_conservation(sol, prob)
+        @test passed == true
+        @test rel_error < 1e-3
+    end
 end
