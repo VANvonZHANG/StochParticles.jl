@@ -1,4 +1,5 @@
 # test/test_diagnostics.jl
+using OrdinaryDiffEq
 using StochParticles
 using Test
 using StaticArrays
