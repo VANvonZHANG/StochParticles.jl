@@ -24,4 +24,5 @@ end
     include("test_dilution.jl")
     include("test_integration.jl")
     include("test_diagnostics.jl")
+    include("test_plotting.jl")
 end
