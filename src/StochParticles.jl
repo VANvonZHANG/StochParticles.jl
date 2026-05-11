@@ -26,6 +26,11 @@ export cnmc_merge!, cnmc_clone!, cnmc_volume_rescale!, cnmc_coagulate!
 export make_coagulation_jump, make_emission_jump
 export dilution_death_affect!, dilution_birth_affect!, make_dilution_jumps
 export number_concentration, mass_concentration, species_mass_concentration
+export reconstruct_volumes, extract_concentrations
+export particle_diameters, compute_size_distribution
+export bin_size_distribution
+export standard_aerosol_atmosphere, standard_cloud_atmosphere
+export lognormal_masses, diameters_from_masses
 
 # ---- Core implementations ----
 include("core/particle_system.jl")
@@ -42,5 +47,12 @@ include("core/assembly.jl")
 
 # ---- Diagnostics ----
 include("diagnostics/moments.jl")
+include("diagnostics/reconstruction.jl")
+include("diagnostics/distributions.jl")
+
+# ---- Utils ----
+include("utils/binning.jl")
+include("utils/parameters.jl")
+include("utils/initial_conditions.jl")
 
 end

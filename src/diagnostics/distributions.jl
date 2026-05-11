@@ -18,7 +18,7 @@ function particle_diameters(u::Vector{Float64}, sys::ParticleSystem, rho::Float6
 end
 
 """
-    compute_size_distribution(sol, prob, bin_edges; n_snapshots=30)
+    compute_size_distribution(sol, prob, bin_edges, rho; n_snapshots=30)
         -> (snapshot_times, bin_centers, dNdlogD_matrix)
 
 Compute size distribution matrix dN/dlogD over time for heatmap plotting.
@@ -27,6 +27,7 @@ Compute size distribution matrix dN/dlogD over time for heatmap plotting.
 - `sol`: SciML solution object
 - `prob`: ParticleProblem (JumpProblem)
 - `bin_edges`: diameter bin edges [m], strictly increasing
+- `rho`: particle density [kg/m³]
 - `n_snapshots`: number of time snapshots to evaluate
 
 # Returns
@@ -34,7 +35,7 @@ Compute size distribution matrix dN/dlogD over time for heatmap plotting.
 - `bin_centers::Vector{Float64}`: geometric mean of each bin edge pair [m]
 - `dNdlogD_matrix::Matrix{Float64}`: matrix of shape (n_bins, n_snapshots)
 """
-function compute_size_distribution(sol, prob, bin_edges::Vector{Float64}; n_snapshots::Int = 30)
+function compute_size_distribution(sol, prob, bin_edges::Vector{Float64}, rho::Float64; n_snapshots::Int = 30)
     if length(bin_edges) < 2
         throw(ArgumentError("bin_edges must have at least 2 elements"))
     end
@@ -59,7 +60,7 @@ function compute_size_distribution(sol, prob, bin_edges::Vector{Float64}; n_snap
         u = sol.u[t_idx]
         V_t = volumes[t_idx]
 
-        diams = particle_diameters(u, sys, sys.rho_p)
+        diams = particle_diameters(u, sys, rho)
         counts = bin_size_distribution(diams, bin_edges)
         dNdlogD_matrix[:, j] = counts ./ dlogD ./ V_t
     end
