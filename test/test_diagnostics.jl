@@ -68,11 +68,11 @@ using StaticArrays
 
         bin_edges = [0.0, 1.0e-6, 2.0e-6]
         snapshot_times, bin_centers, matrix = compute_size_distribution(
-            sol, prob, bin_edges; n_snapshots = 3)
+            sol, prob, bin_edges, 1000.0; n_snapshots = 3)
 
         @test length(snapshot_times) == 3
-        @test length(bin_centers) == 1
-        @test size(matrix) == (1, 3)
+        @test length(bin_centers) == 2
+        @test size(matrix) == (2, 3)
         @test all(matrix .>= 0)
     end
 end
