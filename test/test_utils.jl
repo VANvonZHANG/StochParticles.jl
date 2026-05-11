@@ -22,12 +22,12 @@ using Test
     @testset "standard atmospheres" begin
         aerosol = standard_aerosol_atmosphere()
         @test aerosol.T == 293.15
-        @test aerosol.P == 101325.0
+        @test aerosol.p == 101325.0
         @test aerosol.rho_p == 1800.0
 
         cloud = standard_cloud_atmosphere()
         @test cloud.T == 288.15
-        @test cloud.P == 80000.0
+        @test cloud.p == 80000.0
         @test cloud.rho_p == 1000.0
     end
 
