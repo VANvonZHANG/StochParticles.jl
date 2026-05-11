@@ -30,4 +30,18 @@ using Test
         @test cloud.P == 80000.0
         @test cloud.rho_p == 1000.0
     end
+
+    @testset "lognormal_masses" begin
+        masses = lognormal_masses(10000, 1.0e-7, 1.5, 1000.0)
+        @test length(masses) == 10000
+        @test all(m -> m[1] > 0, masses)
+
+        diams = diameters_from_masses(masses, 1000.0)
+        @test length(diams) == 10000
+        @test all(d -> d > 0, diams)
+
+        for (m, d) in zip(masses, diams)
+            @test m[1] ≈ (π / 6.0) * d^3 * 1000.0 rtol = 1e-10
+        end
+    end
 end
