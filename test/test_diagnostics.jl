@@ -43,4 +43,36 @@ using StaticArrays
         # Mass concentration should be constant (no processes)
         @test all(M_conc .≈ M_conc[1])
     end
+
+    @testset "particle_diameters" begin
+        particles = [SVector{1,Float64}(1.0e-18), SVector{1,Float64}(8.0e-18)]
+        volume = 1.0e-6
+        gas_fn = t -> SVector(0.0)
+        prob = ParticleProblem(particles, volume, gas_fn, ();
+                               tspan = (0.0, 0.01), n_sim = 2)
+        sys = prob.prob.p
+        u0 = make_u0(particles)
+        diams = particle_diameters(u0, sys, 1000.0)
+        @test length(diams) == 2
+        @test diams[1] ≈ (6.0 * 1.0e-18 / (π * 1000.0))^(1.0 / 3.0)
+        @test diams[2] ≈ (6.0 * 8.0e-18 / (π * 1000.0))^(1.0 / 3.0)
+    end
+
+    @testset "compute_size_distribution" begin
+        particles = [SVector{1,Float64}(1.0e-18), SVector{1,Float64}(8.0e-18)]
+        volume = 1.0e-6
+        gas_fn = t -> SVector(0.0)
+        prob = ParticleProblem(particles, volume, gas_fn, ();
+                               tspan = (0.0, 0.01), n_sim = 2)
+        sol = solve(prob, Tsit5(); saveat = 0.005)
+
+        bin_edges = [0.0, 1.0e-6, 2.0e-6]
+        snapshot_times, bin_centers, matrix = compute_size_distribution(
+            sol, prob, bin_edges; n_snapshots = 3)
+
+        @test length(snapshot_times) == 3
+        @test length(bin_centers) == 1
+        @test size(matrix) == (1, 3)
+        @test all(matrix .>= 0)
+    end
 end
