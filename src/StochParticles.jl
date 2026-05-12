@@ -18,7 +18,8 @@ export ParticleSystem, ParticleProblem, species_val
 export get_particle, set_particle!, make_u0, total_mass
 export PhysicsProcess, provides_drift
 export CoagulationKernel, CoagulationSampling
-export BrownianKernel, GlobalMajorant, CompositeKernel, GravitationalKernel, AyalaTurbulentKernel, AtmosphericParameters, make_kernel
+export BrownianKernel, GlobalMajorant, CompositeKernel, GravitationalKernel,
+       AyalaTurbulentKernel, AtmosphericParameters, make_kernel
 export CoagulationProcess, CondensationProcess, EmissionProcess, DilutionProcess
 export apply_drift, make_ode_func
 export compute_majorant, majorant_rate
@@ -32,7 +33,8 @@ export particle_diameters, compute_size_distribution
 export bin_size_distribution
 export standard_aerosol_atmosphere, standard_cloud_atmosphere
 export lognormal_masses, diameters_from_masses
-export plot_concentration_evolution, plot_size_distribution_heatmap, plot_kernel_contributions, plot_simulation_summary
+export plot_concentration_evolution, plot_size_distribution_heatmap,
+       plot_kernel_contributions, plot_simulation_summary
 
 # ---- Core implementations ----
 include("core/particle_system.jl")

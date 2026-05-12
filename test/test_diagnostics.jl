@@ -23,11 +23,11 @@ using StaticArrays
     end
 
     @testset "extract_concentrations" begin
-        particles = [SVector{1,Float64}(1.0e-18), SVector{1,Float64}(2.0e-18)]
+        particles = [SVector{1, Float64}(1.0e-18), SVector{1, Float64}(2.0e-18)]
         volume = 1.0e-6
         gas_fn = t -> SVector(0.0)
         prob = ParticleProblem(particles, volume, gas_fn, ();
-                               tspan = (0.0, 0.01), n_sim = 2)
+            tspan = (0.0, 0.01), n_sim = 2)
         sol = solve(prob, Tsit5(); saveat = 0.005)
 
         t, N_conc, M_conc = extract_concentrations(sol, prob)
@@ -45,11 +45,11 @@ using StaticArrays
     end
 
     @testset "particle_diameters" begin
-        particles = [SVector{1,Float64}(1.0e-18), SVector{1,Float64}(8.0e-18)]
+        particles = [SVector{1, Float64}(1.0e-18), SVector{1, Float64}(8.0e-18)]
         volume = 1.0e-6
         gas_fn = t -> SVector(0.0)
         prob = ParticleProblem(particles, volume, gas_fn, ();
-                               tspan = (0.0, 0.01), n_sim = 2)
+            tspan = (0.0, 0.01), n_sim = 2)
         sys = prob.prob.p
         u0 = make_u0(particles)
         diams = particle_diameters(u0, sys, 1000.0)
@@ -59,15 +59,16 @@ using StaticArrays
     end
 
     @testset "compute_size_distribution" begin
-        particles = [SVector{1,Float64}(1.0e-18), SVector{1,Float64}(8.0e-18)]
+        particles = [SVector{1, Float64}(1.0e-18), SVector{1, Float64}(8.0e-18)]
         volume = 1.0e-6
         gas_fn = t -> SVector(0.0)
         prob = ParticleProblem(particles, volume, gas_fn, ();
-                               tspan = (0.0, 0.01), n_sim = 2)
+            tspan = (0.0, 0.01), n_sim = 2)
         sol = solve(prob, Tsit5(); saveat = 0.005)
 
         bin_edges = [0.0, 1.0e-6, 2.0e-6]
-        snapshot_times, bin_centers, matrix = compute_size_distribution(
+        snapshot_times, bin_centers,
+        matrix = compute_size_distribution(
             sol, prob, bin_edges, 1000.0; n_snapshots = 3)
 
         @test length(snapshot_times) == 3
@@ -85,7 +86,8 @@ using StaticArrays
         particles = fill(SVector(1.0e-15), n_sim)
         tspan = (0.0, 1.0)
 
-        prob = ParticleProblem(particles, 1.0, gas_fn, (coag,); tspan=tspan, n_sim=n_sim)
+        prob = ParticleProblem(
+            particles, 1.0, gas_fn, (coag,); tspan = tspan, n_sim = n_sim)
         sol = solve(prob, Tsit5(); saveat = 0.1)
 
         passed, rel_error = check_mass_conservation(sol, prob)

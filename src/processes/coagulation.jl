@@ -27,8 +27,8 @@ function compute_air_properties(T::Float64, p::Float64)
     gasspeed = sqrt((8.0 * kb * T * N_A) / (pi * M_air))
     gasfreepath = 2.0 * nu_f / gasspeed
 
-    return (rho_air=rho_air, mu_f=mu_f, nu_f=nu_f,
-            gasspeed=gasspeed, gasfreepath=gasfreepath)
+    return (rho_air = rho_air, mu_f = mu_f, nu_f = nu_f,
+        gasspeed = gasspeed, gasfreepath = gasfreepath)
 end
 
 """
@@ -61,21 +61,24 @@ struct BrownianKernel{A} <: CoagulationKernel{A}
     kb::Float64
 end
 
-BrownianKernel(T::Float64, p::Float64, densities::SVector{A, Float64}) where {A} =
+function BrownianKernel(T::Float64, p::Float64, densities::SVector{A, Float64}) where {A}
     BrownianKernel{A}(T, p, compute_air_properties(T, p)..., densities, 1.380649e-23)
+end
 
 """
     CompositeKernel{A, K1, K2} <: CoagulationKernel
 
 Sum of two kernels: K(μ_i, μ_j) = K1(μ_i, μ_j) + K2(μ_i, μ_j).
 """
-struct CompositeKernel{A, K1<:CoagulationKernel{A}, K2<:CoagulationKernel{A}} <: CoagulationKernel{A}
+struct CompositeKernel{A, K1 <: CoagulationKernel{A}, K2 <: CoagulationKernel{A}} <:
+       CoagulationKernel{A}
     k1::K1
     k2::K2
 end
 
-CompositeKernel(k1::BrownianKernel{A}, k2::BrownianKernel{A}) where {A} =
+function CompositeKernel(k1::BrownianKernel{A}, k2::BrownianKernel{A}) where {A}
     CompositeKernel{A, BrownianKernel{A}, BrownianKernel{A}}(k1, k2)
+end
 
 # ---- Kernel evaluation ----
 
@@ -90,7 +93,8 @@ end
 Stokes terminal settling velocity for a spherical particle [m/s].
 Formula: v_g = 2 ρ_p g a² (1 - ρ_f/ρ_p) / (9 μ_f)
 """
-function terminal_velocity_stokes(a::Float64, rho_p::Float64, rho_f::Float64, mu_f::Float64, g::Float64)
+function terminal_velocity_stokes(
+        a::Float64, rho_p::Float64, rho_f::Float64, mu_f::Float64, g::Float64)
     return 2.0 * rho_p * g * a^2 * (1.0 - rho_f / rho_p) / (9.0 * mu_f)
 end
 
@@ -100,7 +104,8 @@ end
 Terminal velocity with Nonlinear Drag (NLD) correction (Ayala 2008 Part 1, Eq. 3-4).
 For a < 30 μm uses Stokes velocity; for a ≥ 30 μm applies NLD factor.
 """
-function terminal_velocity_nld(a::Float64, rho_p::Float64, rho_f::Float64, mu_f::Float64, g::Float64, nu::Float64)
+function terminal_velocity_nld(
+        a::Float64, rho_p::Float64, rho_f::Float64, mu_f::Float64, g::Float64, nu::Float64)
     v_g = terminal_velocity_stokes(a, rho_p, rho_f, mu_f, g)
     if a < 30.0e-6
         return v_g
@@ -132,10 +137,12 @@ struct GravitationalKernel{A} <: CoagulationKernel{A}
     densities::SVector{A, Float64}
 end
 
-CompositeKernel(k1::GravitationalKernel{A}, k2::GravitationalKernel{A}) where {A} =
+function CompositeKernel(k1::GravitationalKernel{A}, k2::GravitationalKernel{A}) where {A}
     CompositeKernel{A, GravitationalKernel{A}, GravitationalKernel{A}}(k1, k2)
+end
 
-function (kernel::GravitationalKernel{A})(μ_i::SVector{A, Float64}, μ_j::SVector{A, Float64}) where {A}
+function (kernel::GravitationalKernel{A})(μ_i::SVector{A, Float64}, μ_j::SVector{
+        A, Float64}) where {A}
     a_i = particle_diameter(μ_i, kernel.densities) / 2.0
     a_j = particle_diameter(μ_j, kernel.densities) / 2.0
     if a_i <= 0.0 || a_j <= 0.0
@@ -203,7 +210,8 @@ function compute_flow_params(epsilon::Float64, R_lambda::Float64, nu::Float64, g
     lambda = u_prime * sqrt(15.0 * nu / epsilon)
     a_0 = (11.0 + 7.0 * R_lambda) / (205.0 + R_lambda)
     tau_T = sqrt(2.0 * R_lambda / (sqrt(15.0) * a_0)) * tau_k
-    return AyalaFlowParams(tau_k, eta, v_k, u_prime, T_L, L_e, lambda, tau_T, a_0, R_lambda, g)
+    return AyalaFlowParams(
+        tau_k, eta, v_k, u_prime, T_L, L_e, lambda, tau_T, a_0, R_lambda, g)
 end
 
 """
@@ -223,8 +231,9 @@ Compute variance σ² of radial relative velocity (Ayala 2008 Part 2, Eq. 69-78)
 
 Reference: Ayala et al. (2008) Part 2, New Journal of Physics 10, 075016.
 """
-function compute_variance_sigma2(tau_p1::Float64, tau_p2::Float64, v_p1::Float64, v_p2::Float64,
-                                  R::Float64, fp::AyalaFlowParams)
+function compute_variance_sigma2(
+        tau_p1::Float64, tau_p2::Float64, v_p1::Float64, v_p2::Float64,
+        R::Float64, fp::AyalaFlowParams)
     # Stokes numbers
     St_1 = tau_p1 / fp.tau_k
     St_2 = tau_p2 / fp.tau_k
@@ -254,7 +263,7 @@ Jacobson (2005) Eq. 15.33 — full transition-regime Brownian coagulation kernel
 Direct port of PartMC's kernel_brown_helper.
 """
 function _kernel_brown_impl(vol_i, den_i, vol_j, den_j,
-                            T, mu_f, gasfreepath, kb, rad_i, rad_j)
+        T, mu_f, gasfreepath, kb, rad_i, rad_j)
     # --- Particle i ---
     Kn_i = gasfreepath / rad_i
     Cc_i = 1.0 + Kn_i * (1.249 + 0.42 * exp(-0.87 / Kn_i))
@@ -284,7 +293,8 @@ function _kernel_brown_impl(vol_i, den_i, vol_j, den_j,
     return 4.0 * pi * rad_sum * diffus_sum / (tmp1 + tmp2)
 end
 
-function (kernel::BrownianKernel{A})(μ_i::SVector{A, Float64}, μ_j::SVector{A, Float64}) where {A}
+function (kernel::BrownianKernel{A})(μ_i::SVector{A, Float64}, μ_j::SVector{
+        A, Float64}) where {A}
     # Particle volumes and bulk densities
     V_i = sum(μ_i[k] / kernel.densities[k] for k in 1:A)
     V_j = sum(μ_j[k] / kernel.densities[k] for k in 1:A)
@@ -300,11 +310,12 @@ function (kernel::BrownianKernel{A})(μ_i::SVector{A, Float64}, μ_j::SVector{A,
     end
 
     return _kernel_brown_impl(V_i, rho_i, V_j, rho_j,
-                              kernel.T, kernel.mu_f, kernel.gasfreepath, kernel.kb,
-                              r_i, r_j)
+        kernel.T, kernel.mu_f, kernel.gasfreepath, kernel.kb,
+        r_i, r_j)
 end
 
-function (kernel::CompositeKernel{A})(μ_i::SVector{A, Float64}, μ_j::SVector{A, Float64}) where {A}
+function (kernel::CompositeKernel{A})(μ_i::SVector{A, Float64}, μ_j::SVector{
+        A, Float64}) where {A}
     return kernel.k1(μ_i, μ_j) + kernel.k2(μ_i, μ_j)
 end
 
@@ -313,7 +324,8 @@ end
 
 Radial distribution function g₁₂ (Ayala 2008 Part 2, Eq. 87-90).
 """
-function compute_rdf_g12(St_1::Float64, St_2::Float64, R::Float64, eta::Float64, fp::AyalaFlowParams)
+function compute_rdf_g12(
+        St_1::Float64, St_2::Float64, R::Float64, eta::Float64, fp::AyalaFlowParams)
     St = max(St_1, St_2)
 
     # y_St polynomial fit (Part 2, p.38)
@@ -377,7 +389,8 @@ struct AyalaTurbulentKernel{A} <: CoagulationKernel{A}
     g::Float64
     densities::SVector{A, Float64}
 
-    function AyalaTurbulentKernel{A}(epsilon, R_lambda, nu, rho_f, rho_p, g, densities::SVector{A, Float64}) where {A}
+    function AyalaTurbulentKernel{A}(epsilon, R_lambda, nu, rho_f, rho_p, g,
+            densities::SVector{A, Float64}) where {A}
         if epsilon <= 0.0
             throw(DomainError(epsilon, "epsilon must be positive"))
         end
@@ -385,13 +398,17 @@ struct AyalaTurbulentKernel{A} <: CoagulationKernel{A}
     end
 end
 
-AyalaTurbulentKernel(epsilon, R_lambda, nu, rho_f, rho_p, g, densities::SVector{A, Float64}) where {A} =
+function AyalaTurbulentKernel(
+        epsilon, R_lambda, nu, rho_f, rho_p, g, densities::SVector{A, Float64}) where {A}
     AyalaTurbulentKernel{A}(epsilon, R_lambda, nu, rho_f, rho_p, g, densities)
+end
 
-CompositeKernel(k1::AyalaTurbulentKernel{A}, k2::AyalaTurbulentKernel{A}) where {A} =
+function CompositeKernel(k1::AyalaTurbulentKernel{A}, k2::AyalaTurbulentKernel{A}) where {A}
     CompositeKernel{A, AyalaTurbulentKernel{A}, AyalaTurbulentKernel{A}}(k1, k2)
+end
 
-function (kernel::AyalaTurbulentKernel{A})(μ_i::SVector{A, Float64}, μ_j::SVector{A, Float64}) where {A}
+function (kernel::AyalaTurbulentKernel{A})(μ_i::SVector{A, Float64}, μ_j::SVector{
+        A, Float64}) where {A}
     # Error handling
     if kernel.epsilon <= 0.0
         throw(DomainError(kernel.epsilon, "epsilon must be positive"))
@@ -486,11 +503,11 @@ end
 Convenience constructor with standard atmospheric defaults.
 """
 function AtmosphericParameters(T::Float64, p::Float64;
-                                rho_f::Float64=1.225,
-                                mu_f::Float64=1.81e-5,
-                                nu::Float64=1.48e-5,
-                                rho_p::Float64=1000.0,
-                                g::Float64=9.81)
+        rho_f::Float64 = 1.225,
+        mu_f::Float64 = 1.81e-5,
+        nu::Float64 = 1.48e-5,
+        rho_p::Float64 = 1000.0,
+        g::Float64 = 9.81)
     return AtmosphericParameters(T, p, rho_f, mu_f, nu, rho_p, g)
 end
 
@@ -503,10 +520,12 @@ coagulation with consistent physical parameters.
 Returns: `CompositeKernel(K_brown, CompositeKernel(K_grav, K_turb))`
 """
 function make_kernel(params::AtmosphericParameters, epsilon::Float64, R_lambda::Float64,
-                      densities::SVector{A, Float64}) where {A}
+        densities::SVector{A, Float64}) where {A}
     K_brown = BrownianKernel(params.T, params.p, densities)
-    K_grav = GravitationalKernel(params.mu_f, params.rho_f, params.rho_p, params.g, densities)
-    K_turb = AyalaTurbulentKernel(epsilon, R_lambda, params.nu, params.rho_f, params.rho_p, params.g, densities)
+    K_grav = GravitationalKernel(
+        params.mu_f, params.rho_f, params.rho_p, params.g, densities)
+    K_turb = AyalaTurbulentKernel(
+        epsilon, R_lambda, params.nu, params.rho_f, params.rho_p, params.g, densities)
     return CompositeKernel(K_brown, CompositeKernel(K_grav, K_turb))
 end
 
@@ -525,7 +544,8 @@ struct GlobalMajorant <: CoagulationSampling end
 
 Compute the majorant kernel value K_max ≥ K(μ_i, μ_j) for all active pairs.
 """
-function compute_majorant(sampling::GlobalMajorant, kernel, u::Vector{Float64}, sys::ParticleSystem{A}) where {A}
+function compute_majorant(
+        sampling::GlobalMajorant, kernel, u::Vector{Float64}, sys::ParticleSystem{A}) where {A}
     K_max = 0.0
     for i in 1:sys.n_active
         μ_i = get_particle(u, i, Val(A))
@@ -560,7 +580,8 @@ Stochastic coagulation process that merges particle pairs via Majorant/Null-even
 - `kernel::K` — coagulation rate kernel (e.g. `BrownianKernel`)
 - `sampling::S` — pair-selection strategy (e.g. `GlobalMajorant`)
 """
-struct CoagulationProcess{K<:CoagulationKernel{<:Any}, S<:CoagulationSampling} <: PhysicsProcess
+struct CoagulationProcess{K <: CoagulationKernel{<:Any}, S <: CoagulationSampling} <:
+       PhysicsProcess
     kernel::K
     sampling::S
 end
@@ -593,7 +614,7 @@ function make_coagulation_jump(kernel, sampling)
 
         # Select random pair
         i = rand(1:N)
-        j = rand(1:(N-1))
+        j = rand(1:(N - 1))
         j = j >= i ? j + 1 : j
 
         A_val = species_val(p)

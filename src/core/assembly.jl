@@ -45,7 +45,9 @@ end
 # ---- Per-process jump collection ----
 
 _process_jumps(::PhysicsProcess, sys) = ()
-_process_jumps(proc::CoagulationProcess, sys) = (make_coagulation_jump(proc.kernel, proc.sampling),)
+function _process_jumps(proc::CoagulationProcess, sys)
+    (make_coagulation_jump(proc.kernel, proc.sampling),)
+end
 _process_jumps(proc::EmissionProcess, sys) = (make_emission_jump(proc),)
 _process_jumps(proc::DilutionProcess, sys) = make_dilution_jumps(proc)
 
@@ -79,14 +81,13 @@ Construct a SciML JumpProblem representing the PDMP for particle simulation.
 - `JumpProblem` ready for `solve(prob, Tsit5())`
 """
 function ParticleProblem(
-    particles::Vector{SVector{A, Float64}},
-    volume::Float64,
-    gas_phase_fn,
-    processes::Tuple{Vararg{PhysicsProcess}};
-    tspan = (0.0, 3600.0),
-    n_sim = length(particles),
+        particles::Vector{SVector{A, Float64}},
+        volume::Float64,
+        gas_phase_fn,
+        processes::Tuple{Vararg{PhysicsProcess}};
+        tspan = (0.0, 3600.0),
+        n_sim = length(particles)
 ) where {A}
-
     sys = ParticleSystem(Val(A), n_sim, volume, gas_phase_fn)
     u0 = make_u0(particles)
 
