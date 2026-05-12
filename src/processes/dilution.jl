@@ -12,7 +12,7 @@ Dilution via independent death (particle loss) and birth (background entrainment
 
 Contributes two ConstantRateJumps: death and birth.
 """
-struct DilutionProcess{L<:Function, B<:Function} <: PhysicsProcess
+struct DilutionProcess{L <: Function, B <: Function} <: PhysicsProcess
     dilution_rate::L
     background_sampler::B
 end
@@ -71,7 +71,8 @@ function make_dilution_jumps(proc::DilutionProcess)
     death_jump = ConstantRateJump(death_rate,
         (integrator) -> dilution_death_affect!(integrator, proc))
 
-    birth_rate = (u, p, t) -> begin
+    birth_rate = (
+        u, p, t) -> begin
         p.n_active >= p.n_sim ? 0.0 : proc.dilution_rate(t) * p.volume
     end
     birth_jump = ConstantRateJump(birth_rate,

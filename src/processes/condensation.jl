@@ -9,7 +9,7 @@ Provides drift only (no jumps).
 # Fields
 - `flux::I` — function (μ::SVector, g, t) -> SVector, returning condensation flux
 """
-struct CondensationProcess{I<:Function} <: PhysicsProcess
+struct CondensationProcess{I <: Function} <: PhysicsProcess
     flux::I
 end
 

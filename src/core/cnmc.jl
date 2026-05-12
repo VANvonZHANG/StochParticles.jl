@@ -54,7 +54,8 @@ Full CNMC coagulation step:
 2. Clone a random particle into the vacated slot (n_active increments)
 3. Rescale volume to conserve mass concentration (n_sim maintained)
 """
-function cnmc_coagulate!(u::Vector{Float64}, sys::ParticleSystem{A}, ::Val{A}, i::Int, j::Int) where {A}
+function cnmc_coagulate!(
+        u::Vector{Float64}, sys::ParticleSystem{A}, ::Val{A}, i::Int, j::Int) where {A}
     A_val = Val(A)
 
     # Cache total mass before merge

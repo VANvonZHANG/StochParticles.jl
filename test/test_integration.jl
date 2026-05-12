@@ -20,7 +20,8 @@ using JumpProcesses
         particles = fill(SVector(1.0e-15), n_sim)
         tspan = (0.0, 10.0)
 
-        prob = ParticleProblem(particles, 1.0, gas_fn, (cond, coag); tspan=tspan, n_sim=n_sim)
+        prob = ParticleProblem(
+            particles, 1.0, gas_fn, (cond, coag); tspan = tspan, n_sim = n_sim)
 
         @test prob isa JumpProblem
 
@@ -43,7 +44,7 @@ using JumpProcesses
         tspan = (0.0, 5.0)
 
         prob = ParticleProblem(particles, 1.0, gas_fn, (cond, coag, emit, dil);
-                               tspan=tspan, n_sim=n_sim)
+            tspan = tspan, n_sim = n_sim)
 
         sol = solve(prob, Tsit5())
         @test sol.retcode == ReturnCode.Success
@@ -60,7 +61,8 @@ using JumpProcesses
         particles = fill(SVector(1.0e-15), n_sim)
         tspan = (0.0, 1.0)
 
-        prob = ParticleProblem(particles, 1.0, gas_fn, (coag,); tspan=tspan, n_sim=n_sim)
+        prob = ParticleProblem(
+            particles, 1.0, gas_fn, (coag,); tspan = tspan, n_sim = n_sim)
 
         sol = solve(prob, Tsit5())
         @test sol.retcode == ReturnCode.Success

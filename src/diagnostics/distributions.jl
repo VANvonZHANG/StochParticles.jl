@@ -35,7 +35,8 @@ Compute size distribution matrix dN/dlogD over time for heatmap plotting.
 - `bin_centers::Vector{Float64}`: geometric mean of each bin edge pair [m]
 - `dNdlogD_matrix::Matrix{Float64}`: matrix of shape (n_bins, n_snapshots)
 """
-function compute_size_distribution(sol, prob, bin_edges::Vector{Float64}, rho::Float64; n_snapshots::Int = 30)
+function compute_size_distribution(
+        sol, prob, bin_edges::Vector{Float64}, rho::Float64; n_snapshots::Int = 30)
     if length(bin_edges) < 2
         throw(ArgumentError("bin_edges must have at least 2 elements"))
     end
@@ -65,6 +66,6 @@ function compute_size_distribution(sol, prob, bin_edges::Vector{Float64}, rho::F
         dNdlogD_matrix[:, j] = counts ./ dlogD ./ V_t
     end
 
-    bin_centers = @. sqrt(bin_edges[1:end-1] * bin_edges[2:end])
+    bin_centers = @. sqrt(bin_edges[1:(end - 1)] * bin_edges[2:end])
     return collect(snapshot_times), bin_centers, dNdlogD_matrix
 end
