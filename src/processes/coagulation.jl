@@ -3,6 +3,32 @@
 # ---- Kernel implementations ----
 
 """
+    compute_air_properties(T, p) -> NamedTuple
+
+Compute air properties from temperature [K] and pressure [Pa].
+
+References:
+- Air density: ideal gas law (Jacobson 2005, Eq. 4.54)
+- Viscosity: Sutherland formula (Jacobson 2005, Eq. 4.48)
+- Mean free path: kinetic theory derivation
+"""
+function compute_air_properties(T::Float64, p::Float64)
+    M_air = 0.0289647       # kg/mol, molar mass of dry air
+    R_univ = 8.314462618   # J/(mol*K), universal gas constant
+    N_A = 6.02214076e23    # mol^-1, Avogadro's number
+    kb = 1.380649e-23      # J/K, Boltzmann constant
+
+    rho_air = p * M_air / (R_univ * T)
+    mu_f = 1.8325e-5 * (416.16 / (T + 120.0)) * (T / 296.16)^1.5
+    nu_f = mu_f / rho_air
+    gasspeed = sqrt((8.0 * kb * T * N_A) / (pi * M_air))
+    gasfreepath = 2.0 * nu_f / gasspeed
+
+    return (rho_air=rho_air, mu_f=mu_f, nu_f=nu_f,
+            gasspeed=gasspeed, gasfreepath=gasfreepath)
+end
+
+"""
     BrownianKernel{A} <: CoagulationKernel
 
 Brownian diffusion coagulation kernel:
@@ -10,19 +36,29 @@ Brownian diffusion coagulation kernel:
 
 # Fields
 - `T::Float64` — temperature [K]
+- `p::Float64` — pressure [Pa]
+- `rho_air::Float64` — air density [kg/m³]
 - `mu_f::Float64` — dynamic viscosity of carrier fluid [Pa·s]
+- `nu_f::Float64` — kinematic viscosity [m²/s]
+- `gasspeed::Float64` — mean molecular speed [m/s]
+- `gasfreepath::Float64` — mean free path [m]
 - `densities::SVector{A, Float64}` — per-species densities [kg/m³]
 - `kb::Float64` — Boltzmann constant
 """
 struct BrownianKernel{A} <: CoagulationKernel{A}
     T::Float64
+    p::Float64
+    rho_air::Float64
     mu_f::Float64
+    nu_f::Float64
+    gasspeed::Float64
+    gasfreepath::Float64
     densities::SVector{A, Float64}
     kb::Float64
 end
 
-BrownianKernel(T::Float64, mu_f::Float64, densities::SVector{A, Float64}) where {A} =
-    BrownianKernel{A}(T, mu_f, densities, 1.380649e-23)
+BrownianKernel(T::Float64, p::Float64, densities::SVector{A, Float64}) where {A} =
+    BrownianKernel{A}(T, p, compute_air_properties(T, p)..., densities, 1.380649e-23)
 
 """
     CompositeKernel{A, K1, K2} <: CoagulationKernel
