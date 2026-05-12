@@ -243,11 +243,57 @@ function compute_variance_sigma2(tau_p1::Float64, tau_p2::Float64, v_p1::Float64
     return sigma2_fluid + sigma2_particle + sigma2_grav
 end
 
+"""
+    _kernel_brown_impl(vol_i, den_i, vol_j, den_j, T, mu_f, gasfreepath, kb, rad_i, rad_j)
+
+Jacobson (2005) Eq. 15.33 — full transition-regime Brownian coagulation kernel.
+Direct port of PartMC's kernel_brown_helper.
+"""
+function _kernel_brown_impl(vol_i, den_i, vol_j, den_j,
+                            T, mu_f, gasfreepath, kb, rad_i, rad_j)
+    # --- Particle i ---
+    Kn_i = gasfreepath / rad_i
+    Cc_i = 1.0 + Kn_i * (1.249 + 0.42 * exp(-0.87 / Kn_i))
+    diffus_i = (kb * T * Cc_i) / (6.0 * pi * rad_i * mu_f)
+    speedsq_i = 8.0 * kb * T / (pi * den_i * vol_i)
+    freepath_i = 8.0 * diffus_i / (pi * sqrt(speedsq_i))
+    tmp1_i = (2.0 * rad_i + freepath_i)^3
+    tmp2_i = (4.0 * rad_i^2 + freepath_i^2)^1.5
+    deltasq_i = ((tmp1_i - tmp2_i) / (6.0 * rad_i * freepath_i) - 2.0 * rad_i)^2
+
+    # --- Particle j ---
+    Kn_j = gasfreepath / rad_j
+    Cc_j = 1.0 + Kn_j * (1.249 + 0.42 * exp(-0.87 / Kn_j))
+    diffus_j = (kb * T * Cc_j) / (6.0 * pi * rad_j * mu_f)
+    speedsq_j = 8.0 * kb * T / (pi * den_j * vol_j)
+    freepath_j = 8.0 * diffus_j / (pi * sqrt(speedsq_j))
+    tmp1_j = (2.0 * rad_j + freepath_j)^3
+    tmp2_j = (4.0 * rad_j^2 + freepath_j^2)^1.5
+    deltasq_j = ((tmp1_j - tmp2_j) / (6.0 * rad_j * freepath_j) - 2.0 * rad_j)^2
+
+    # --- Full kernel (Jacobson Eq. 15.33) ---
+    rad_sum = rad_i + rad_j
+    diffus_sum = diffus_i + diffus_j
+    tmp1 = rad_sum / (rad_sum + sqrt(deltasq_i + deltasq_j))
+    tmp2 = 4.0 * diffus_sum / (rad_sum * sqrt(speedsq_i + speedsq_j))
+
+    return 4.0 * pi * rad_sum * diffus_sum / (tmp1 + tmp2)
+end
+
 function (kernel::BrownianKernel{A})(μ_i::SVector{A, Float64}, μ_j::SVector{A, Float64}) where {A}
-    d_i = particle_diameter(μ_i, kernel.densities)
-    d_j = particle_diameter(μ_j, kernel.densities)
-    coeff = 2.0 * kernel.kb * kernel.T / (3.0 * kernel.mu_f)
-    return coeff * (d_i + d_j)^2 / (d_i * d_j)
+    # Particle volumes and bulk densities
+    V_i = sum(μ_i[k] / kernel.densities[k] for k in 1:A)
+    V_j = sum(μ_j[k] / kernel.densities[k] for k in 1:A)
+    rho_i = sum(μ_i) / V_i
+    rho_j = sum(μ_j) / V_j
+
+    # Geometric radii (spherical assumption)
+    r_i = cbrt(3.0 * V_i / (4.0 * pi))
+    r_j = cbrt(3.0 * V_j / (4.0 * pi))
+
+    return _kernel_brown_impl(V_i, rho_i, V_j, rho_j,
+                              kernel.T, kernel.mu_f, kernel.gasfreepath, kernel.kb,
+                              r_i, r_j)
 end
 
 function (kernel::CompositeKernel{A})(μ_i::SVector{A, Float64}, μ_j::SVector{A, Float64}) where {A}
