@@ -13,14 +13,15 @@ using JumpProcesses
         flux = (μ, g, t) -> -0.01 .* μ
         cond = CondensationProcess(flux)
 
-        kernel = BrownianKernel(293.15, 1.81e-5, SVector(1800.0))
+        kernel = BrownianKernel(293.15, 101325.0, SVector(1800.0))
         coag = CoagulationProcess(kernel, GlobalMajorant())
 
         gas_fn = t -> SVector(0.0)
         particles = fill(SVector(1.0e-15), n_sim)
         tspan = (0.0, 10.0)
 
-        prob = ParticleProblem(particles, 1.0, gas_fn, (cond, coag); tspan=tspan, n_sim=n_sim)
+        prob = ParticleProblem(
+            particles, 1.0, gas_fn, (cond, coag); tspan = tspan, n_sim = n_sim)
 
         @test prob isa JumpProblem
 
@@ -33,7 +34,7 @@ using JumpProcesses
         n_sim = 30
 
         cond = CondensationProcess((μ, g, t) -> -0.01 .* μ)
-        kernel = BrownianKernel(293.15, 1.81e-5, SVector(1800.0))
+        kernel = BrownianKernel(293.15, 101325.0, SVector(1800.0))
         coag = CoagulationProcess(kernel, GlobalMajorant())
         emit = EmissionProcess(0.1, t -> SVector(1.0e-15))
         dil = DilutionProcess(t -> 0.05, t -> SVector(0.5e-15))
@@ -43,7 +44,7 @@ using JumpProcesses
         tspan = (0.0, 5.0)
 
         prob = ParticleProblem(particles, 1.0, gas_fn, (cond, coag, emit, dil);
-                               tspan=tspan, n_sim=n_sim)
+            tspan = tspan, n_sim = n_sim)
 
         sol = solve(prob, Tsit5())
         @test sol.retcode == ReturnCode.Success
@@ -53,14 +54,15 @@ using JumpProcesses
         A = 1
         n_sim = 100
 
-        kernel = BrownianKernel(293.15, 1.81e-5, SVector(1800.0))
+        kernel = BrownianKernel(293.15, 101325.0, SVector(1800.0))
         coag = CoagulationProcess(kernel, GlobalMajorant())
 
         gas_fn = t -> SVector(0.0)
         particles = fill(SVector(1.0e-15), n_sim)
         tspan = (0.0, 1.0)
 
-        prob = ParticleProblem(particles, 1.0, gas_fn, (coag,); tspan=tspan, n_sim=n_sim)
+        prob = ParticleProblem(
+            particles, 1.0, gas_fn, (coag,); tspan = tspan, n_sim = n_sim)
 
         sol = solve(prob, Tsit5())
         @test sol.retcode == ReturnCode.Success

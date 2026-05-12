@@ -12,7 +12,7 @@ Particle emission via Poisson point process.
 
 Contributes a ConstantRateJump (V1 simplification: constant total rate).
 """
-struct EmissionProcess{S<:Function} <: PhysicsProcess
+struct EmissionProcess{S <: Function} <: PhysicsProcess
     total_rate::Float64
     sampler::S
 end

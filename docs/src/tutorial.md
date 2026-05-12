@@ -36,7 +36,7 @@ The flux function `(μ, g, t) -> SVector` receives the particle state `μ`, gas-
 Brownian coagulation uses the diffusion kernel with majorant sampling:
 
 ```@repl tutorial
-kernel = BrownianKernel(293.15, 1.81e-5, SVector(1800.0))  # T, μ_f, ρ
+kernel = BrownianKernel(293.15, 101325.0, SVector(1800.0))  # T, p, ρ
 coag = CoagulationProcess(kernel, GlobalMajorant())
 ```
 

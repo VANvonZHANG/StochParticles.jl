@@ -22,7 +22,8 @@ end
 
 Mass concentration of a single species: (Σᵢ μ_{species_idx,i}) / V_comp.
 """
-function species_mass_concentration(u::Vector{Float64}, species_idx::Int, ::Val{A}, sys::ParticleSystem) where {A}
+function species_mass_concentration(
+        u::Vector{Float64}, species_idx::Int, ::Val{A}, sys::ParticleSystem) where {A}
     m = 0.0
     for i in 1:sys.n_active
         μ = get_particle(u, i, Val(A))

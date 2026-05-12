@@ -37,7 +37,7 @@ Evaluate the coagulation rate between two particles with compositions
 All concrete subtypes of `CoagulationKernel` must be callable as
 `kernel(μ_i, μ_j)`.
 """
-function (kernel::CoagulationKernel)(μ_i, μ_j)
+function (kernel::CoagulationKernel{A})(μ_i, μ_j) where {A}
     error("$(typeof(kernel)) must implement the callable interface `(kernel)(μ_i, μ_j)`")
 end
 
