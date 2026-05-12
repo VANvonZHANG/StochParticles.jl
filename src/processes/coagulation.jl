@@ -496,7 +496,7 @@ Returns: `CompositeKernel(K_brown, CompositeKernel(K_grav, K_turb))`
 """
 function make_kernel(params::AtmosphericParameters, epsilon::Float64, R_lambda::Float64,
                       densities::SVector{A, Float64}) where {A}
-    K_brown = BrownianKernel(params.T, params.mu_f, densities)
+    K_brown = BrownianKernel(params.T, params.p, densities)
     K_grav = GravitationalKernel(params.mu_f, params.rho_f, params.rho_p, params.g, densities)
     K_turb = AyalaTurbulentKernel(epsilon, R_lambda, params.nu, params.rho_f, params.rho_p, params.g, densities)
     return CompositeKernel(K_brown, CompositeKernel(K_grav, K_turb))

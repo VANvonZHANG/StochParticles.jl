@@ -43,7 +43,7 @@ bin_edges = 10.0 .^ range(-6, -3; length=21)
 pl_summary = plot_simulation_summary(sol, prob, bin_edges, 1000.0)
 
 # ---- Kernel contribution comparison ----
-K_brown = BrownianKernel(params.T, params.mu_f, densities)
+K_brown = BrownianKernel(params.T, params.p, densities)
 K_grav  = GravitationalKernel(params.mu_f, params.rho_f, params.rho_p, params.g, densities)
 K_turb  = AyalaTurbulentKernel(epsilon, R_lambda, params.nu, params.rho_f, params.rho_p, params.g, densities)
 

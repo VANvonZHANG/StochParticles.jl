@@ -13,7 +13,7 @@ using JumpProcesses
         flux = (μ, g, t) -> -0.01 .* μ
         cond = CondensationProcess(flux)
 
-        kernel = BrownianKernel(293.15, 1.81e-5, SVector(1800.0))
+        kernel = BrownianKernel(293.15, 101325.0, SVector(1800.0))
         coag = CoagulationProcess(kernel, GlobalMajorant())
 
         gas_fn = t -> SVector(0.0)
@@ -33,7 +33,7 @@ using JumpProcesses
         n_sim = 30
 
         cond = CondensationProcess((μ, g, t) -> -0.01 .* μ)
-        kernel = BrownianKernel(293.15, 1.81e-5, SVector(1800.0))
+        kernel = BrownianKernel(293.15, 101325.0, SVector(1800.0))
         coag = CoagulationProcess(kernel, GlobalMajorant())
         emit = EmissionProcess(0.1, t -> SVector(1.0e-15))
         dil = DilutionProcess(t -> 0.05, t -> SVector(0.5e-15))
@@ -53,7 +53,7 @@ using JumpProcesses
         A = 1
         n_sim = 100
 
-        kernel = BrownianKernel(293.15, 1.81e-5, SVector(1800.0))
+        kernel = BrownianKernel(293.15, 101325.0, SVector(1800.0))
         coag = CoagulationProcess(kernel, GlobalMajorant())
 
         gas_fn = t -> SVector(0.0)
