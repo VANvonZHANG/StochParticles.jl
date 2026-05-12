@@ -31,15 +31,16 @@ using Test
         coag = CoagulationProcess(kernel, GlobalMajorant())
         gas_fn = t -> SVector(0.0)
         particles = fill(SVector(1.0e-15), n_sim)
-        prob = ParticleProblem(particles, 1.0, gas_fn, (coag,); tspan=(0.0, 1.0), n_sim=n_sim)
-        sol = solve(prob, Tsit5(); saveat=0.1)
+        prob = ParticleProblem(
+            particles, 1.0, gas_fn, (coag,); tspan = (0.0, 1.0), n_sim = n_sim)
+        sol = solve(prob, Tsit5(); saveat = 0.1)
 
         bin_edges = [0.0, 1.0e-6, 2.0e-6]
         pl = plot_simulation_summary(sol, prob, bin_edges, 1000.0)
         @test pl !== nothing
 
         # Test with time_unit="min"
-        pl_min = plot_simulation_summary(sol, prob, bin_edges, 1000.0; time_unit="min")
+        pl_min = plot_simulation_summary(sol, prob, bin_edges, 1000.0; time_unit = "min")
         @test pl_min !== nothing
     end
 end

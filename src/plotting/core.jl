@@ -16,8 +16,9 @@ Plot number concentration and normalized mass concentration vs time.
 # Returns
 - `Plots.Plot`: the concentration evolution plot
 """
-function plot_concentration_evolution(t::Vector{Float64}, N_conc::Vector{Float64}, M_conc::Vector{Float64};
-                                       time_unit::String="s", kwargs...)
+function plot_concentration_evolution(
+        t::Vector{Float64}, N_conc::Vector{Float64}, M_conc::Vector{Float64};
+        time_unit::String = "s", kwargs...)
     # Normalize M_conc to same scale as N_conc for visualization
     M_norm = M_conc ./ maximum(M_conc) .* maximum(N_conc)
 
@@ -32,7 +33,7 @@ function plot_concentration_evolution(t::Vector{Float64}, N_conc::Vector{Float64
     plot!(pl, t, M_norm;
         label = "M(t) (normalized)",
         linewidth = 2,
-        linestyle = :dash,
+        linestyle = :dash
     )
     return pl
 end
@@ -54,10 +55,11 @@ Plot size distribution evolution as a heatmap.
 # Returns
 - `Plots.Plot`: the heatmap plot
 """
-function plot_size_distribution_heatmap(snapshot_times::Vector{Float64}, bin_centers::Vector{Float64},
-                                         dNdlogD_matrix::Matrix{Float64};
-                                         time_unit::String="s", diameter_unit::String="μm",
-                                         kwargs...)
+function plot_size_distribution_heatmap(
+        snapshot_times::Vector{Float64}, bin_centers::Vector{Float64},
+        dNdlogD_matrix::Matrix{Float64};
+        time_unit::String = "s", diameter_unit::String = "μm",
+        kwargs...)
     # Convert diameter to display unit
     if diameter_unit == "μm"
         diam_display = bin_centers .* 1.0e6
