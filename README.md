@@ -33,7 +33,7 @@ using OrdinaryDiffEq
 
 # Define physics processes
 cond = CondensationProcess((μ, g, t) -> -0.01 .* μ)
-kernel = BrownianKernel(293.15, 1.81e-5, SVector(1800.0))  # T, μ_f, ρ
+kernel = BrownianKernel(293.15, 101325.0, SVector(1800.0))  # T, p, ρ
 coag = CoagulationProcess(kernel, GlobalMajorant())
 
 # Initial conditions: 50 particles, each 1 fg of species 1

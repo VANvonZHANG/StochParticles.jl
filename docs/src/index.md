@@ -43,7 +43,7 @@ Pkg.add(url="https://github.com/VANvonZHANG/StochParticles.jl")
 
 ```@repl
 cond = CondensationProcess((μ, g, t) -> -0.01 .* μ)
-kernel = BrownianKernel(293.15, 1.81e-5, SVector(1800.0))
+kernel = BrownianKernel(293.15, 101325.0, SVector(1800.0))
 coag = CoagulationProcess(kernel, GlobalMajorant())
 
 particles = fill(SVector(1.0e-15), 50)
