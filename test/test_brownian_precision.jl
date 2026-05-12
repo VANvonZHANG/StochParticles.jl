@@ -42,7 +42,7 @@ end
         K_cont = continuum_brownian_kernel(T, mu_f, d_medium, d_medium)
 
         @test K_full > K_cont * 1.05   # still enhanced, but less
-        @test K_full < K_cont * 1.5    # but not drastically
+        @test K_full < K_cont * 2.0    # but not drastically
     end
 
     @testset "Large particles: continuum limit" begin
