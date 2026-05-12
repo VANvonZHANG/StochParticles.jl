@@ -25,7 +25,7 @@ particles = vcat(particles_small, particles_large)
 kernel = make_kernel(params, epsilon, R_lambda, densities)
 coag = CoagulationProcess(kernel, GlobalMajorant())
 gas_fn = t -> SVector(0.0)
-prob = ParticleProblem(particles, volume, gas_fn, (coag,); tspan=tspan, n_sim=n_sim)
+prob = ParticleProblem(particles, volume, gas_fn, (coag,); tspan = tspan, n_sim = n_sim)
 
 # ---- Solve ----
 println("Running cloud droplet turbulent coagulation simulation...")
@@ -39,13 +39,14 @@ println("Mass concentration relative error: $rel_error")
 @assert passed "Mass concentration not conserved! (rel_error=$rel_error)"
 
 # ---- Plot summary (concentration + size distribution) ----
-bin_edges = 10.0 .^ range(-6, -3; length=21)
+bin_edges = 10.0 .^ range(-6, -3; length = 21)
 pl_summary = plot_simulation_summary(sol, prob, bin_edges, 1000.0)
 
 # ---- Kernel contribution comparison ----
 K_brown = BrownianKernel(params.T, params.p, densities)
-K_grav  = GravitationalKernel(params.mu_f, params.rho_f, params.rho_p, params.g, densities)
-K_turb  = AyalaTurbulentKernel(epsilon, R_lambda, params.nu, params.rho_f, params.rho_p, params.g, densities)
+K_grav = GravitationalKernel(params.mu_f, params.rho_f, params.rho_p, params.g, densities)
+K_turb = AyalaTurbulentKernel(
+    epsilon, R_lambda, params.nu, params.rho_f, params.rho_p, params.g, densities)
 
 μ_10um = SVector((π / 6.0) * (1.0e-5)^3 * 1000.0)
 μ_20um = SVector((π / 6.0) * (2.0e-5)^3 * 1000.0)
@@ -67,6 +68,6 @@ pl_kernel = plot_kernel_contributions(
 )
 
 # ---- Combine and save ----
-pl = plot(pl_summary, pl_kernel, layout=(2,1), size=(1400, 1000))
+pl = plot(pl_summary, pl_kernel, layout = (2, 1), size = (1400, 1000))
 savefig(pl, "cloud_droplet_turbulent_coagulation.png")
 println("\nPlot saved to cloud_droplet_turbulent_coagulation.png")

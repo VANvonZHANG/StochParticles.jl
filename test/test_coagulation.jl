@@ -29,7 +29,8 @@ using StaticArrays
         sys = ParticleSystem(Val(1), 3, 1.0, t -> SVector(0.0))
         K_max = compute_majorant(GlobalMajorant(), kernel, u0, sys)
         # K_max must be >= every pair's actual kernel value
-        for i in 1:3, j in (i+1):3
+        for i in 1:3, j in (i + 1):3
+
             K_ij = kernel(get_particle(u0, i, Val(1)), get_particle(u0, j, Val(1)))
             @test K_max >= K_ij
         end
@@ -60,11 +61,14 @@ using StaticArrays
     end
 
     @testset "AyalaTurbulentKernel" begin
-        kernel = AyalaTurbulentKernel(0.01, 50.0, 1.48e-5, 1.225, 1000.0, 9.81, SVector(1000.0))
+        kernel = AyalaTurbulentKernel(
+            0.01, 50.0, 1.48e-5, 1.225, 1000.0, 9.81, SVector(1000.0))
 
         # epsilon <= 0 throws
-        @test_throws DomainError AyalaTurbulentKernel(-0.01, 50.0, 1.48e-5, 1.225, 1000.0, 9.81, SVector(1000.0))
-        @test_throws DomainError AyalaTurbulentKernel(0.0, 50.0, 1.48e-5, 1.225, 1000.0, 9.81, SVector(1000.0))
+        @test_throws DomainError AyalaTurbulentKernel(
+            -0.01, 50.0, 1.48e-5, 1.225, 1000.0, 9.81, SVector(1000.0))
+        @test_throws DomainError AyalaTurbulentKernel(
+            0.0, 50.0, 1.48e-5, 1.225, 1000.0, 9.81, SVector(1000.0))
 
         # Zero-size particles -> K = 0
         μ_zero = SVector(0.0)
@@ -89,7 +93,8 @@ using StaticArrays
         @test @inferred(kernel(μ_10um, μ_20um)) > 0.0
 
         # Stagnant limit: small epsilon should produce positive K
-        K_turb_small = AyalaTurbulentKernel(1e-6, 50.0, 1.48e-5, 1.225, 1000.0, 9.81, SVector(1000.0))
+        K_turb_small = AyalaTurbulentKernel(
+            1e-6, 50.0, 1.48e-5, 1.225, 1000.0, 9.81, SVector(1000.0))
         K_small_val = K_turb_small(μ_10um, μ_20um)
         @test K_small_val > 0.0
     end
@@ -120,8 +125,10 @@ using StaticArrays
         densities = SVector(1000.0)
 
         K_brown = BrownianKernel(params.T, params.p, densities)
-        K_grav = GravitationalKernel(params.mu_f, params.rho_f, params.rho_p, params.g, densities)
-        K_turb = AyalaTurbulentKernel(0.01, 50.0, params.nu, params.rho_f, params.rho_p, params.g, densities)
+        K_grav = GravitationalKernel(
+            params.mu_f, params.rho_f, params.rho_p, params.g, densities)
+        K_turb = AyalaTurbulentKernel(
+            0.01, 50.0, params.nu, params.rho_f, params.rho_p, params.g, densities)
 
         K_combined = CompositeKernel(K_brown, CompositeKernel(K_grav, K_turb))
 

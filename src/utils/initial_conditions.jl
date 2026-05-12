@@ -12,7 +12,7 @@ function lognormal_masses(N::Int, d_g::Float64, sigma_g::Float64, rho::Float64)
     ln_sigma = log(sigma_g)
     diameters = exp.(ln_dg .+ ln_sigma .* randn(N))
     masses = @. (π / 6.0) * diameters^3 * rho
-    return [SVector{1,Float64}(m) for m in masses]
+    return [SVector{1, Float64}(m) for m in masses]
 end
 
 """
@@ -20,6 +20,6 @@ end
 
 Convert particle mass vectors back to diameters [m].
 """
-function diameters_from_masses(masses::Vector{SVector{1,Float64}}, rho::Float64)
+function diameters_from_masses(masses::Vector{SVector{1, Float64}}, rho::Float64)
     return [(6.0 * m[1] / (π * rho))^(1.0 / 3.0) for m in masses]
 end
