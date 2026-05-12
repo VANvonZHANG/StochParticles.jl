@@ -27,7 +27,7 @@ using Test
 
     @testset "plot_simulation_summary" begin
         n_sim = 50
-        kernel = BrownianKernel(293.15, 1.81e-5, SVector(1800.0))
+        kernel = BrownianKernel(293.15, 101325.0, SVector(1800.0))
         coag = CoagulationProcess(kernel, GlobalMajorant())
         gas_fn = t -> SVector(0.0)
         particles = fill(SVector(1.0e-15), n_sim)

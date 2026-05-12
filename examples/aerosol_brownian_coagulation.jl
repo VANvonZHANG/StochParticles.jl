@@ -19,7 +19,7 @@ particles_large = lognormal_masses(n_sim - n_half, 1.0e-7, 1.5, 1800.0)
 particles = vcat(particles_small, particles_large)
 
 # ---- Build problem ----
-kernel = BrownianKernel(params.T, params.mu_f, densities)
+kernel = BrownianKernel(params.T, params.p, densities)
 coag = CoagulationProcess(kernel, GlobalMajorant())
 gas_fn = t -> SVector(0.0)
 prob = ParticleProblem(particles, volume, gas_fn, (coag,); tspan=tspan, n_sim=n_sim)

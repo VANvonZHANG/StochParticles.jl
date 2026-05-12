@@ -5,7 +5,7 @@ using StaticArrays
 
 @testset "Coagulation Kernels" begin
     @testset "BrownianKernel" begin
-        kernel = BrownianKernel(293.15, 1.81e-5, SVector(1000.0))  # single species, ρ=1000
+        kernel = BrownianKernel(293.15, 101325.0, SVector(1000.0))  # single species, ρ=1000
         μ_i = SVector(1.0e-18)   # 1 attogram
         μ_j = SVector(1.0e-18)
         K = kernel(μ_i, μ_j)
@@ -15,15 +15,15 @@ using StaticArrays
     end
 
     @testset "CompositeKernel" begin
-        k1 = BrownianKernel(293.15, 1.81e-5, SVector(1000.0))
-        k2 = BrownianKernel(293.15, 1.81e-5, SVector(1000.0))
+        k1 = BrownianKernel(293.15, 101325.0, SVector(1000.0))
+        k2 = BrownianKernel(293.15, 101325.0, SVector(1000.0))
         comp = CompositeKernel(k1, k2)
         μ = SVector(1.0e-18)
         @test comp(μ, μ) ≈ 2 * k1(μ, μ)  # sum of both kernels
     end
 
     @testset "compute_majorant" begin
-        kernel = BrownianKernel(293.15, 1.81e-5, SVector(1000.0))
+        kernel = BrownianKernel(293.15, 101325.0, SVector(1000.0))
         particles = [SVector(1.0e-18), SVector(2.0e-18), SVector(3.0e-18)]
         u0 = make_u0(particles)
         sys = ParticleSystem(Val(1), 3, 1.0, t -> SVector(0.0))
@@ -119,7 +119,7 @@ using StaticArrays
         params = AtmosphericParameters(293.15, 1.0e5)
         densities = SVector(1000.0)
 
-        K_brown = BrownianKernel(params.T, params.mu_f, densities)
+        K_brown = BrownianKernel(params.T, params.p, densities)
         K_grav = GravitationalKernel(params.mu_f, params.rho_f, params.rho_p, params.g, densities)
         K_turb = AyalaTurbulentKernel(0.01, 50.0, params.nu, params.rho_f, params.rho_p, params.g, densities)
 
@@ -137,13 +137,13 @@ end
 
 @testset "CoagulationProcess" begin
     @testset "provides no drift" begin
-        kernel = BrownianKernel(293.15, 1.81e-5, SVector(1000.0))
+        kernel = BrownianKernel(293.15, 101325.0, SVector(1000.0))
         proc = CoagulationProcess(kernel, GlobalMajorant())
         @test provides_drift(proc) == false
     end
 
     @testset "coagulation jump preserves mass and n_sim" begin
-        kernel = BrownianKernel(293.15, 1.81e-5, SVector(1000.0))
+        kernel = BrownianKernel(293.15, 101325.0, SVector(1000.0))
         sampling = GlobalMajorant()
         proc = CoagulationProcess(kernel, sampling)
 
