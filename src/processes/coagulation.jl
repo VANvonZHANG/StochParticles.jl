@@ -13,6 +13,9 @@ References:
 - Mean free path: kinetic theory derivation
 """
 function compute_air_properties(T::Float64, p::Float64)
+    T > 0 || throw(DomainError(T, "temperature must be positive"))
+    p > 0 || throw(DomainError(p, "pressure must be positive"))
+
     M_air = 0.0289647       # kg/mol, molar mass of dry air
     R_univ = 8.314462618   # J/(mol*K), universal gas constant
     N_A = 6.02214076e23    # mol^-1, Avogadro's number
@@ -31,8 +34,9 @@ end
 """
     BrownianKernel{A} <: CoagulationKernel
 
-Brownian diffusion coagulation kernel:
-    K = (2 k_B T) / (3 μ_f) × (d_i + d_j)² / (d_i × d_j)
+Full transition-regime Brownian diffusion coagulation kernel
+(Jacobson 2005, Eq. 15.33). Covers 1 nm – 100 um spherical particles
+via Cunningham slip correction and delta-correction.
 
 # Fields
 - `T::Float64` — temperature [K]
@@ -290,6 +294,10 @@ function (kernel::BrownianKernel{A})(μ_i::SVector{A, Float64}, μ_j::SVector{A,
     # Geometric radii (spherical assumption)
     r_i = cbrt(3.0 * V_i / (4.0 * pi))
     r_j = cbrt(3.0 * V_j / (4.0 * pi))
+
+    if r_i <= 0.0 || r_j <= 0.0
+        return 0.0
+    end
 
     return _kernel_brown_impl(V_i, rho_i, V_j, rho_j,
                               kernel.T, kernel.mu_f, kernel.gasfreepath, kernel.kb,

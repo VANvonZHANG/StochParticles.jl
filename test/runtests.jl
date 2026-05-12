@@ -25,4 +25,5 @@ end
     include("test_integration.jl")
     include("test_diagnostics.jl")
     include("test_plotting.jl")
+    include("test_brownian_precision.jl")
 end
