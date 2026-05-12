@@ -1,6 +1,6 @@
 using Documenter, StochParticles
 
-DocMeta.setdocmeta!(StochParticles, :DocTestSetup, :(using StochParticles); recursive=true)
+DocMeta.setdocmeta!(StochParticles, :DocTestSetup, :(using StochParticles); recursive = true)
 
 makedocs(;
     modules = [StochParticles],
@@ -11,7 +11,7 @@ makedocs(;
     format = Documenter.HTML(;
         canonical = "https://VANvonZHANG.github.io/StochParticles.jl",
         edit_link = "main",
-        assets = String[],
+        assets = String[]
     ),
     pages = [
         "Home" => "index.md",
@@ -21,13 +21,13 @@ makedocs(;
             "Physics Processes" => "api/processes.md",
             "Coagulation Kernels" => "api/kernels.md",
             "CNMC Operations" => "api/cnmc.md",
-            "Diagnostics" => "api/diagnostics.md",
-        ],
-    ],
+            "Diagnostics" => "api/diagnostics.md"
+        ]
+    ]
 )
 
 deploydocs(;
     repo = "github.com/VANvonZHANG/StochParticles.jl",
     devbranch = "main",
-    push_preview = true,
+    push_preview = true
 )

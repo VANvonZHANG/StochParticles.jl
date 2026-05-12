@@ -22,7 +22,7 @@ particles = vcat(particles_small, particles_large)
 kernel = BrownianKernel(params.T, params.p, densities)
 coag = CoagulationProcess(kernel, GlobalMajorant())
 gas_fn = t -> SVector(0.0)
-prob = ParticleProblem(particles, volume, gas_fn, (coag,); tspan=tspan, n_sim=n_sim)
+prob = ParticleProblem(particles, volume, gas_fn, (coag,); tspan = tspan, n_sim = n_sim)
 
 # ---- Solve ----
 println("Running aerosol Brownian coagulation simulation...")
@@ -36,8 +36,8 @@ println("Mass concentration relative error: $rel_error")
 @assert passed "Mass concentration not conserved! (rel_error=$rel_error)"
 
 # ---- Plot ----
-bin_edges = 10.0 .^ range(-9, -5; length=26)
+bin_edges = 10.0 .^ range(-9, -5; length = 26)
 pl = plot_simulation_summary(sol, prob, bin_edges, 1800.0;
-                              time_unit="min", diameter_unit="μm")
+    time_unit = "min", diameter_unit = "μm")
 savefig(pl, "aerosol_brownian_coagulation.png")
 println("Plot saved to aerosol_brownian_coagulation.png")

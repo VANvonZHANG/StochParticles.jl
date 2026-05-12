@@ -10,7 +10,7 @@ For simulations with emission/dilution, mass conservation is not expected.
 
 Returns a tuple of (whether the check passed, the relative error).
 """
-function check_mass_conservation(sol, prob; tolerance::Float64=1e-3)
+function check_mass_conservation(sol, prob; tolerance::Float64 = 1e-3)
     t, N_conc, M_conc = extract_concentrations(sol, prob)
     M0 = M_conc[1]
     max_rel_error = 0.0

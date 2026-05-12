@@ -33,9 +33,9 @@ savefig(pl, "simulation_summary.png")
 ```
 """
 function plot_simulation_summary(sol, prob, bin_edges::Vector{Float64}, rho::Float64;
-                                  time_unit::String="s", diameter_unit::String="μm",
-                                  n_snapshots::Int=30, layout::Tuple{Int,Int}=(1,2),
-                                  size::Tuple{Int,Int}=(1400,500), kwargs...)
+        time_unit::String = "s", diameter_unit::String = "μm",
+        n_snapshots::Int = 30, layout::Tuple{Int, Int} = (1, 2),
+        size::Tuple{Int, Int} = (1400, 500), kwargs...)
     # Extract concentrations
     t, N_conc, M_conc = extract_concentrations(sol, prob)
 
@@ -51,11 +51,12 @@ function plot_simulation_summary(sol, prob, bin_edges::Vector{Float64}, rho::Flo
     end
 
     # Left panel: concentration evolution
-    pl1 = plot_concentration_evolution(t_display, N_conc, M_conc; time_unit=time_unit)
+    pl1 = plot_concentration_evolution(t_display, N_conc, M_conc; time_unit = time_unit)
 
     # Right panel: size distribution heatmap
-    snapshot_times, bin_centers, matrix = compute_size_distribution(
-        sol, prob, bin_edges, rho; n_snapshots=n_snapshots)
+    snapshot_times, bin_centers,
+    matrix = compute_size_distribution(
+        sol, prob, bin_edges, rho; n_snapshots = n_snapshots)
 
     # Convert snapshot times to display unit
     snapshot_times_display = if time_unit == "min"
@@ -70,8 +71,8 @@ function plot_simulation_summary(sol, prob, bin_edges::Vector{Float64}, rho::Flo
 
     pl2 = plot_size_distribution_heatmap(
         snapshot_times_display, bin_centers, matrix;
-        time_unit=time_unit, diameter_unit=diameter_unit)
+        time_unit = time_unit, diameter_unit = diameter_unit)
 
     # Combine
-    return plot(pl1, pl2; layout=layout, size=size, kwargs...)
+    return plot(pl1, pl2; layout = layout, size = size, kwargs...)
 end

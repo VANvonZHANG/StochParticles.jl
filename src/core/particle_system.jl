@@ -34,8 +34,9 @@ end
 
 Construct a ParticleSystem with `n_sim` active particles.
 """
-ParticleSystem(::Val{A}, n_sim::Int, volume::Float64, gas_phase_fn::F) where {A, F} =
+function ParticleSystem(::Val{A}, n_sim::Int, volume::Float64, gas_phase_fn::F) where {A, F}
     ParticleSystem{A, F}(n_sim, volume, gas_phase_fn, n_sim, 0.0, 0.0)
+end
 
 """
     species_val(sys::ParticleSystem{A}) -> Val{A}
@@ -60,7 +61,8 @@ end
 
 Write particle i's composition into flat ODE state vector `u`.
 """
-@inline function set_particle!(u::Vector{Float64}, i::Int, ::Val{A}, μ::SVector{A, Float64}) where {A}
+@inline function set_particle!(u::Vector{Float64}, i::Int, ::Val{A}, μ::SVector{
+        A, Float64}) where {A}
     offset = (i - 1) * A
     @inbounds for k in 1:A
         u[offset + k] = μ[k]
