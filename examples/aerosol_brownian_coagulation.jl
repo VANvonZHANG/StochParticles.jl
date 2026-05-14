@@ -35,8 +35,21 @@ passed, rel_error = check_mass_conservation(sol, prob)
 println("Mass concentration relative error: $rel_error")
 @assert passed "Mass concentration not conserved! (rel_error=$rel_error)"
 
-# ---- Plot ----
+# ---- Diagnostics export ----
 bin_edges = 10.0 .^ range(-9, -5; length = 26)
+sys = prob.prob.p
+A = 1
+
+init_diagnostics_file("aerosol_brownian_coagulation.h5", A, bin_edges;
+    species_names = ["SO4"], chunk_size = 64)
+
+for (t, u) in zip(sol.t, sol.u)
+    save_diagnostics("aerosol_brownian_coagulation.h5", t, u, sys, Val(A);
+        bin_edges = bin_edges, rho = 1800.0)
+end
+println("Diagnostics saved to aerosol_brownian_coagulation.h5")
+
+# ---- Plot ----
 pl = plot_simulation_summary(sol, prob, bin_edges, 1800.0;
     time_unit = "min", diameter_unit = "μm")
 savefig(pl, "aerosol_brownian_coagulation.png")
