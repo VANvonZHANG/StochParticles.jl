@@ -136,3 +136,66 @@ function save_diagnostics(
 
     return nothing
 end
+
+"""
+    export_diagnostics_to_csv(h5_path::String, csv_dir::String)
+
+Convert HDF5 diagnostics to CSV format. Creates one CSV file per dataset
+in `csv_dir`, plus a combined `all_diagnostics.csv` with time as the first column.
+"""
+function export_diagnostics_to_csv(h5_path::String, csv_dir::String)
+    if !isdir(csv_dir)
+        mkpath(csv_dir)
+    end
+
+    HDF5.h5open(h5_path, "r") do file
+        time_data = read(file["time"])
+        n_rows = length(time_data)
+
+        datasets = String[]
+        for name in keys(file)
+            if name == "time" || name == "meta"
+                continue
+            end
+            ds = file[name]
+            data = read(ds)
+            push!(datasets, name)
+
+            # Write individual CSV
+            csv_path = joinpath(csv_dir, "$(name).csv")
+            open(csv_path, "w") do io
+                if ndims(data) == 1
+                    println(io, "time,$(name)")
+                    for i in 1:n_rows
+                        println(io, "$(time_data[i]),$(data[i])")
+                    end
+                elseif ndims(data) == 2
+                    n_cols = size(data, 2)
+                    headers = ["time"; ["$(name)_$(j)" for j in 1:n_cols]]
+                    println(io, join(headers, ","))
+                    for i in 1:n_rows
+                        row = [time_data[i]; data[i, :]]
+                        println(io, join(row, ","))
+                    end
+                end
+            end
+        end
+
+        # Write combined CSV with time + all 1D datasets
+        combined_path = joinpath(csv_dir, "all_diagnostics.csv")
+        open(combined_path, "w") do io
+            one_d_datasets = filter(d -> ndims(read(file[d])) == 1, datasets)
+            headers = ["time"; one_d_datasets]
+            println(io, join(headers, ","))
+            for i in 1:n_rows
+                row = [time_data[i]]
+                for d in one_d_datasets
+                    push!(row, read(file[d])[i])
+                end
+                println(io, join(row, ","))
+            end
+        end
+    end
+
+    nothing
+end
