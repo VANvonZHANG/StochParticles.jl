@@ -64,4 +64,7 @@ include("utils/binning.jl")
 include("utils/parameters.jl")
 include("utils/initial_conditions.jl")
 
+# ---- I/O ----
+include("io/hdf5.jl")
+
 end
