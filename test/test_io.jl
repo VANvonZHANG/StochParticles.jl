@@ -163,3 +163,95 @@ end
         @test seq_orig == seq_restored
     end
 end
+
+@testset "IO: diagnostics init and append" begin
+    mktempdir() do dir
+        gas_fn(t) = [1.0, 2.0]
+        sys = ParticleSystem(Val(2), 5, 1.0, gas_fn)
+        sys.n_active = 5
+        u = [1.0, 2.0, 3.0, 4.0, 5.0,
+             6.0, 7.0, 8.0, 9.0, 10.0]
+        bin_edges = [0.0, 1.0e-6, 2.0e-6, 3.0e-6]
+        n_bins = length(bin_edges) - 1
+        path = joinpath(dir, "diagnostics.h5")
+
+        # Test init_diagnostics_file creates file with correct structure
+        StochParticles.init_diagnostics_file(path, 2, bin_edges; species_names = ["SO4", "NO3"])
+        @test isfile(path)
+
+        HDF5.h5open(path, "r") do file
+            @test haskey(file, "time")
+            @test haskey(file, "number_concentration")
+            @test haskey(file, "mass_concentration")
+            @test haskey(file, "species_mass_concentration")
+            @test haskey(file, "mean_diameter")
+            @test haskey(file, "volume")
+            @test haskey(file, "size_distribution")
+            @test haskey(file, "meta")
+
+            @test size(file["time"]) == (0,)
+            @test size(file["number_concentration"]) == (0,)
+            @test size(file["mass_concentration"]) == (0,)
+            @test size(file["species_mass_concentration"]) == (0, 2)
+            @test size(file["mean_diameter"]) == (0,)
+            @test size(file["volume"]) == (0,)
+            @test size(file["size_distribution"]) == (0, n_bins)
+
+            meta_attrs = StochParticles.h5_read_attrs(file, "meta")
+            @test meta_attrs["schema_version"] == "1.0.0"
+            @test meta_attrs["species_names"] == ["SO4", "NO3"]
+            @test meta_attrs["bin_edges"] ≈ bin_edges
+        end
+
+        # Test save_diagnostics appends data correctly
+        t1 = 0.0
+        StochParticles.save_diagnostics(path, t1, u, sys, Val(2); bin_edges = bin_edges, rho = 1000.0)
+
+        t2 = 1.0
+        StochParticles.save_diagnostics(path, t2, u, sys, Val(2); bin_edges = bin_edges, rho = 1000.0)
+
+        HDF5.h5open(path, "r") do file
+            @test size(file["time"]) == (2,)
+            @test read(file["time"]) ≈ [t1, t2]
+
+            @test size(file["number_concentration"]) == (2,)
+            @test read(file["number_concentration"]) ≈ [sys.n_sim / sys.volume, sys.n_sim / sys.volume]
+
+            @test size(file["mass_concentration"]) == (2,)
+            M = StochParticles.total_mass(u, Val(2), sys.n_active)
+            expected_mass_conc = M / sys.volume
+            @test read(file["mass_concentration"]) ≈ [expected_mass_conc, expected_mass_conc]
+
+            @test size(file["species_mass_concentration"]) == (2, 2)
+            smc = read(file["species_mass_concentration"])
+            for s in 1:2
+                expected_smc = StochParticles.species_mass_concentration(u, s, Val(2), sys)
+                @test smc[:, s] ≈ [expected_smc, expected_smc]
+            end
+
+            @test size(file["size_distribution"]) == (2, n_bins)
+        end
+
+        # Test error paths
+        @test_throws ErrorException StochParticles.init_diagnostics_file(path, 2, bin_edges)
+        @test_throws SystemError StochParticles.save_diagnostics(joinpath(dir, "nonexistent.h5"), 0.0, u, sys, Val(2))
+
+        bad_path = joinpath(dir, "bad.h5")
+        HDF5.h5open(bad_path, "w") do file
+            file["other"] = 1.0
+        end
+        @test_throws ErrorException StochParticles.save_diagnostics(bad_path, 0.0, u, sys, Val(2))
+
+        # Test bin_edges validation
+        @test_throws ArgumentError StochParticles.init_diagnostics_file(joinpath(dir, "bad_edges.h5"), 2, [1.0])
+
+        # Test species_names length validation
+        @test_throws ArgumentError StochParticles.init_diagnostics_file(joinpath(dir, "bad_names.h5"), 2, bin_edges; species_names = ["SO4"])
+
+        # Test bin_edges mismatch in save_diagnostics
+        path_mismatch = joinpath(dir, "mismatch.h5")
+        StochParticles.init_diagnostics_file(path_mismatch, 2, bin_edges; species_names = ["SO4", "NO3"])
+        mismatched_edges = [0.0, 2.0e-6, 4.0e-6]
+        @test_throws ArgumentError StochParticles.save_diagnostics(path_mismatch, 0.0, u, sys, Val(2); bin_edges = mismatched_edges)
+    end
+end
