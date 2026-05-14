@@ -30,6 +30,7 @@ function save_checkpoint_jld2(
     u::Vector{Float64},
     sys::ParticleSystem,
     t::Float64;
+    process_info = nothing,
     rng::AbstractRNG = Random.default_rng(),
     overwrite::Bool = false
 )
@@ -60,6 +61,7 @@ function save_checkpoint_jld2(
         file["cached_majorant"] = sys._cached_majorant
         file["rng_seed"] = seed
         file["rng_state"] = state_vec
+        file["version"] = CHECKPOINT_VERSION
         file["schema_version"] = SCHEMA_VERSION
         file["created_at"] = string(now())
     end
@@ -95,6 +97,12 @@ function load_checkpoint_jld2(path::String)
     end
 
     jldopen(path, "r") do file
+        for key in ["schema_version", "u", "t", "n_active", "volume", "n_sim", "mass_total_cache", "cached_majorant", "rng_seed", "rng_state"]
+            if !haskey(file, key)
+                throw(ErrorException("Checkpoint file missing required key: $(key)"))
+            end
+        end
+
         file_version = file["schema_version"]
         current = VersionNumber(SCHEMA_VERSION)
         file_v = VersionNumber(file_version)
