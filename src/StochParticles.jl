@@ -36,6 +36,7 @@ export lognormal_masses, diameters_from_masses
 export plot_concentration_evolution, plot_size_distribution_heatmap,
        plot_kernel_contributions, plot_simulation_summary
 export save_checkpoint, load_checkpoint, list_checkpoints, restore_rng
+export save_checkpoint_jld2, load_checkpoint_jld2
 export init_diagnostics_file, save_diagnostics
 
 # ---- Core implementations ----
@@ -70,5 +71,6 @@ include("utils/initial_conditions.jl")
 include("io/hdf5.jl")
 include("io/checkpoint.jl")
 include("io/diagnostics.jl")
+include("io/jld2.jl")
 
 end
