@@ -35,6 +35,7 @@ export standard_aerosol_atmosphere, standard_cloud_atmosphere
 export lognormal_masses, diameters_from_masses
 export plot_concentration_evolution, plot_size_distribution_heatmap,
        plot_kernel_contributions, plot_simulation_summary
+export save_checkpoint, load_checkpoint, list_checkpoints, restore_rng
 
 # ---- Core implementations ----
 include("core/particle_system.jl")
@@ -66,5 +67,6 @@ include("utils/initial_conditions.jl")
 
 # ---- I/O ----
 include("io/hdf5.jl")
+include("io/checkpoint.jl")
 
 end
