@@ -255,3 +255,56 @@ end
         @test_throws ArgumentError StochParticles.save_diagnostics(path_mismatch, 0.0, u, sys, Val(2); bin_edges = mismatched_edges)
     end
 end
+
+@testset "IO: JLD2 fallback round-trip" begin
+    mktempdir() do dir
+        gas_fn(t) = [1.0, 2.0]
+        sys = ParticleSystem(Val(2), 10, 1.5, gas_fn)
+        sys.n_active = 7
+        sys._mass_total_cache = 42.0
+        sys._cached_majorant = 3.14
+        u = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0,
+             11.0, 12.0, 13.0, 14.0]
+        t = 0.5
+        rng = Random.Xoshiro(1234)
+
+        path = joinpath(dir, "checkpoint")
+        StochParticles.save_checkpoint_jld2(path, u, sys, t; rng=rng)
+
+        # Verify .jld2 suffix appended
+        @test isfile(path * ".jld2")
+
+        # Load and verify
+        u_loaded, sys_data, t_loaded, rng_state = StochParticles.load_checkpoint_jld2(path * ".jld2")
+        @test u_loaded ≈ u
+        @test sys_data.n_active == 7
+        @test sys_data.volume == 1.5
+        @test sys_data.n_sim == 10
+        @test sys_data.mass_total_cache == 42.0
+        @test sys_data.cached_majorant == 3.14
+        @test t_loaded == t
+        @test rng_state[:seed] == 0
+        @test rng_state[:state] == Vector{UInt64}([rng.s0, rng.s1, rng.s2, rng.s3])
+
+        # Test overwrite=false throws
+        @test_throws ErrorException StochParticles.save_checkpoint_jld2(path, u, sys, t; rng=rng, overwrite=false)
+
+        # Test overwrite=true succeeds
+        StochParticles.save_checkpoint_jld2(path, u, sys, t; rng=rng, overwrite=true)
+
+        # Test load_checkpoint_jld2 throws for missing file
+        @test_throws SystemError StochParticles.load_checkpoint_jld2(joinpath(dir, "nonexistent.jld2"))
+
+        # Test restore_rng sequence determinism for JLD2
+        rng_orig = Random.Xoshiro(5678)
+        # Advance original RNG
+        _ = rand(rng_orig, 5)
+        StochParticles.save_checkpoint_jld2(joinpath(dir, "rng_test"), u, sys, t; rng=rng_orig)
+        _, _, _, rng_state_loaded = StochParticles.load_checkpoint_jld2(joinpath(dir, "rng_test.jld2"))
+        rng_restored = StochParticles.restore_rng(rng_state_loaded)
+        # Verify same future sequence
+        seq_orig = [rand(rng_orig) for _ in 1:10]
+        seq_restored = [rand(rng_restored) for _ in 1:10]
+        @test seq_orig == seq_restored
+    end
+end
