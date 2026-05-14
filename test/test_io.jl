@@ -1,6 +1,7 @@
 using StochParticles
 using Test
 using HDF5
+using Random
 
 @testset "IO: HDF5 low-level helpers" begin
     mktempdir() do dir
@@ -83,5 +84,82 @@ using HDF5
             # Missing /meta throws
             @test_throws ErrorException StochParticles.validate_schema_version(file)
         end
+    end
+end
+
+@testset "IO: checkpoint round-trip" begin
+    mktempdir() do dir
+        gas_fn(t) = [1.0, 2.0]
+        sys = ParticleSystem(Val(2), 10, 1.5, gas_fn)
+        sys.n_active = 7
+        sys._mass_total_cache = 42.0
+        sys._cached_majorant = 3.14
+        u = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0,
+             11.0, 12.0, 13.0, 14.0]
+        t = 0.5
+        rng = Random.Xoshiro(1234)
+
+        path = joinpath(dir, "checkpoint")
+        StochParticles.save_checkpoint(path, u, sys, t; rng=rng)
+
+        # Verify .h5 suffix appended
+        @test isfile(path * ".h5")
+
+        # Load and verify
+        u_loaded, sys_data, t_loaded, rng_state = StochParticles.load_checkpoint(path * ".h5")
+        @test u_loaded ≈ u
+        @test sys_data.n_active == 7
+        @test sys_data.volume == 1.5
+        @test sys_data.n_sim == 10
+        @test sys_data.mass_total_cache == 42.0
+        @test sys_data.cached_majorant == 3.14
+        @test t_loaded == t
+        @test rng_state[:seed] == 0
+        @test rng_state[:state] == Vector{UInt64}([rng.s0, rng.s1, rng.s2, rng.s3])
+
+        # Test overwrite=false throws
+        @test_throws ErrorException StochParticles.save_checkpoint(path, u, sys, t; rng=rng, overwrite=false)
+
+        # Test overwrite=true succeeds
+        StochParticles.save_checkpoint(path, u, sys, t; rng=rng, overwrite=true)
+
+        # Test load_checkpoint throws for missing file
+        @test_throws SystemError StochParticles.load_checkpoint(joinpath(dir, "nonexistent.h5"))
+
+        # Test list_checkpoints with actual checkpoint files and numeric sort
+        cp1 = joinpath(dir, "run_001.h5")
+        cp2 = joinpath(dir, "run_010.h5")
+        cp3 = joinpath(dir, "run_100.h5")
+        touch(cp1)
+        touch(cp2)
+        touch(cp3)
+        cps = StochParticles.list_checkpoints(joinpath(dir, "run"))
+        @test cps == [cp1, cp2, cp3]
+
+        # Test list_checkpoints numeric sort (run_10 after run_2)
+        cp4 = joinpath(dir, "run_2.h5")
+        cp5 = joinpath(dir, "run_10.h5")
+        touch(cp4)
+        touch(cp5)
+        cps2 = StochParticles.list_checkpoints(joinpath(dir, "run"))
+        @test cps2 == [cp1, cp4, cp2, cp5, cp3]
+
+        # Test load_checkpoint throws SystemError on missing file
+        @test_throws SystemError StochParticles.load_checkpoint(joinpath(dir, "nonexistent.h5"))
+
+        # Test save_checkpoint throws ErrorException on existing file with overwrite=false
+        @test_throws ErrorException StochParticles.save_checkpoint(path, u, sys, t; rng=rng, overwrite=false)
+
+        # Test restore_rng sequence determinism
+        rng_orig = Random.Xoshiro(5678)
+        # Advance original RNG
+        _ = rand(rng_orig, 5)
+        StochParticles.save_checkpoint(joinpath(dir, "rng_test"), u, sys, t; rng=rng_orig)
+        _, _, _, rng_state_loaded = StochParticles.load_checkpoint(joinpath(dir, "rng_test.h5"))
+        rng_restored = StochParticles.restore_rng(rng_state_loaded)
+        # Verify same future sequence
+        seq_orig = [rand(rng_orig) for _ in 1:10]
+        seq_restored = [rand(rng_restored) for _ in 1:10]
+        @test seq_orig == seq_restored
     end
 end
