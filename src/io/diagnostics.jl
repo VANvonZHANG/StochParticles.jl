@@ -16,7 +16,7 @@ function init_diagnostics_file(
         path::String,
         n_species::Int,
         bin_edges::Vector{Float64};
-        species_names = ["species_\$i" for i in 1:n_species],
+        species_names = ["species_" * string(i) for i in 1:n_species],
         chunk_size::Int = 64
     )
     if isfile(path)
@@ -101,8 +101,7 @@ function save_diagnostics(
         h5_append_row!(file, "time", t)
         h5_append_row!(file, "number_concentration", number_concentration(sys))
 
-        M = total_mass(u, Val(A), sys.n_active)
-        h5_append_row!(file, "mass_concentration", M / sys.volume)
+        h5_append_row!(file, "mass_concentration", mass_concentration(u, Val(A), sys))
 
         species_masses = Vector{Float64}(undef, A)
         for s in 1:A
