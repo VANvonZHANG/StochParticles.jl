@@ -308,3 +308,50 @@ end
         @test seq_orig == seq_restored
     end
 end
+
+@testset "IO: utility functions" begin
+    mktempdir() do dir
+        # Test list_checkpoints numeric sorting with ckpt_001, ckpt_010, ckpt_002
+        cp1 = joinpath(dir, "ckpt_001.h5")
+        cp2 = joinpath(dir, "ckpt_010.h5")
+        cp3 = joinpath(dir, "ckpt_002.h5")
+        touch(cp1)
+        touch(cp2)
+        touch(cp3)
+        cps = StochParticles.list_checkpoints(joinpath(dir, "ckpt"))
+        @test cps == [cp1, cp3, cp2]
+
+        # Test export_diagnostics_to_csv
+        gas_fn(t) = [1.0, 2.0]
+        sys = ParticleSystem(Val(2), 5, 1.0, gas_fn)
+        sys.n_active = 5
+        u = [1.0, 2.0, 3.0, 4.0, 5.0,
+             6.0, 7.0, 8.0, 9.0, 10.0]
+        bin_edges = [0.0, 1.0e-6, 2.0e-6, 3.0e-6]
+        diag_path = joinpath(dir, "export_diagnostics.h5")
+        csv_dir = joinpath(dir, "csv_output")
+
+        StochParticles.init_diagnostics_file(diag_path, 2, bin_edges; species_names = ["SO4", "NO3"])
+        StochParticles.save_diagnostics(diag_path, 0.0, u, sys, Val(2); bin_edges = bin_edges, rho = 1000.0)
+        StochParticles.save_diagnostics(diag_path, 1.0, u, sys, Val(2); bin_edges = bin_edges, rho = 1000.0)
+
+        StochParticles.export_diagnostics_to_csv(diag_path, csv_dir)
+
+        @test isdir(csv_dir)
+        @test isfile(joinpath(csv_dir, "number_concentration.csv"))
+        @test isfile(joinpath(csv_dir, "mass_concentration.csv"))
+        @test isfile(joinpath(csv_dir, "all_diagnostics.csv"))
+
+        # Read back number_concentration.csv and verify number of rows (header + 2 data rows)
+        nc_lines = readlines(joinpath(csv_dir, "number_concentration.csv"))
+        @test length(nc_lines) == 3
+        @test nc_lines[1] == "time,number_concentration"
+        @test startswith(nc_lines[2], "0.0,")
+        @test startswith(nc_lines[3], "1.0,")
+
+        # Read back all_diagnostics.csv and verify header includes 1D datasets
+        all_lines = readlines(joinpath(csv_dir, "all_diagnostics.csv"))
+        @test length(all_lines) == 3
+        @test startswith(all_lines[1], "time,")
+    end
+end
