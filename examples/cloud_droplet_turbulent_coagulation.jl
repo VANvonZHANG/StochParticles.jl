@@ -38,8 +38,21 @@ passed, rel_error = check_mass_conservation(sol, prob)
 println("Mass concentration relative error: $rel_error")
 @assert passed "Mass concentration not conserved! (rel_error=$rel_error)"
 
-# ---- Plot summary (concentration + size distribution) ----
+# ---- Diagnostics export ----
 bin_edges = 10.0 .^ range(-6, -3; length = 21)
+sys = prob.prob.p
+A = 1
+
+init_diagnostics_file("cloud_droplet_turbulent_coagulation.h5", A, bin_edges;
+    species_names = ["H2O"], chunk_size = 64)
+
+for (t, u) in zip(sol.t, sol.u)
+    save_diagnostics("cloud_droplet_turbulent_coagulation.h5", t, u, sys, Val(A);
+        bin_edges = bin_edges, rho = 1000.0)
+end
+println("Diagnostics saved to cloud_droplet_turbulent_coagulation.h5")
+
+# ---- Plot summary (concentration + size distribution) ----
 pl_summary = plot_simulation_summary(sol, prob, bin_edges, 1000.0)
 
 # ---- Kernel contribution comparison ----
