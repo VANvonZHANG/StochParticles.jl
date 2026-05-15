@@ -16,6 +16,9 @@ function lognormal_masses(
         densities::SVector{A, Float64};
         fractions::SVector{A, Float64} = SVector{A, Float64}(
             ntuple(k -> k == 1 ? 1.0 : 0.0, Val(A)))) where {A}
+    if abs(sum(fractions) - 1.0) > 1e-10
+        throw(ArgumentError("fractions must sum to 1.0, got $(sum(fractions))"))
+    end
     ln_dg = log(d_g)
     ln_sigma = log(sigma_g)
     diameters = exp.(ln_dg .+ ln_sigma .* randn(N))
