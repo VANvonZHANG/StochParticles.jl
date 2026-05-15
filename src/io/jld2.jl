@@ -26,13 +26,13 @@ Save a simulation checkpoint to a JLD2 file.
 - `ErrorException` if the file already exists and `overwrite` is `false`.
 """
 function save_checkpoint_jld2(
-    path::String,
-    u::Vector{Float64},
-    sys::ParticleSystem,
-    t::Float64;
-    process_info = nothing,
-    rng::AbstractRNG = Random.default_rng(),
-    overwrite::Bool = false
+        path::String,
+        u::Vector{Float64},
+        sys::ParticleSystem,
+        t::Float64;
+        process_info = nothing,
+        rng::AbstractRNG = Random.default_rng(),
+        overwrite::Bool = false
 )
     if !endswith(path, ".jld2")
         path = path * ".jld2"
@@ -97,7 +97,8 @@ function load_checkpoint_jld2(path::String)
     end
 
     jldopen(path, "r") do file
-        for key in ["schema_version", "u", "t", "n_active", "volume", "n_sim", "mass_total_cache", "cached_majorant", "rng_seed", "rng_state"]
+        for key in ["schema_version", "u", "t", "n_active", "volume", "n_sim",
+            "mass_total_cache", "cached_majorant", "rng_seed", "rng_state"]
             if !haskey(file, key)
                 throw(ErrorException("Checkpoint file missing required key: $(key)"))
             end
