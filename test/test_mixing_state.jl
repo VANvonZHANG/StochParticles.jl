@@ -127,4 +127,27 @@ using StaticArrays
         d_expected = (6.0 * V_expected / π)^(1.0 / 3.0)
         @test diams2[1] ≈ d_expected
     end
+
+    @testset "lognormal_masses multi-species" begin
+        densities = SVector(1770.0, 1800.0)
+
+        # Pure SO4 mode (fractions = [1, 0])
+        so4_particles = @inferred lognormal_masses(
+            1000, 1.0e-7, 1.5, densities; fractions = SVector(1.0, 0.0))
+        @test length(so4_particles) == 1000
+        @test all(p -> p[1] > 0 && p[2] == 0, so4_particles)
+
+        # Mixed mode (50/50)
+        mixed_particles = @inferred lognormal_masses(
+            1000, 1.0e-7, 1.5, densities; fractions = SVector(0.5, 0.5))
+        @test length(mixed_particles) == 1000
+        @test all(p -> p[1] > 0 && p[2] > 0, mixed_particles)
+        @test all(p -> p[1] ≈ p[2], mixed_particles)
+
+        # Backward compatible single-species call
+        single_particles = @inferred lognormal_masses(100, 1.0e-7, 1.5, 1000.0)
+        @test length(single_particles) == 100
+        @test all(p -> p[1] > 0, single_particles)
+        @test eltype(single_particles) == SVector{1, Float64}
+    end
 end
