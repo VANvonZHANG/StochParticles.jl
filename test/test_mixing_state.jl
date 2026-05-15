@@ -111,18 +111,18 @@ using StaticArrays
         # Two particles with only species 1 (density 1000)
         sys1 = ParticleSystem(Val(2), 2, 1.0, gas_fn)
         u1 = make_u0([SVector(1.0e-18, 0.0), SVector(8.0e-18, 0.0)])
-        diams1 = particle_diameters(u1, sys1, SVector(1000.0, 2000.0))
+        diams1 = @inferred particle_diameters(u1, sys1, SVector(1000.0, 2000.0))
         @test diams1[1] ≈ (6.0 * 1.0e-18 / (π * 1000.0))^(1.0 / 3.0)
         @test diams1[2] ≈ (6.0 * 8.0e-18 / (π * 1000.0))^(1.0 / 3.0)
 
         # Same particle but use backward-compatible single-species call
-        diams1_compat = particle_diameters(u1, sys1, 1000.0)
+        diams1_compat = @inferred particle_diameters(u1, sys1, 1000.0)
         @test diams1_compat ≈ diams1
 
         # Mixed particle: total volume = 0.5e-18/1000 + 0.5e-18/2000
         sys2 = ParticleSystem(Val(2), 1, 1.0, gas_fn)
         u2 = make_u0([SVector(0.5e-18, 0.5e-18)])
-        diams2 = particle_diameters(u2, sys2, SVector(1000.0, 2000.0))
+        diams2 = @inferred particle_diameters(u2, sys2, SVector(1000.0, 2000.0))
         V_expected = 0.5e-18 / 1000.0 + 0.5e-18 / 2000.0
         d_expected = (6.0 * V_expected / π)^(1.0 / 3.0)
         @test diams2[1] ≈ d_expected

@@ -29,7 +29,7 @@ end
 # Backward-compatible single-species shortcut
 function particle_diameters(
         u::Vector{Float64}, sys::ParticleSystem, rho::Float64)
-    return particle_diameters(u, sys, SVector(rho))
+    return particle_diameters(u, sys, SVector{1, Float64}(rho))
 end
 
 """
