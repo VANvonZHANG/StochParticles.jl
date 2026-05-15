@@ -20,7 +20,8 @@ export PhysicsProcess, provides_drift
 export CoagulationKernel, CoagulationSampling
 export BrownianKernel, GlobalMajorant, CompositeKernel, GravitationalKernel,
        AyalaTurbulentKernel, AtmosphericParameters, make_kernel
-export CoagulationProcess, CondensationProcess, EmissionProcess, DilutionProcess
+export CoagulationProcess, CondensationProcess, SpeciesDependentCondensation,
+       EmissionProcess, DilutionProcess
 export apply_drift, make_ode_func
 export compute_majorant, majorant_rate
 export cnmc_merge!, cnmc_clone!, cnmc_volume_rescale!, cnmc_coagulate!

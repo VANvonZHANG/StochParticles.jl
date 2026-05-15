@@ -180,4 +180,17 @@ using StaticArrays
         diams1 = diameters_from_masses(masses1, 1000.0)
         @test diams1[1] ≈ (6.0 * 1.0e-18 / (π * 1000.0))^(1.0 / 3.0)
     end
+
+    @testset "SpeciesDependentCondensation" begin
+        rates = SVector(1.0e-20, 2.0e-20)
+        proc = SpeciesDependentCondensation(rates)
+
+        μ = SVector(1.0e-18, 2.0e-18)
+        gas_fn = t -> SVector(0.0, 0.0)
+        sys = ParticleSystem(Val(2), 10, 1.0, gas_fn)
+
+        dμ = @inferred apply_drift(proc, μ, sys, 0.0)
+        @test dμ ≈ rates
+        @test provides_drift(proc) == true
+    end
 end

@@ -24,3 +24,26 @@ function apply_drift(proc::CondensationProcess, μ::SVector{A, Float64}, sys::Pa
     g = sys.gas_phase(t)
     return proc.flux(μ, g, t)
 end
+
+"""
+    SpeciesDependentCondensation{A} <: PhysicsProcess
+
+Constant per-species condensation rates.
+
+# Constructor
+    SpeciesDependentCondensation(rates::SVector{A, Float64})
+
+Each species grows at its own constant rate [kg/s], independent of particle state.
+For state-dependent or gas-phase-dependent rates, use `CondensationProcess` directly.
+"""
+struct SpeciesDependentCondensation{A} <: PhysicsProcess
+    rates::SVector{A, Float64}
+end
+
+provides_drift(::SpeciesDependentCondensation) = true
+
+function apply_drift(
+    proc::SpeciesDependentCondensation{A}, μ::SVector{A, Float64},
+    sys::ParticleSystem{A}, t) where {A}
+    return proc.rates
+end
