@@ -1,20 +1,35 @@
 # src/diagnostics/distributions.jl
 
 """
-    particle_diameters(u, sys, rho) -> Vector{Float64}
+    particle_diameters(u, sys, densities) -> Vector{Float64}
 
 Compute sphere-equivalent diameters [m] for all active particles from their masses.
 
-Assumes single-species particles with density `rho` [kg/m³].
+For multi-species particles, the equivalent volume is computed as:
+    V_p = Σ μ_k / ρ_k
+
+# Arguments
+- `densities::SVector{A, Float64}`: per-species densities [kg/m³]
 """
-function particle_diameters(u::Vector{Float64}, sys::ParticleSystem, rho::Float64)
-    A = species_val(sys)
+function particle_diameters(
+        u::Vector{Float64}, sys::ParticleSystem, densities::SVector{A, Float64}) where {A}
+    A_val = species_val(sys)
     diams = Vector{Float64}(undef, sys.n_active)
     for i in 1:sys.n_active
-        μ = get_particle(u, i, A)
-        diams[i] = (6.0 * μ[1] / (π * rho))^(1.0 / 3.0)
+        μ = get_particle(u, i, A_val)
+        V_p = 0.0
+        for k in 1:A
+            V_p += μ[k] / densities[k]
+        end
+        diams[i] = (6.0 * V_p / π)^(1.0 / 3.0)
     end
     return diams
+end
+
+# Backward-compatible single-species shortcut
+function particle_diameters(
+        u::Vector{Float64}, sys::ParticleSystem, rho::Float64)
+    return particle_diameters(u, sys, SVector(rho))
 end
 
 """
