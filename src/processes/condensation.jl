@@ -43,7 +43,7 @@ end
 provides_drift(::SpeciesDependentCondensation) = true
 
 function apply_drift(
-    proc::SpeciesDependentCondensation{A}, μ::SVector{A, Float64},
-    sys::ParticleSystem{A}, t) where {A}
+        proc::SpeciesDependentCondensation{A}, μ::SVector{A, Float64},
+        sys::ParticleSystem{A}, t) where {A}
     return proc.rates
 end
