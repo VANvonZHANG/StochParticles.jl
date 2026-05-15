@@ -46,6 +46,25 @@ This document tracks completed features and planned improvements for StochPartic
 - [x] Aerosol Brownian coagulation with bimodal distribution
 - [x] Cloud droplet turbulent coagulation with composite kernel
 
+## Completed (2026-05-12 to 2026-05-15)
+
+### Data I/O
+- [x] HDF5 checkpoint/restart (`save_checkpoint`, `load_checkpoint`) with schema v1.0.0
+- [x] JLD2 fallback for Julia-native workflows (`save_checkpoint_jld2`, `load_checkpoint_jld2`)
+- [x] Chunked HDF5 append for time-series diagnostics (`init_diagnostics_file`, `save_diagnostics`)
+- [x] Export diagnostics to CSV (`export_diagnostics_to_csv`)
+- [x] RNG restoration and checkpoint enumeration (`restore_rng`, `list_checkpoints`)
+- [x] HDF5 2D dataset dimension ordering fix for cross-language compatibility with h5py
+- [x] Python post-processing scripts for HDF5 diagnostics (single combined figure per example)
+- [x] Example outputs written to `examples/` folder via `@__DIR__`
+
+### CI / Automation
+- [x] JuliaFormatter integration and format check in CI
+- [x] Code coverage reporting via Codecov
+- [x] Aqua.jl code quality checks (unbound type params, undefined exports, stale deps, piracy)
+- [x] TagBot for automatic release tagging
+- [x] CompatHelper for dependency updates
+
 ---
 
 ## Planned Improvements
@@ -89,9 +108,7 @@ This document tracks completed features and planned improvements for StochPartic
 - [ ] Benchmark suite with performance regression detection
 
 ### Data I/O
-- [ ] Save/load simulation states (JLD2/HDF5)
-- [ ] Export diagnostics to CSV/NetCDF
-- [ ] Import initial conditions from observational data
+- [ ] Import initial conditions from observational data (CSV/NetCDF)
 
 ### Uncertainty Quantification
 - [ ] Ensemble simulation runner
@@ -99,15 +116,10 @@ This document tracks completed features and planned improvements for StochPartic
 - [ ] Parameter estimation / inverse problem framework
 
 ### Testing & CI
-- [ ] JuliaFormatter integration and format check in CI
 - [ ] Example scripts run in CI (smoke tests)
-- [ ] Code coverage reporting
-- [ ] Aqua.jl ambiguities and piracy checks
 
 ### Registry & Distribution
 - [ ] Register v0.2.0 to Julia General Registry
-- [ ] Set up TagBot for automatic release tagging
-- [ ] Set up CompatHelper for dependency updates
 - [ ] Add CITATION.cff
 
 ## Long-term Vision
