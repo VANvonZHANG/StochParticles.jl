@@ -43,6 +43,8 @@ function init_diagnostics_file(
         h5_create_chunked(file, "volume", Float64, (1,); chunk_size = chunk_size)
         h5_create_chunked(
             file, "size_distribution", Float64, (1, n_bins); chunk_size = chunk_size)
+        h5_create_chunked(
+            file, "mixing_state", Float64, (1,); chunk_size = chunk_size)
 
         h5_write_attrs(file, "meta";
             species_names = species_names,
@@ -136,6 +138,14 @@ function save_diagnostics(
             size_dist = zeros(Float64, n_bins)
         end
         h5_append_row!(file, "size_distribution", size_dist)
+
+        # Mixing state
+        if A > 1
+            chi = mixing_state_index(u, sys)
+        else
+            chi = 1.0
+        end
+        h5_append_row!(file, "mixing_state", chi)
     end
 
     return nothing
