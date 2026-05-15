@@ -31,3 +31,18 @@ function species_mass_concentration(
     end
     return m / sys.volume
 end
+
+"""
+    species_fractions(μ::SVector{A, Float64}) -> SVector{A, Float64}
+
+Per-particle species mass fractions, normalized to sum to 1.
+If total mass is zero, returns uniform fractions.
+"""
+function species_fractions(μ::SVector{A, Float64}) where {A}
+    m_total = sum(μ)
+    if m_total > 0
+        return μ / m_total
+    else
+        return SVector{A, Float64}(ntuple(_ -> 1.0 / A, Val(A)))
+    end
+end
