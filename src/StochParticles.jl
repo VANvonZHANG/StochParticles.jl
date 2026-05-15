@@ -26,7 +26,8 @@ export compute_majorant, majorant_rate
 export cnmc_merge!, cnmc_clone!, cnmc_volume_rescale!, cnmc_coagulate!
 export make_coagulation_jump, make_emission_jump
 export dilution_death_affect!, dilution_birth_affect!, make_dilution_jumps
-export number_concentration, mass_concentration, species_mass_concentration, species_fractions
+export number_concentration, mass_concentration, species_mass_concentration, species_fractions,
+       mixing_state_index, particle_mixing_entropy, shannon_entropy
 export reconstruct_volumes, extract_concentrations
 export check_mass_conservation
 export particle_diameters, compute_size_distribution
@@ -54,6 +55,7 @@ include("core/assembly.jl")
 
 # ---- Diagnostics ----
 include("diagnostics/moments.jl")
+include("diagnostics/mixing_state.jl")
 include("diagnostics/reconstruction.jl")
 include("diagnostics/distributions.jl")
 include("diagnostics/validation.jl")

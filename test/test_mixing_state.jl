@@ -28,4 +28,59 @@ using StaticArrays
         μ3 = SVector(1.0, 2.0, 3.0)
         @test @inferred(species_fractions(μ3)) ≈ SVector(1.0 / 6.0, 2.0 / 6.0, 3.0 / 6.0)
     end
+
+    @testset "shannon_entropy" begin
+        # Pure particle has zero entropy
+        f_pure = SVector(1.0, 0.0)
+        @test @inferred(shannon_entropy(f_pure)) ≈ 0.0 atol = 1e-15
+
+        # Uniform binary mixture
+        f_uniform = SVector(0.5, 0.5)
+        @test @inferred(shannon_entropy(f_uniform)) ≈ log(2.0) rtol = 1e-10
+
+        # Uniform ternary mixture
+        f_3 = SVector(1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0)
+        @test @inferred(shannon_entropy(f_3)) ≈ log(3.0) rtol = 1e-10
+    end
+
+    @testset "mixing_state_index" begin
+        gas_fn = t -> SVector(0.0)
+
+        # Fully external mixture: 100 pure SO4 + 100 pure BC
+        sys_ext = ParticleSystem(Val(2), 200, 1.0, gas_fn)
+        u_ext = make_u0(vcat(
+            [SVector(1.0, 0.0) for _ in 1:100],
+            [SVector(0.0, 1.0) for _ in 1:100]
+        ))
+        chi_ext = mixing_state_index(u_ext, sys_ext)
+        @test chi_ext ≈ 0.0 atol = 0.05
+
+        # Fully internal mixture: all particles have same composition
+        sys_int = ParticleSystem(Val(2), 200, 1.0, gas_fn)
+        u_int = make_u0([SVector(0.5, 0.5) for _ in 1:200])
+        chi_int = mixing_state_index(u_int, sys_int)
+        @test chi_int ≈ 1.0 atol = 1e-10
+
+        # Single species returns 1.0
+        sys_1 = ParticleSystem(Val(1), 100, 1.0, gas_fn)
+        u_1 = make_u0([SVector(1.0) for _ in 1:100])
+        @test mixing_state_index(u_1, sys_1) ≈ 1.0
+    end
+
+    @testset "particle_mixing_entropy" begin
+        gas_fn = t -> SVector(0.0)
+        sys = ParticleSystem(Val(2), 4, 1.0, gas_fn)
+        u = make_u0([
+            SVector(1.0, 0.0),   # pure, entropy = 0
+            SVector(0.0, 1.0),   # pure, entropy = 0
+            SVector(0.5, 0.5),   # mixed, entropy = ln(2)
+            SVector(0.5, 0.5),   # mixed, entropy = ln(2)
+        ])
+        entropies = particle_mixing_entropy(u, sys)
+        @test length(entropies) == 4
+        @test entropies[1] ≈ 0.0 atol = 1e-15
+        @test entropies[2] ≈ 0.0 atol = 1e-15
+        @test entropies[3] ≈ log(2.0) rtol = 1e-10
+        @test entropies[4] ≈ log(2.0) rtol = 1e-10
+    end
 end
