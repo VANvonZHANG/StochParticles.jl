@@ -160,4 +160,24 @@ using StaticArrays
         @test all(p -> p[1] > 0, single_particles)
         @test eltype(single_particles) == SVector{1, Float64}
     end
+
+    @testset "diameters_from_masses multi-species" begin
+        densities = SVector(1000.0, 2000.0)
+
+        # Pure species 1 particle
+        masses = [SVector(1.0e-18, 0.0)]
+        diams = diameters_from_masses(masses, densities)
+        @test diams[1] ≈ (6.0 * 1.0e-18 / (π * 1000.0))^(1.0 / 3.0)
+
+        # Mixed particle
+        masses2 = [SVector(0.5e-18, 0.5e-18)]
+        diams2 = diameters_from_masses(masses2, densities)
+        V_expected = 0.5e-18 / 1000.0 + 0.5e-18 / 2000.0
+        @test diams2[1] ≈ (6.0 * V_expected / π)^(1.0 / 3.0)
+
+        # Backward compatible single-species call
+        masses1 = [SVector{1, Float64}(1.0e-18)]
+        diams1 = diameters_from_masses(masses1, 1000.0)
+        @test diams1[1] ≈ (6.0 * 1.0e-18 / (π * 1000.0))^(1.0 / 3.0)
+    end
 end
