@@ -42,3 +42,17 @@ Convert particle mass vectors back to diameters [m].
 function diameters_from_masses(masses::Vector{SVector{1, Float64}}, rho::Float64)
     return [(6.0 * m[1] / (π * rho))^(1.0 / 3.0) for m in masses]
 end
+
+"""
+    diameters_from_masses(masses, densities::SVector{A, Float64}) -> Vector{Float64}
+
+Convert particle mass vectors back to sphere-equivalent diameters [m].
+Supports multi-species particles with per-species densities.
+"""
+function diameters_from_masses(
+        masses::Vector{SVector{A, Float64}}, densities::SVector{A, Float64}) where {A}
+    return [
+        (6.0 * sum(masses[i][k] / densities[k] for k in 1:A) / π)^(1.0 / 3.0)
+        for i in 1:length(masses)
+    ]
+end
