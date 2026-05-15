@@ -25,3 +25,7 @@ Thumbs.db
 # Claude Code worktrees
 .claude/worktrees/
 .worktrees/
+
+# Example outputs
+examples/*.h5
+examples/*.png

@@ -19,18 +19,16 @@ function h5_create_chunked(file, name, T, dims; chunk_size=64)
         dcpl = HDF5.API.h5p_create(HDF5.API.H5P_DATASET_CREATE)
         HDF5.API.h5p_set_chunk(dcpl, 1, Csize_t[chunk_size])
     elseif length(dims) == 2
-        # 2D dataset: dims is (n_rows, n_cols) in Julia
-        # HDF5.dataspace takes dims in Julia order and stores in file order.
-        # size() reads file order and returns Julia order (reversed).
-        # To get Julia initial size (0, n_cols) with first dim unlimited:
-        #   Use dataspace((0, n_cols), max_dims=(UNLIMITED, n_cols))
-        #   File raw: current=[n_cols, 0], max=[n_cols, UNLIMITED]
+        # 2D dataset: logical shape is (n_time, n_cols).
+        # HDF5.jl reverses dimensions between Julia and the file.
+        # To make h5py see (n_time, n_cols) we create with Julia dims (n_cols, 0):
+        #   File raw: [0, n_cols] → h5py sees (0, n_cols).
+        # size() in Julia reads file dims reversed → (n_cols, 0).
         n_rows, n_cols = dims
-        space = HDF5.dataspace((0, n_cols), max_dims=(signed(HDF5.API.H5S_UNLIMITED), n_cols))
+        space = HDF5.dataspace((n_cols, 0), max_dims=(n_cols, signed(HDF5.API.H5S_UNLIMITED)))
         dcpl = HDF5.API.h5p_create(HDF5.API.H5P_DATASET_CREATE)
-        # Chunk in file order: [n_cols, chunk_size]
-        # Julia chunk = reverse([n_cols, chunk_size]) = (chunk_size, n_cols)
-        HDF5.API.h5p_set_chunk(dcpl, 2, Csize_t[n_cols, chunk_size])
+        # Chunk in file order: [chunk_size, n_cols] → h5py sees (chunk_size, n_cols).
+        HDF5.API.h5p_set_chunk(dcpl, 2, Csize_t[chunk_size, n_cols])
     else
         error("Only 1D and 2D datasets are supported")
     end
@@ -58,17 +56,16 @@ function h5_append_row!(file, name, row::AbstractVector)
     curr_size = size(dset)
 
     if length(curr_size) == 2
-        if length(row) != curr_size[2]
-            throw(DimensionMismatch("Row length $(length(row)) does not match dataset width $(curr_size[2])"))
+        # In Julia, curr_size is (n_cols, n_time) because of HDF5.jl's reversal.
+        if length(row) != curr_size[1]
+            throw(DimensionMismatch("Row length $(length(row)) does not match dataset width $(curr_size[1])"))
         end
-        # 2D dataset: extend dim 1 by 1
-        # curr_size is in Julia order: (n_rows, n_cols)
-        # To extend to (n_rows+1, n_cols) in Julia:
-        #   File raw should be [n_cols, n_rows+1]
-        new_n_rows = curr_size[1] + 1
-        HDF5.API.h5d_set_extent(dset, Csize_t[curr_size[2], new_n_rows])
-        # Write the row at the new last index
-        dset[new_n_rows:new_n_rows, :] = reshape(row, 1, length(row))
+        # Grow the time dimension (second Julia dim).
+        new_n_time = curr_size[2] + 1
+        # File raw extent becomes [new_n_time, n_cols].
+        HDF5.API.h5d_set_extent(dset, Csize_t[new_n_time, curr_size[1]])
+        # Write to the new last time slice.
+        dset[:, new_n_time:new_n_time] = row
     else
         error("Only 2D datasets are supported with vector input")
     end
