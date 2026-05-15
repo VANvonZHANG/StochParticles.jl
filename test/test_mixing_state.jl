@@ -72,7 +72,7 @@ using StaticArrays
             SVector(1.0, 0.0),
             SVector(0.0, 1.0),
             SVector(0.5, 0.5),
-            SVector(0.5, 0.5),
+            SVector(0.5, 0.5)
         ])
         chi_partial = @inferred mixing_state_index(u_partial, sys_partial)
         @test 0.0 < chi_partial < 1.0
@@ -82,7 +82,7 @@ using StaticArrays
         u_zero = make_u0([
             SVector(1.0, 0.0),
             SVector(0.0, 1.0),
-            SVector(0.0, 0.0),
+            SVector(0.0, 0.0)
         ])
         chi_zero = mixing_state_index(u_zero, sys_zero)
         @test isfinite(chi_zero)  # should not be NaN or Inf
@@ -95,7 +95,7 @@ using StaticArrays
             SVector(1.0, 0.0),   # pure, entropy = 0
             SVector(0.0, 1.0),   # pure, entropy = 0
             SVector(0.5, 0.5),   # mixed, entropy = ln(2)
-            SVector(0.5, 0.5),   # mixed, entropy = ln(2)
+            SVector(0.5, 0.5)   # mixed, entropy = ln(2)
         ])
         entropies = @inferred particle_mixing_entropy(u, sys)
         @test length(entropies) == 4
@@ -210,7 +210,7 @@ using StaticArrays
                 SVector(1.0, 0.0),
                 SVector(0.0, 1.0),
                 SVector(1.0, 0.0),
-                SVector(0.0, 1.0),
+                SVector(0.0, 1.0)
             ])
 
             # Save one timestep
