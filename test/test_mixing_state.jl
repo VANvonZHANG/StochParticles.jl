@@ -135,7 +135,7 @@ using StaticArrays
         so4_particles = @inferred lognormal_masses(
             1000, 1.0e-7, 1.5, densities; fractions = SVector(1.0, 0.0))
         @test length(so4_particles) == 1000
-        @test all(p -> p[1] > 0 && p[2] == 0, so4_particles)
+        @test all(p -> p[1] > 0 && iszero(p[2]), so4_particles)
 
         # Mixed mode (50/50)
         mixed_particles = @inferred lognormal_masses(
@@ -143,6 +143,16 @@ using StaticArrays
         @test length(mixed_particles) == 1000
         @test all(p -> p[1] > 0 && p[2] > 0, mixed_particles)
         @test all(p -> p[1] ≈ p[2], mixed_particles)
+
+        # Default fractions (pure species 1)
+        default_particles = @inferred lognormal_masses(
+            100, 1.0e-7, 1.5, densities)
+        @test length(default_particles) == 100
+        @test all(p -> p[1] > 0 && iszero(p[2]), default_particles)
+
+        # Invalid fractions (do not sum to 1)
+        @test_throws ArgumentError lognormal_masses(
+            10, 1.0e-7, 1.5, densities; fractions = SVector(0.3, 0.3))
 
         # Backward compatible single-species call
         single_particles = @inferred lognormal_masses(100, 1.0e-7, 1.5, 1000.0)
