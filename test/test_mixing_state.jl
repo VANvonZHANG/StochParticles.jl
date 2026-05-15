@@ -193,4 +193,38 @@ using StaticArrays
         @test dμ ≈ rates
         @test provides_drift(proc) == true
     end
+
+    @testset "IO mixing state integration" begin
+        using HDF5
+        mktempdir() do dir
+            h5_path = joinpath(dir, "test_mixing.h5")
+            bin_edges = [1.0e-9, 1.0e-8, 1.0e-7, 1.0e-6]
+
+            # Create diagnostics file
+            init_diagnostics_file(h5_path, 2, bin_edges;
+                species_names = ["SO4", "BC"])
+
+            gas_fn = t -> SVector(0.0, 0.0)
+            sys = ParticleSystem(Val(2), 4, 1.0, gas_fn)
+            u = make_u0([
+                SVector(1.0, 0.0),
+                SVector(0.0, 1.0),
+                SVector(1.0, 0.0),
+                SVector(0.0, 1.0),
+            ])
+
+            # Save one timestep
+            save_diagnostics(h5_path, 0.0, u, sys, Val(2);
+                bin_edges = bin_edges, rho = 1000.0)
+
+            # Verify mixing_state dataset exists and has correct value
+            HDF5.h5open(h5_path, "r") do file
+                @test haskey(file, "mixing_state")
+                chi_data = read(file["mixing_state"])
+                @test length(chi_data) == 1
+                # External mixture should have χ ≈ 0
+                @test chi_data[1] ≈ 0.0 atol = 0.1
+            end
+        end
+    end
 end
