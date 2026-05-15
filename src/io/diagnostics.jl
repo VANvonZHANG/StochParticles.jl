@@ -18,7 +18,7 @@ function init_diagnostics_file(
         bin_edges::Vector{Float64};
         species_names = ["species_" * string(i) for i in 1:n_species],
         chunk_size::Int = 64
-    )
+)
     if isfile(path)
         throw(ErrorException("Diagnostics file already exists: $(path)"))
     end
@@ -33,12 +33,16 @@ function init_diagnostics_file(
 
     HDF5.h5open(path, "cw") do file
         h5_create_chunked(file, "time", Float64, (1,); chunk_size = chunk_size)
-        h5_create_chunked(file, "number_concentration", Float64, (1,); chunk_size = chunk_size)
-        h5_create_chunked(file, "mass_concentration", Float64, (1,); chunk_size = chunk_size)
-        h5_create_chunked(file, "species_mass_concentration", Float64, (1, n_species); chunk_size = chunk_size)
+        h5_create_chunked(
+            file, "number_concentration", Float64, (1,); chunk_size = chunk_size)
+        h5_create_chunked(
+            file, "mass_concentration", Float64, (1,); chunk_size = chunk_size)
+        h5_create_chunked(file, "species_mass_concentration", Float64,
+            (1, n_species); chunk_size = chunk_size)
         h5_create_chunked(file, "mean_diameter", Float64, (1,); chunk_size = chunk_size)
         h5_create_chunked(file, "volume", Float64, (1,); chunk_size = chunk_size)
-        h5_create_chunked(file, "size_distribution", Float64, (1, n_bins); chunk_size = chunk_size)
+        h5_create_chunked(
+            file, "size_distribution", Float64, (1, n_bins); chunk_size = chunk_size)
 
         h5_write_attrs(file, "meta";
             species_names = species_names,
@@ -77,7 +81,7 @@ function save_diagnostics(
         ::Val{A};
         bin_edges = nothing,
         rho::Float64 = 1000.0
-    ) where {A}
+) where {A}
     if !isfile(path)
         throw(SystemError("Diagnostics file not found: $(path)", 0))
     end
@@ -89,7 +93,8 @@ function save_diagnostics(
 
         if bin_edges !== nothing
             stored_bin_edges = attrs(file["meta"])["bin_edges"]
-            if length(bin_edges) != length(stored_bin_edges) || !all(bin_edges .≈ stored_bin_edges)
+            if length(bin_edges) != length(stored_bin_edges) ||
+               !all(bin_edges .≈ stored_bin_edges)
                 throw(ArgumentError("bin_edges do not match the bin_edges stored in the diagnostics file"))
             end
         end

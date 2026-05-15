@@ -18,13 +18,13 @@ const CHECKPOINT_VERSION = "StochParticles.jl v0.1.0"
 Save a restart checkpoint to `path`. Appends `.h5` suffix if missing.
 """
 function save_checkpoint(
-    path::String,
-    u::Vector{Float64},
-    sys::ParticleSystem,
-    t::Float64;
-    rng::AbstractRNG = Random.default_rng(),
-    process_info = nothing,
-    overwrite::Bool = false
+        path::String,
+        u::Vector{Float64},
+        sys::ParticleSystem,
+        t::Float64;
+        rng::AbstractRNG = Random.default_rng(),
+        process_info = nothing,
+        overwrite::Bool = false
 )
     if !endswith(path, ".h5")
         path = path * ".h5"

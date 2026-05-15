@@ -12,10 +12,10 @@ Create an extendable chunked dataset in the HDF5 file.
 
 Note: Due to HDF5/Julia dimension ordering, `dims` is interpreted in Julia column-major order.
 """
-function h5_create_chunked(file, name, T, dims; chunk_size=64)
+function h5_create_chunked(file, name, T, dims; chunk_size = 64)
     if length(dims) == 1
         # 1D dataset: initial shape (0,), max (UNLIMITED,)
-        space = HDF5.dataspace((0,), max_dims=(signed(HDF5.API.H5S_UNLIMITED),))
+        space = HDF5.dataspace((0,), max_dims = (signed(HDF5.API.H5S_UNLIMITED),))
         dcpl = HDF5.API.h5p_create(HDF5.API.H5P_DATASET_CREATE)
         HDF5.API.h5p_set_chunk(dcpl, 1, Csize_t[chunk_size])
     elseif length(dims) == 2
@@ -25,7 +25,8 @@ function h5_create_chunked(file, name, T, dims; chunk_size=64)
         #   File raw: [0, n_cols] → h5py sees (0, n_cols).
         # size() in Julia reads file dims reversed → (n_cols, 0).
         n_rows, n_cols = dims
-        space = HDF5.dataspace((n_cols, 0), max_dims=(n_cols, signed(HDF5.API.H5S_UNLIMITED)))
+        space = HDF5.dataspace((n_cols, 0), max_dims = (
+            n_cols, signed(HDF5.API.H5S_UNLIMITED)))
         dcpl = HDF5.API.h5p_create(HDF5.API.H5P_DATASET_CREATE)
         # Chunk in file order: [chunk_size, n_cols] → h5py sees (chunk_size, n_cols).
         HDF5.API.h5p_set_chunk(dcpl, 2, Csize_t[chunk_size, n_cols])
@@ -35,7 +36,7 @@ function h5_create_chunked(file, name, T, dims; chunk_size=64)
 
     dtype = HDF5.datatype(T)
     dset_id = HDF5.API.h5d_create(file, name, dtype, space,
-                                  HDF5.API.H5P_DEFAULT, dcpl, HDF5.API.H5P_DEFAULT)
+        HDF5.API.H5P_DEFAULT, dcpl, HDF5.API.H5P_DEFAULT)
     HDF5.API.h5o_close(dset_id)
     HDF5.API.h5p_close(dcpl)
     HDF5.close(dtype)
@@ -117,7 +118,7 @@ function h5_read_attrs(parent, name)
     end
     g = parent[name]
     a = attrs(g)
-    result = Dict{String,Any}()
+    result = Dict{String, Any}()
     for k in keys(a)
         result[k] = a[k]
     end
