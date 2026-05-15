@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
 Post-processing script for cloud_droplet_turbulent_coagulation.h5
-Reads the HDF5 diagnostics file and generates analysis plots.
+Reads the HDF5 diagnostics file and generates a single combined analysis figure.
 """
 
 import os
 import sys
 
 import h5py
+import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -44,27 +45,37 @@ mean_d_um = mean_d * 1e6
 bin_edges_um = bin_edges * 1e6
 bin_centers_um = np.sqrt(bin_edges_um[:-1] * bin_edges_um[1:])
 
-# ---------------------------------------------------------------------------
-# Plot 1: Time series of concentrations and mean diameter
-# ---------------------------------------------------------------------------
-fig, axes = plt.subplots(2, 2, figsize=(12, 9), constrained_layout=True)
-fig.suptitle("Cloud Droplet Turbulent Coagulation — Time Series", fontsize=14)
+# Subsample time for heatmap
+nt = len(time)
+step = max(1, nt // 200)
+time_sub = time[::step]
+size_dist_sub = size_dist[::step, :]
 
-ax = axes[0, 0]
+# ---------------------------------------------------------------------------
+# Combined figure
+# ---------------------------------------------------------------------------
+fig = plt.figure(figsize=(14, 16))
+gs = gridspec.GridSpec(4, 2, figure=fig, height_ratios=[1, 1, 1.2, 1.2])
+fig.suptitle("Cloud Droplet Turbulent Coagulation — Analysis", fontsize=16, y=0.995)
+
+# Row 0, Col 0: Number Concentration
+ax = fig.add_subplot(gs[0, 0])
 ax.plot(time, N_conc, color="C0")
 ax.set_xlabel("Time (s)")
 ax.set_ylabel("Number concentration (m⁻³)")
 ax.set_title("Number Concentration")
 ax.ticklabel_format(style="sci", axis="y", scilimits=(0, 0))
 
-ax = axes[0, 1]
+# Row 0, Col 1: Mass Concentration
+ax = fig.add_subplot(gs[0, 1])
 ax.plot(time, M_conc, color="C1")
 ax.set_xlabel("Time (s)")
 ax.set_ylabel("Mass concentration (kg/m³)")
 ax.set_title("Mass Concentration")
 ax.ticklabel_format(style="sci", axis="y", scilimits=(0, 0))
 
-ax = axes[1, 0]
+# Row 1, Col 0: Species Mass Concentration
+ax = fig.add_subplot(gs[1, 0])
 for i, name in enumerate(species_names):
     ax.plot(time, species_mass[:, i], label=name)
 ax.set_xlabel("Time (s)")
@@ -73,29 +84,15 @@ ax.set_title("Species Mass Concentration")
 ax.legend()
 ax.ticklabel_format(style="sci", axis="y", scilimits=(0, 0))
 
-ax = axes[1, 1]
+# Row 1, Col 1: Mean Diameter
+ax = fig.add_subplot(gs[1, 1])
 ax.plot(time, mean_d_um, color="C3")
 ax.set_xlabel("Time (s)")
 ax.set_ylabel("Mean diameter (μm)")
 ax.set_title("Mean Diameter")
 
-out_path = os.path.join(OUT_DIR, "cloud_droplet_turbulent_coagulation_timeseries.png")
-fig.savefig(out_path, dpi=150)
-print(f"Saved: {out_path}")
-plt.close(fig)
-
-# ---------------------------------------------------------------------------
-# Plot 2: Size distribution heatmap
-# ---------------------------------------------------------------------------
-fig, ax = plt.subplots(figsize=(10, 5), constrained_layout=True)
-
-# Subsample time for clearer visualization
-nt = len(time)
-step = max(1, nt // 200)
-time_sub = time[::step]
-size_dist_sub = size_dist[::step, :]
-
-# Plot as pcolormesh (pad one row so C matches edge count for nearest shading)
+# Row 2: Size distribution heatmap (span both columns)
+ax = fig.add_subplot(gs[2, :])
 C_padded = np.vstack([size_dist_sub.T, size_dist_sub.T[-1:, :]])
 c = ax.pcolormesh(time_sub, bin_edges_um, C_padded, shading="nearest", cmap="YlOrRd")
 ax.set_yscale("log")
@@ -105,16 +102,8 @@ ax.set_ylabel("Diameter (μm)")
 ax.set_title("Size Distribution dN/dlogD (m⁻³)")
 fig.colorbar(c, ax=ax, label="Concentration (m⁻³)")
 
-out_path = os.path.join(OUT_DIR, "cloud_droplet_turbulent_coagulation_size_heatmap.png")
-fig.savefig(out_path, dpi=150)
-print(f"Saved: {out_path}")
-plt.close(fig)
-
-# ---------------------------------------------------------------------------
-# Plot 3: Snapshots of size distribution at selected times
-# ---------------------------------------------------------------------------
-fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
-
+# Row 3: Snapshots (span both columns)
+ax = fig.add_subplot(gs[3, :])
 snapshot_times = [0.0, 50.0, 100.0, 200.0]  # seconds
 for t_target in snapshot_times:
     idx = np.argmin(np.abs(time - t_target))
@@ -129,9 +118,10 @@ ax.set_title("Size Distribution Snapshots")
 ax.legend()
 ax.grid(True, which="both", ls="--", alpha=0.5)
 
-out_path = os.path.join(OUT_DIR, "cloud_droplet_turbulent_coagulation_snapshots.png")
+fig.tight_layout(rect=[0, 0, 1, 0.99])
+out_path = os.path.join(OUT_DIR, "cloud_droplet_turbulent_coagulation_analysis.png")
 fig.savefig(out_path, dpi=150)
 print(f"Saved: {out_path}")
 plt.close(fig)
 
-print("\nAnalysis complete.")
+print("Analysis complete.")
