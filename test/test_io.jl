@@ -12,19 +12,19 @@ using Random
             StochParticles.h5_create_chunked(file, "data", Float64, (2, 3); chunk_size=4)
             @test haskey(file, "data")
             ds = file["data"]
-            @test size(ds) == (0, 3)
-            @test HDF5.get_chunk(ds)[1] == 4
+            @test size(ds) == (3, 0)
+            @test HDF5.get_chunk(ds)[2] == 4
         end
 
-        # Test h5_append_row! with 2D data (append along dim 1)
+        # Test h5_append_row! with 2D data (append along time dim)
         HDF5.h5open(path, "r+") do file
             StochParticles.h5_append_row!(file, "data", [1.0, 2.0, 3.0])
             StochParticles.h5_append_row!(file, "data", [4.0, 5.0, 6.0])
             ds = file["data"]
-            @test size(ds) == (2, 3)
+            @test size(ds) == (3, 2)
             data = read(ds)
-            @test data[1, :] ≈ [1.0, 2.0, 3.0]
-            @test data[2, :] ≈ [4.0, 5.0, 6.0]
+            @test data[:, 1] ≈ [1.0, 2.0, 3.0]
+            @test data[:, 2] ≈ [4.0, 5.0, 6.0]
         end
 
         # Test h5_write_attrs and h5_read_attrs
@@ -192,10 +192,10 @@ end
             @test size(file["time"]) == (0,)
             @test size(file["number_concentration"]) == (0,)
             @test size(file["mass_concentration"]) == (0,)
-            @test size(file["species_mass_concentration"]) == (0, 2)
+            @test size(file["species_mass_concentration"]) == (2, 0)
             @test size(file["mean_diameter"]) == (0,)
             @test size(file["volume"]) == (0,)
-            @test size(file["size_distribution"]) == (0, n_bins)
+            @test size(file["size_distribution"]) == (n_bins, 0)
 
             meta_attrs = StochParticles.h5_read_attrs(file, "meta")
             @test meta_attrs["schema_version"] == "1.0.0"
@@ -226,10 +226,10 @@ end
             smc = read(file["species_mass_concentration"])
             for s in 1:2
                 expected_smc = StochParticles.species_mass_concentration(u, s, Val(2), sys)
-                @test smc[:, s] ≈ [expected_smc, expected_smc]
+                @test smc[s, :] ≈ [expected_smc, expected_smc]
             end
 
-            @test size(file["size_distribution"]) == (2, n_bins)
+            @test size(file["size_distribution"]) == (n_bins, 2)
         end
 
         # Test error paths

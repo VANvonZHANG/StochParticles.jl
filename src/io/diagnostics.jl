@@ -127,7 +127,7 @@ function save_diagnostics(
                 size_dist = zeros(Float64, n_bins)
             end
         else
-            n_bins = size(file["size_distribution"])[2]
+            n_bins = size(file["size_distribution"])[1]
             size_dist = zeros(Float64, n_bins)
         end
         h5_append_row!(file, "size_distribution", size_dist)
@@ -158,6 +158,10 @@ function export_diagnostics_to_csv(h5_path::String, csv_dir::String)
             end
             ds = file[name]
             data = read(ds)
+            # HDF5.jl reverses dims for 2D arrays; transpose so time is first.
+            if ndims(data) == 2
+                data = permutedims(data, (2, 1))
+            end
             push!(datasets, name)
 
             # Write individual CSV
