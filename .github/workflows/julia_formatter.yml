@@ -15,4 +15,4 @@ jobs:
           julia -e 'using Pkg; Pkg.add("JuliaFormatter")'
           julia -e 'using JuliaFormatter; format(".", verbose=true)'
       - run: |
-          git diff --exit-code || (echo "::error::Code is not formatted. Run 'julia -e '"'"'using JuliaFormatter; format(\".\")'"'"'"; exit 1)
+          git diff --exit-code || (echo "::error::Code is not formatted. Run: julia -e 'using JuliaFormatter; format(\".\")'"; exit 1)
