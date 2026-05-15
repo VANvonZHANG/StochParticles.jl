@@ -3,7 +3,8 @@ using StochParticles
 using StaticArrays
 using OrdinaryDiffEq
 using Printf
-using Statistics
+using JumpProcesses
+using Plots
 
 println("Multi-species mixing state demo: external → internal mixture via coagulation")
 
@@ -42,11 +43,14 @@ println("Solving...")
 sol = solve(prob, Tsit5(); saveat = 60.0)
 println("Done. $(length(sol.t)) time steps saved.")
 
+# Verify mass conservation
+passed, rel_error = check_mass_conservation(sol, prob)
+if !passed
+    @warn "Mass conservation check failed" rel_error
+end
+
 # ---- Extract mixing state evolution ----
 chi_t = [mixing_state_index(sol.u[i], prob.prob.p) for i in eachindex(sol.t)]
-mean_entropy_t = [
-    mean(particle_mixing_entropy(sol.u[i], prob.prob.p))
-    for i in eachindex(sol.t)]
 
 # ---- Print summary ----
 println("\nMixing state evolution:")
@@ -59,9 +63,21 @@ println(@sprintf("  t = %6.0f s:  χ = %.4f (final)", sol.t[end], chi_t[end]))
 h5_path = joinpath(@__DIR__, "mixing_state_diagnostics.h5")
 bin_edges = 10.0 .^ range(-9, -6; length = 31)
 
-init_diagnostics_file(h5_path, 2, bin_edges; species_names = ["SO4", "BC"])
+init_diagnostics_file(h5_path, 2, bin_edges;
+    species_names = ["SO4", "BC"], chunk_size = 64)
 for i in eachindex(sol.t)
-    save_diagnostics(h5_path, sol.t[i], sol.u[i], prob.prob.p, Val(2);
-        bin_edges = bin_edges, rho = 1000.0)
+    save_diagnostics(h5_path, sol.t[i], sol.u[i], prob.prob.p, Val(2); # 2 species
+        bin_edges = bin_edges, rho = 1000.0) # Representative density for diameter-based binning
 end
 println("\nDiagnostics saved to: $(h5_path)")
+
+# ---- Plot mixing state evolution ----
+fig_path = joinpath(@__DIR__, "mixing_state_evolution.png")
+p = plot(sol.t ./ 60.0, chi_t,
+    xlabel = "Time (min)",
+    ylabel = "Mixing state index χ",
+    title = "External → Internal Mixture via Coagulation",
+    linewidth = 2,
+    legend = false)
+savefig(p, fig_path)
+println("Plot saved to: $(fig_path)")
