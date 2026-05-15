@@ -139,7 +139,7 @@ function save_diagnostics(
         end
         h5_append_row!(file, "size_distribution", size_dist)
 
-        # Mixing state
+        # Mixing state: single-species systems are trivially fully internally mixed
         if A > 1
             chi = mixing_state_index(u, sys)
         else

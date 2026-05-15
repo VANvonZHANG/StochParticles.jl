@@ -223,7 +223,7 @@ using StaticArrays
                 chi_data = read(file["mixing_state"])
                 @test length(chi_data) == 1
                 # External mixture should have χ ≈ 0
-                @test chi_data[1] ≈ 0.0 atol = 0.1
+                @test chi_data[1] ≈ 0.0 atol = 1e-10
             end
         end
     end
