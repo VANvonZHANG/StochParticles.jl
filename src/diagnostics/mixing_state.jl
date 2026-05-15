@@ -39,13 +39,14 @@ function mixing_state_index(u::Vector{Float64}, sys::ParticleSystem{A}) where {A
 
     # Population-average species fractions (mass-weighted)
     m_total = 0.0
-    f_bar = zeros(SVector{A, Float64})
+    f_bar = zero(SVector{A, Float64})
     for i in 1:n
         μ_i = get_particle(u, i, A_val)
         m_i = sum(μ_i)
         m_total += m_i
         f_bar += species_fractions(μ_i) * m_i
     end
+    m_total > 0 || return NaN
     f_bar /= m_total
 
     # Actual diversity: average per-particle entropy
@@ -57,7 +58,8 @@ function mixing_state_index(u::Vector{Float64}, sys::ParticleSystem{A}) where {A
     # Internal reference: all particles have bulk-average composition
     D_gamma = shannon_entropy(f_bar)
 
-    return (D_alpha - D_eps) / (D_alpha - D_gamma)
+    chi = (D_alpha - D_eps) / (D_alpha - D_gamma)
+    return chi == 0.0 ? 0.0 : chi  # eliminate -0.0
 end
 
 """
