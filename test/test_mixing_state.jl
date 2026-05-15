@@ -52,19 +52,40 @@ using StaticArrays
             [SVector(1.0, 0.0) for _ in 1:100],
             [SVector(0.0, 1.0) for _ in 1:100]
         ))
-        chi_ext = mixing_state_index(u_ext, sys_ext)
+        chi_ext = @inferred mixing_state_index(u_ext, sys_ext)
         @test chi_ext ≈ 0.0 atol = 0.05
 
         # Fully internal mixture: all particles have same composition
         sys_int = ParticleSystem(Val(2), 200, 1.0, gas_fn)
         u_int = make_u0([SVector(0.5, 0.5) for _ in 1:200])
-        chi_int = mixing_state_index(u_int, sys_int)
+        chi_int = @inferred mixing_state_index(u_int, sys_int)
         @test chi_int ≈ 1.0 atol = 1e-10
 
         # Single species returns 1.0
         sys_1 = ParticleSystem(Val(1), 100, 1.0, gas_fn)
         u_1 = make_u0([SVector(1.0) for _ in 1:100])
-        @test mixing_state_index(u_1, sys_1) ≈ 1.0
+        @test @inferred(mixing_state_index(u_1, sys_1)) ≈ 1.0
+
+        # Partially mixed: 2 pure + 2 mixed (50/50)
+        sys_partial = ParticleSystem(Val(2), 4, 1.0, gas_fn)
+        u_partial = make_u0([
+            SVector(1.0, 0.0),
+            SVector(0.0, 1.0),
+            SVector(0.5, 0.5),
+            SVector(0.5, 0.5),
+        ])
+        chi_partial = @inferred mixing_state_index(u_partial, sys_partial)
+        @test 0.0 < chi_partial < 1.0
+
+        # System with one zero-mass particle
+        sys_zero = ParticleSystem(Val(2), 3, 1.0, gas_fn)
+        u_zero = make_u0([
+            SVector(1.0, 0.0),
+            SVector(0.0, 1.0),
+            SVector(0.0, 0.0),
+        ])
+        chi_zero = mixing_state_index(u_zero, sys_zero)
+        @test isfinite(chi_zero)  # should not be NaN or Inf
     end
 
     @testset "particle_mixing_entropy" begin
@@ -76,7 +97,7 @@ using StaticArrays
             SVector(0.5, 0.5),   # mixed, entropy = ln(2)
             SVector(0.5, 0.5),   # mixed, entropy = ln(2)
         ])
-        entropies = particle_mixing_entropy(u, sys)
+        entropies = @inferred particle_mixing_entropy(u, sys)
         @test length(entropies) == 4
         @test entropies[1] ≈ 0.0 atol = 1e-15
         @test entropies[2] ≈ 0.0 atol = 1e-15
