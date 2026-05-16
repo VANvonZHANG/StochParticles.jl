@@ -7,15 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-05-16
+
 ### Added
 
-- HDF5 I/O subsystem for checkpoint/restart and time-series diagnostics.
-  - `save_checkpoint` / `load_checkpoint` — HDF5 checkpoint with schema v1.0.0.
-  - `save_checkpoint_jld2` / `load_checkpoint_jld2` — JLD2 fallback for Julia-native workflows.
-  - `init_diagnostics_file` / `save_diagnostics` — chunked HDF5 append for time-series data.
-  - `export_diagnostics_to_csv` — convert HDF5 diagnostics to CSV.
-  - `restore_rng` / `list_checkpoints` — RNG restoration and checkpoint enumeration.
+#### HDF5/JLD2 I/O subsystem
+- `save_checkpoint` / `load_checkpoint` — HDF5 checkpoint with schema v1.0.0.
+- `save_checkpoint_jld2` / `load_checkpoint_jld2` — JLD2 fallback for Julia-native workflows.
+- `init_diagnostics_file` / `save_diagnostics` — chunked HDF5 append for time-series data.
+- `export_diagnostics_to_csv` — convert HDF5 diagnostics to CSV.
+- `restore_rng` / `list_checkpoints` — RNG restoration and checkpoint enumeration.
 - Diagnostics datasets: `time`, `number_concentration`, `mass_concentration`, `species_mass_concentration`, `mean_diameter`, `volume`, `size_distribution`.
+- HDF5 output for mixing state diagnostics (`species_fractions`, `mixing_state_index`, `particle_entropy`).
+- Dependencies: `HDF5.jl` and `JLD2.jl`.
+
+#### Multi-species mixing state
+- `species_fractions(u, Val(A), sys)` — per-particle species mass fraction matrix.
+- `mixing_state_index(u, Val(A), sys)` — diversity-based mixing state index (0 = fully internal, 1 = fully external).
+- `particle_entropy(u, Val(A), sys)` — Shannon entropy of particle composition distribution.
+- Multi-species density support in `particle_diameters` and `diameters_from_masses`.
+- Multi-species initial conditions in `lognormal_masses` via `fractions` keyword.
+- `SpeciesDependentCondensation` — per-species condensation growth rates with linear mixing parameterization.
+- External-to-internal mixing state coagulation example (`mixing_state_coagulation.jl`).
+
+#### Post-processing and examples
 - Python post-processing scripts in `examples/`:
   - `analyze_aerosol_brownian_coagulation.py` — single combined figure from HDF5 diagnostics.
   - `analyze_cloud_droplet_turbulent_coagulation.py` — single combined figure from HDF5 diagnostics.
@@ -23,7 +38,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Edge cases in `mixing_state_index` for single-species and uniform-composition particles.
+- Validate that `lognormal_masses` fractions sum to 1.
 - HDF5 2D dataset dimension ordering for cross-language compatibility with h5py.
+- Missing imports and mass conservation check in mixing state coagulation example.
 
 ## [0.1.0] - 2026-05-12
 
@@ -88,3 +106,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Brownian kernel transition-regime precision tests
 
 [0.1.0]: https://github.com/VANvonZHANG/StochParticles.jl/releases/tag/v0.1.0
+[0.2.0]: https://github.com/VANvonZHANG/StochParticles.jl/releases/tag/v0.2.0
