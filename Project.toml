@@ -1,8 +1,8 @@
 name = "StochParticles"
 uuid = "48f1789a-3b45-4590-abaa-0579032d20b3"
+version = "0.2.0"
 authors = ["Fan Zhang <vanvonzhang@gmail.com>"]
 description = "SciML-native framework for particle-resolved Monte Carlo simulation of aerosol/colloidal population dynamics via PDMPs"
-version = "0.2.0"
 
 [deps]
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
@@ -21,7 +21,7 @@ Dates = "1.10"
 HDF5 = "0.17"
 JLD2 = "0.6"
 JumpProcesses = "9"
-OrdinaryDiffEq = "6.78"
+OrdinaryDiffEq = "6.78, 7"
 Plots = "1"
 Random = "1.10"
 SpecialFunctions = "2"
