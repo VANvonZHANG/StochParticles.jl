@@ -20,7 +20,7 @@ export PhysicsProcess, provides_drift
 export CoagulationKernel, CoagulationSampling
 export BrownianKernel, GlobalMajorant, CompositeKernel, GravitationalKernel,
        AyalaTurbulentKernel, AtmosphericParameters, make_kernel
-export CoagulationProcess, CondensationProcess, SpeciesDependentCondensation,
+export CoagulationProcess, CondensationProcess, SpeciesDependentCondensation, H2OCondensationFlux,
        EmissionProcess, DilutionProcess
 export apply_drift, make_ode_func
 export compute_majorant, majorant_rate
@@ -49,10 +49,10 @@ include("core/cnmc.jl")
 
 # ---- Process implementations ----
 include("processes/coagulation.jl")
+include("processes/h2o_thermodynamics.jl")
 include("processes/condensation.jl")
 include("processes/emission.jl")
 include("processes/dilution.jl")
-include("processes/h2o_thermodynamics.jl")
 
 # ---- Assembly (depends on all above) ----
 include("core/assembly.jl")
