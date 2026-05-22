@@ -84,3 +84,32 @@ end
     # R = (3V/4π)^(1/3) ≈ 7.20e-8
     @test R ≈ 7.20e-8 atol = 1e-9
 end
+
+@testset "Critical supersaturation" begin
+    thermo = ThermodynamicsParams(
+        SVector(0.61, 0.0, 0.0),
+        0.072, 1000.0, 18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2,
+    )
+    densities = SVector(1770.0, 1800.0, 1000.0)
+    T = 293.15
+
+    # Small particle (50 nm dry diameter)
+    # Higher Sc (harder to activate)
+    m_dry_small = SVector(1.16e-19, 0.0, 0.0)  # ~50 nm SO4
+    Sc_small = critical_supersaturation(m_dry_small, thermo, densities, T)
+    @test Sc_small > 0.0
+    @test Sc_small > 0.001  # small particles have high Sc
+
+    # Large particle (200 nm dry diameter)
+    # Lower Sc (easier to activate)
+    m_dry_large = SVector(7.4e-18, 0.0, 0.0)  # ~200 nm SO4
+    Sc_large = critical_supersaturation(m_dry_large, thermo, densities, T)
+    @test Sc_large > 0.0
+    @test Sc_large < Sc_small  # larger particles have lower Sc
+
+    # Verify order of magnitude for 100 nm ammonium sulfate at 293K
+    # Literature value: Sc ≈ 0.1% to 0.5% for this size
+    m_dry = SVector(9.27e-19, 0.0, 0.0)  # ~100 nm SO4
+    Sc = critical_supersaturation(m_dry, thermo, densities, T)
+    @test 0.001 < Sc < 0.01  # 0.1% to 1%
+end

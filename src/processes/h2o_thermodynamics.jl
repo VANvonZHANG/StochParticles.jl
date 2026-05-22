@@ -169,3 +169,68 @@ function equilibrium_vapor_pressure(
 
     return p_sat * a_w * kelvin
 end
+
+"""
+    critical_supersaturation(m_dry, thermo, densities, T) -> Float64
+
+Compute the critical supersaturation Sc from κ-Köhler theory.
+
+This is the maximum of the Köhler curve. When environmental supersaturation
+S exceeds Sc, the particle activates (enters unstable growth).
+
+# Formula
+    Sc = (4 · A_k³ / (27 · B))^(1/2)
+
+where:
+- A_k = 4σ·M_w / (R·T·ρ_w)  [m] — Kelvin parameter
+- B = κ_mix · V_dry  [m³] — hygroscopicity × dry volume
+- κ_mix = Σ ε_k · κ_k — volume-fraction-weighted κ
+- V_dry = Σ m_k / ρ_k — dry particle volume
+
+# Arguments
+- `m_dry::SVector{A}` — dry species masses [kg]
+- `thermo::ThermodynamicsParams` — thermodynamic parameters
+- `densities::SVector{A}` — per-species densities [kg/m³]
+- `T::Float64` — temperature [K]
+
+# Returns
+- Critical supersaturation Sc (dimensionless, e.g., 0.005 = 0.5%)
+
+# Reference
+Petters & Kreidenweis (2007), ACP, Eq. for Sc from κ-Köhler theory.
+"""
+function critical_supersaturation(
+    m_dry::SVector{A, Float64},
+    thermo::ThermodynamicsParams{A},
+    densities::SVector{A, Float64},
+    T::Float64,
+) where {A}
+    # Kelvin parameter A_k [m]
+    # A = 4σ / (R_v · T · ρ_w) — note: no M_w factor because R_v is the
+    # specific gas constant (J/kg/K), not the universal gas constant.
+    A_k = 4.0 * thermo.σ / (thermo.R_v * T * thermo.ρ_w)
+
+    # Dry volume V_dry [m³]
+    V_dry = 0.0
+    κ_mix = 0.0
+    for k in 1:(A - 1)  # exclude water
+        V_k = m_dry[k] / densities[k]
+        V_dry += V_k
+        κ_mix += V_k * thermo.κ_values[k]
+    end
+
+    if V_dry ≈ 0.0
+        return 0.0  # pure water: no critical point
+    end
+
+    κ_mix /= V_dry  # volume-fraction-weighted average κ
+
+    # B parameter [m³]
+    B = κ_mix * V_dry
+
+    # Critical supersaturation
+    # Sc = (4 · A_k³ / (27 · B))^(1/2)
+    Sc = sqrt(4.0 * A_k^3 / (27.0 * B))
+
+    return Sc
+end
