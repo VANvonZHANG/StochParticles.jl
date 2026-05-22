@@ -28,7 +28,7 @@ export cnmc_merge!, cnmc_clone!, cnmc_volume_rescale!, cnmc_coagulate!
 export make_coagulation_jump, make_emission_jump
 export dilution_death_affect!, dilution_birth_affect!, make_dilution_jumps
 export water_activity, ThermodynamicsParams, saturation_vapor_pressure, modified_diffusion_coefficient, particle_wet_radius, equilibrium_vapor_pressure
-export ParcelState, parcel_drift
+export ParcelState, parcel_drift, extract_parcel, set_parcel!
 export number_concentration, mass_concentration, species_mass_concentration,
        species_fractions,
        mixing_state_index, particle_mixing_entropy, shannon_entropy

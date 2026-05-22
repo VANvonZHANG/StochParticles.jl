@@ -53,3 +53,37 @@ end
     expected_dqv = -total_condensation / (rho_a * volume)
     @test dparcel.qv ≈ expected_dqv atol = 1e-10
 end
+
+@testset "State vector with parcel extension" begin
+    A = 2
+    n_sim = 3
+    n_parcel = 4
+
+    # Build state vector: 3 particles × 2 species + 4 parcel vars
+    u = zeros(n_sim * A + n_parcel)
+    u[1] = 1.0e-18   # particle 1, species 1
+    u[2] = 1.0e-18   # particle 1, species 2 (H2O)
+    u[3] = 2.0e-18
+    u[4] = 2.0e-18
+    u[5] = 3.0e-18
+    u[6] = 3.0e-18
+    u[7] = 293.15    # T
+    u[8] = 1.01325e5 # p
+    u[9] = 0.01      # qv
+    u[10] = 0.0      # S
+
+    # Extract parcel
+    parcel = extract_parcel(u, n_sim, A)
+    @test parcel.T ≈ 293.15
+    @test parcel.p ≈ 1.01325e5
+    @test parcel.qv ≈ 0.01
+    @test parcel.S ≈ 0.0
+
+    # Modify parcel
+    new_parcel = ParcelState(295.0, 1.0e5, 0.012, 0.01)
+    set_parcel!(u, new_parcel, n_sim, A)
+    @test u[7] ≈ 295.0
+    @test u[8] ≈ 1.0e5
+    @test u[9] ≈ 0.012
+    @test u[10] ≈ 0.01
+end
