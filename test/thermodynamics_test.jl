@@ -53,3 +53,34 @@ end
     @test D_v_prime < thermo.D_v
     @test D_v_prime > 0.5 * thermo.D_v  # not too small
 end
+
+@testset "Equilibrium vapor pressure" begin
+    thermo = ThermodynamicsParams(
+        SVector(0.61, 0.0, 0.0),
+        0.072, 1000.0, 18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2,
+    )
+    densities = SVector(1770.0, 1800.0, 1000.0)
+    T = 293.15
+
+    # Small dry particle (~10 nm diameter equivalent)
+    # m_dry = pi/6 * d^3 * rho = pi/6 * (10e-9)^3 * 1770 ≈ 9.27e-22 kg
+    m_dry = SVector(9.27e-22, 0.0, 0.0)
+    m_w = 5e-21  # ~5x dry mass in water
+
+    p_eq = equilibrium_vapor_pressure(m_dry, m_w, thermo, densities, T)
+    p_sat = saturation_vapor_pressure(T)
+
+    # For this small particle, Kelvin effect dominates over water activity reduction
+    # resulting in supersaturated equilibrium (p_eq > p_sat)
+    @test p_eq > p_sat
+end
+
+@testset "Particle wet radius" begin
+    densities = SVector(1770.0, 1800.0, 1000.0)
+    m_dry = SVector(1e-18, 0.0, 0.0)
+    m_w = 1e-18
+    R = particle_wet_radius(m_dry, m_w, densities)
+    # V_total = V_dry + V_w = 1e-18/1770 + 1e-18/1000 ≈ 1.565e-21
+    # R = (3V/4π)^(1/3) ≈ 7.20e-8
+    @test R ≈ 7.20e-8 atol = 1e-9
+end

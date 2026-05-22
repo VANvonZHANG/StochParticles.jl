@@ -119,3 +119,53 @@ function water_activity(
 
     return V_w / denominator
 end
+
+"""
+    particle_wet_radius(m_dry, m_w, densities) -> Float64
+
+Compute wet particle radius from dry masses and water mass.
+Assumes volume-additive mixing.
+"""
+function particle_wet_radius(
+    m_dry::SVector{A, Float64},
+    m_w::Float64,
+    densities::SVector{A, Float64},
+) where {A}
+    # Total volume = dry volume + water volume
+    V_total = m_w / densities[end]  # water volume
+    for k in 1:(A - 1)
+        V_total += m_dry[k] / densities[k]
+    end
+    return cbrt(3.0 * V_total / (4.0 * π))
+end
+
+"""
+    equilibrium_vapor_pressure(m_dry, m_w, thermo, densities, T) -> Float64
+
+Köhler equilibrium vapor pressure over a solution droplet.
+
+p_eq = p_sat(T) · a_w · exp(2σ / (R_v · T · ρ_w · R))
+
+# Arguments
+- `m_dry` — dry species masses
+- `m_w` — water mass
+- `thermo` — ThermodynamicsParams
+- `densities` — per-species densities
+- `T` — temperature [K]
+"""
+function equilibrium_vapor_pressure(
+    m_dry::SVector{A, Float64},
+    m_w::Float64,
+    thermo::ThermodynamicsParams{A},
+    densities::SVector{A, Float64},
+    T::Float64,
+) where {A}
+    p_sat = saturation_vapor_pressure(T)
+    a_w = water_activity(m_dry, m_w, thermo.κ_values, densities)
+    R = particle_wet_radius(m_dry, m_w, densities)
+
+    # Kelvin effect
+    kelvin = exp(2.0 * thermo.σ / (thermo.R_v * T * thermo.ρ_w * R))
+
+    return p_sat * a_w * kelvin
+end
