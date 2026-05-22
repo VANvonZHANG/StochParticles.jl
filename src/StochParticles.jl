@@ -27,6 +27,7 @@ export compute_majorant, majorant_rate
 export cnmc_merge!, cnmc_clone!, cnmc_volume_rescale!, cnmc_coagulate!
 export make_coagulation_jump, make_emission_jump
 export dilution_death_affect!, dilution_birth_affect!, make_dilution_jumps
+export water_activity
 export number_concentration, mass_concentration, species_mass_concentration,
        species_fractions,
        mixing_state_index, particle_mixing_entropy, shannon_entropy
@@ -51,6 +52,7 @@ include("processes/coagulation.jl")
 include("processes/condensation.jl")
 include("processes/emission.jl")
 include("processes/dilution.jl")
+include("processes/h2o_thermodynamics.jl")
 
 # ---- Assembly (depends on all above) ----
 include("core/assembly.jl")
