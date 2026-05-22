@@ -56,3 +56,22 @@ end
     # Dry mass should not change
     @test dμ[1] == 0.0
 end
+
+@testset "H2OCondensationProcess convenience constructor" begin
+    thermo = ThermodynamicsParams(
+        SVector(0.61, 0.0),
+        0.072, 1000.0, 18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2,
+    )
+    densities = SVector(1770.0, 1000.0)
+
+    proc = H2OCondensationProcess(thermo, densities; h2o_idx=2, w=1.0)
+
+    @test proc isa CondensationProcess
+    @test provides_drift(proc) == true
+
+    # Test that it produces flux
+    sys = ParticleSystem(Val(2), 10, 1.0e-6, t -> SVector(293.15, 1000.0))
+    μ = SVector(1e-18, 1e-18)
+    dμ = apply_drift(proc, μ, sys, 0.0)
+    @test dμ isa SVector{2, Float64}
+end

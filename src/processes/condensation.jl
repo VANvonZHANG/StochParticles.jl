@@ -130,3 +130,34 @@ function (flux::H2OCondensationFlux{A})(
 
     return dμ
 end
+
+"""
+    H2OCondensationProcess(thermo, densities; h2o_idx, w)
+
+Convenience constructor for a `CondensationProcess` with physically rigorous H2O flux.
+
+# Arguments
+- `thermo::ThermodynamicsParams` — thermodynamic parameters
+- `densities::SVector{A,Float64}` — per-species densities
+- `h2o_idx::Int` — index of H2O in species vector (default: last species)
+- `w::Float64` — updraft velocity [m/s] (default: 1.0)
+
+# Returns
+- `CondensationProcess` with `H2OCondensationFlux`
+
+# Example
+```julia
+thermo = ThermodynamicsParams(κ_values, 0.072, 1000.0, ...)
+densities = SVector(1770.0, 1000.0)  # SO4, H2O
+proc = H2OCondensationProcess(thermo, densities; h2o_idx=2, w=1.0)
+```
+"""
+function H2OCondensationProcess(
+        thermo::ThermodynamicsParams{A},
+        densities::SVector{A, Float64};
+        h2o_idx::Int = A,
+        w::Float64 = 1.0,
+) where {A}
+    flux = H2OCondensationFlux(thermo, h2o_idx, densities, w)
+    return CondensationProcess((μ, g, t) -> flux(μ, g, nothing, t))
+end
