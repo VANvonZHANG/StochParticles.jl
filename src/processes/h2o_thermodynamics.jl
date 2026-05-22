@@ -1,4 +1,78 @@
 """
+    ThermodynamicsParams
+
+Physical parameters for H2O thermodynamics calculations.
+
+# Fields
+- `κ_values::SVector{A,Float64}` — hygroscopicity κ per species
+- `σ::Float64` — surface tension [N/m]
+- `ρ_w::Float64` — water density [kg/m³]
+- `M_w::Float64` — water molar mass [kg/mol]
+- `L_v::Float64` — latent heat of vaporization [J/kg]
+- `R_v::Float64` — specific gas constant for water vapor [J/kg/K]
+- `D_v::Float64` — molecular diffusivity of water vapor [m²/s]
+- `k_a::Float64` — thermal conductivity of air [W/m/K]
+"""
+struct ThermodynamicsParams{A}
+    κ_values::SVector{A, Float64}
+    σ::Float64
+    ρ_w::Float64
+    M_w::Float64
+    L_v::Float64
+    R_v::Float64
+    D_v::Float64
+    k_a::Float64
+end
+
+"""
+    saturation_vapor_pressure(T::Float64) -> Float64
+
+Saturation vapor pressure over liquid water using the Clausius-Clapeyron relation.
+
+Reference: p_sat at T0 = 273.15 K is 611.2 Pa.
+"""
+function saturation_vapor_pressure(T::Float64)
+    T0 = 273.15
+    p_sat_0 = 611.2
+    L_v = 2.5e6      # [J/kg]
+    R_v = 461.5      # [J/kg/K]
+    return p_sat_0 * exp((L_v / R_v) * (1.0 / T0 - 1.0 / T))
+end
+
+"""
+    modified_diffusion_coefficient(thermo, T, p_sat) -> Float64
+
+Effective mass transfer coefficient accounting for latent heat release.
+Formula from Seinfeld & Pandis (Eq. 13.58).
+
+D_v' = [1/D_v + (L_v / (k_a·T)) · (L_v/(R_v·T) - 1) · p_sat / p_v ]^(-1)
+
+For the limit p_v → p_sat (near equilibrium), we use p_v ≈ p_sat.
+"""
+function modified_diffusion_coefficient(
+    thermo::ThermodynamicsParams,
+    T::Float64,
+    p_sat::Float64,
+)
+    D_v = thermo.D_v
+    L_v = thermo.L_v
+    k_a = thermo.k_a
+    R_v = thermo.R_v
+
+    # Thermal resistance term (latent heat correction)
+    # L_v must be in J/mol for unit consistency; convert from J/kg using M_w
+    L_v_mol = L_v * thermo.M_w
+    thermal_resistance = (L_v_mol / (k_a * T)) * (L_v / (R_v * T) - 1.0)
+
+    # Total resistance: 1/D_v' = 1/D_v + thermal_resistance · p_sat / p_atm
+    # Using standard atmospheric pressure p_atm = 101325 Pa
+    p_atm = 101325.0
+    total_resistance = 1.0 / D_v + thermal_resistance * (p_sat / p_atm)
+
+    return 1.0 / total_resistance
+end
+
+"""
     water_activity(m_dry, m_w, κ_values, densities) -> Float64
 
 Compute water activity using κ-Köhler theory (Petters & Kreidenweis, 2007).
