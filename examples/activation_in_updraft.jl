@@ -64,28 +64,56 @@ sol = solve(prob, TRBDF2(autodiff=false); saveat = 10.0)
 println("Done. $(length(sol.t)) time steps saved.")
 
 # ---- Extract activation evolution ----
-act_frac = [activation_fraction(sol.u[i], prob.prob.p, Val(2);
+
+# Method 1: Legacy radius-based criterion (arbitrary threshold)
+act_frac_radius = [activation_fraction(sol.u[i], prob.prob.p, Val(2);
+    mode = :radius_threshold,
     threshold = 1.0e-6, densities = densities) for i in eachindex(sol.t)]
 
-# ---- Print summary ----
-println("\nActivation evolution:")
-for (t, f) in zip(sol.t[1:10:end], act_frac[1:10:end])
-    println("  t = $(round(t, digits=1)) s: activation fraction = $(round(f, digits=3))")
-end
-println("  t = $(round(sol.t[end], digits=1)) s: activation fraction = $(round(act_frac[end], digits=3))")
+# Method 2: Physics-based criterion (Köhler critical supersaturation)
+# At each timestep, compute environmental S from parcel state
+# For now, use a fixed S envelope (parcel model not fully coupled in this example)
+# In a full simulation, S_env would come from the parcel state
+S_env_time = 0.002 .* (1.0 .- exp.(-sol.t ./ 100.0))  # S rises to 0.2%
 
-# ---- Plot ----
-fig = plot(sol.t, act_frac,
+act_frac_phys = [activation_fraction(sol.u[i], prob.prob.p, Val(2);
+    mode = :critical_supersaturation,
+    S_env = S_env_time[i],
+    thermo = thermo,
+    densities = densities,
+    T = T0) for i in eachindex(sol.t)]
+
+# ---- Print summary ----
+println("\nActivation evolution (radius-based vs physics-based):")
+for (t, fr, fp) in zip(sol.t[1:10:end], act_frac_radius[1:10:end], act_frac_phys[1:10:end])
+    println("  t = $(round(t, digits=1)) s:  radius-based = $(round(fr, digits=3))  |  Sc-based = $(round(fp, digits=3))")
+end
+println("  t = $(round(sol.t[end], digits=1)) s:  radius-based = $(round(act_frac_radius[end], digits=3))  |  Sc-based = $(round(act_frac_phys[end], digits=3))")
+
+# ---- Plot both criteria ----
+fig = plot(sol.t, [act_frac_radius act_frac_phys],
     xlabel = "Time (s)",
     ylabel = "Activation Fraction",
     title = "Aerosol Activation in Updraft (w = $(w) m/s)",
     linewidth = 2,
-    legend = false)
+    label = ["Radius threshold (1 μm)" "Critical Sc (Köhler)"],
+    legend = :bottomright)
 
 savefig(fig, joinpath(@__DIR__, "activation_evolution.png"))
 println("\nPlot saved to: activation_evolution.png")
 
 # ---- Final diagnostics ----
-N_d = cloud_droplet_concentration(sol.u[end], prob.prob.p, Val(2);
+N_d_radius = cloud_droplet_concentration(sol.u[end], prob.prob.p, Val(2);
+    mode = :radius_threshold,
     threshold = 1.0e-6, densities = densities)
-println("Final cloud droplet concentration: $(round(N_d, sigdigits=3)) m⁻³")
+
+N_d_phys = cloud_droplet_concentration(sol.u[end], prob.prob.p, Val(2);
+    mode = :critical_supersaturation,
+    S_env = S_env_time[end],
+    thermo = thermo,
+    densities = densities,
+    T = T0)
+
+println("Final cloud droplet concentration:")
+println("  Radius-based: $(round(N_d_radius, sigdigits=3)) m⁻³")
+println("  Sc-based:     $(round(N_d_phys, sigdigits=3)) m⁻³")
