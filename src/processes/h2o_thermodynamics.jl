@@ -171,21 +171,40 @@ function equilibrium_vapor_pressure(
 end
 
 """
+    _kohler_supersaturation(R, V_dry, κ_mix, thermo, T) -> Float64
+
+Evaluate the exact Köhler supersaturation S at droplet radius R.
+
+    S(R) = a_w(R) · exp(2σ / (R_v · T · ρ_w · R)) - 1
+
+Private helper for `critical_supersaturation`.
+"""
+function _kohler_supersaturation(
+        R::Float64,
+        V_dry::Float64,
+        κ_mix::Float64,
+        thermo::ThermodynamicsParams,
+        T::Float64,
+)
+    V_w = (4.0 / 3.0) * π * R^3 - V_dry
+    if V_w <= 0.0
+        return -1.0
+    end
+    a_w = V_w / (V_w + κ_mix * V_dry)
+    kelvin = exp(2.0 * thermo.σ / (thermo.R_v * T * thermo.ρ_w * R))
+    return a_w * kelvin - 1.0
+end
+
+"""
     critical_supersaturation(m_dry, thermo, densities, T) -> Float64
 
-Compute the critical supersaturation Sc from κ-Köhler theory.
+Compute the critical supersaturation Sc by numerically maximizing
+the exact κ-Köhler curve.
 
-This is the maximum of the Köhler curve. When environmental supersaturation
-S exceeds Sc, the particle activates (enters unstable growth).
+Uses golden section search to find the maximum of:
+    S(R) = a_w(R) · exp(2σ / (R_v · T · ρ_w · R)) - 1
 
-# Formula
-    Sc = (4 · A_k³ / (27 · B))^(1/2)
-
-where:
-- A_k = 4σ·M_w / (R·T·ρ_w)  [m] — Kelvin parameter
-- B = κ_mix · V_dry  [m³] — hygroscopicity × dry volume
-- κ_mix = Σ ε_k · κ_k — volume-fraction-weighted κ
-- V_dry = Σ m_k / ρ_k — dry particle volume
+where a_w = V_w / (V_w + κ_mix · V_dry) and V_w = (4/3)πR³ - V_dry.
 
 # Arguments
 - `m_dry::SVector{A}` — dry species masses [kg]
@@ -194,43 +213,69 @@ where:
 - `T::Float64` — temperature [K]
 
 # Returns
-- Critical supersaturation Sc (dimensionless, e.g., 0.005 = 0.5%)
+- Critical supersaturation Sc (dimensionless, e.g., 0.0015 = 0.15%)
 
 # Reference
-Petters & Kreidenweis (2007), ACP, Eq. for Sc from κ-Köhler theory.
+Petters & Kreidenweis (2007), ACP. Numerical maximum of exact Köhler curve
+replaces the approximate analytical formula.
 """
 function critical_supersaturation(
-    m_dry::SVector{A, Float64},
-    thermo::ThermodynamicsParams{A},
-    densities::SVector{A, Float64},
-    T::Float64,
+        m_dry::SVector{A, Float64},
+        thermo::ThermodynamicsParams{A},
+        densities::SVector{A, Float64},
+        T::Float64,
 ) where {A}
-    # Kelvin parameter A_k [m]
-    # A = 4σ / (R_v · T · ρ_w) — note: no M_w factor because R_v is the
-    # specific gas constant (J/kg/K), not the universal gas constant.
-    A_k = 4.0 * thermo.σ / (thermo.R_v * T * thermo.ρ_w)
-
-    # Dry volume V_dry [m³]
+    # Compute dry volume and volume-weighted κ
     V_dry = 0.0
     κ_mix = 0.0
-    for k in 1:(A - 1)  # exclude water
+    for k in 1:(A - 1)
         V_k = m_dry[k] / densities[k]
         V_dry += V_k
         κ_mix += V_k * thermo.κ_values[k]
     end
 
     if V_dry ≈ 0.0
-        return 0.0  # pure water: no critical point
+        return 0.0
     end
 
-    κ_mix /= V_dry  # volume-fraction-weighted average κ
+    κ_mix /= V_dry
 
-    # B parameter [m³]
-    B = κ_mix * V_dry
+    # Dry radius
+    R_dry = cbrt(3.0 * V_dry / (4.0 * π))
 
-    # Critical supersaturation
-    # Sc = (4 · A_k³ / (27 · B))^(1/2)
-    Sc = sqrt(4.0 * A_k^3 / (27.0 * B))
+    # Approximate critical radius from analytical formula (initial guess)
+    A_kelvin = 2.0 * thermo.σ / (thermo.R_v * T * thermo.ρ_w)
+    R_c_approx = sqrt(3.0 * κ_mix * V_dry / A_kelvin)
 
-    return Sc
+    # Golden section search for maximum of S(R) in [R_dry, R_c_approx * 10]
+    a = R_dry * 1.001
+    b = max(R_c_approx * 10.0, R_dry * 100.0)
+    φ = (sqrt(5.0) - 1.0) / 2.0
+
+    c = b - φ * (b - a)
+    d = a + φ * (b - a)
+    Sc_c = _kohler_supersaturation(c, V_dry, κ_mix, thermo, T)
+    Sc_d = _kohler_supersaturation(d, V_dry, κ_mix, thermo, T)
+
+    for _ in 1:100
+        if b - a < 1e-12 * R_c_approx
+            break
+        end
+        if Sc_c < Sc_d
+            a = c
+            c = d
+            Sc_c = Sc_d
+            d = a + φ * (b - a)
+            Sc_d = _kohler_supersaturation(d, V_dry, κ_mix, thermo, T)
+        else
+            b = d
+            d = c
+            Sc_d = Sc_c
+            c = b - φ * (b - a)
+            Sc_c = _kohler_supersaturation(c, V_dry, κ_mix, thermo, T)
+        end
+    end
+
+    R_opt = (a + b) / 2.0
+    return max(_kohler_supersaturation(R_opt, V_dry, κ_mix, thermo, T), 0.0)
 end
