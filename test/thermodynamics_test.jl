@@ -107,9 +107,9 @@ end
     @test Sc_large > 0.0
     @test Sc_large < Sc_small  # larger particles have lower Sc
 
-    # Verify order of magnitude for 100 nm ammonium sulfate at 293K
-    # Literature value: Sc ≈ 0.1% to 0.5% for this size
+    # 100 nm ammonium sulfate at 293K
+    # Exact Köhler maximum: Sc ≈ 0.15% (literature: 0.1%–0.2%)
     m_dry = SVector(9.27e-19, 0.0, 0.0)  # ~100 nm SO4
     Sc = critical_supersaturation(m_dry, thermo, densities, T)
-    @test 0.001 < Sc < 0.01  # 0.1% to 1%
+    @test 0.001 < Sc < 0.003  # ~0.15%
 end
