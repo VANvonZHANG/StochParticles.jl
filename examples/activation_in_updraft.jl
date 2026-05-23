@@ -17,19 +17,7 @@ n_sim = 2000         # Number of particles
 
 # Species: SO4 (ammonium sulfate proxy), H2O (water)
 densities = SVector(1770.0, 1000.0)   # [kg/m³]
-κ_values  = SVector(0.61, 0.0)        # κ per species
 h2o_idx = 2
-
-thermo = ThermodynamicsParams(
-    κ_values,
-    0.072,       # σ  [N/m]
-    1000.0,      # ρ_w [kg/m³]
-    18.015e-3,   # M_w [kg/mol]
-    2.5e6,       # L_v [J/kg]
-    461.5,       # R_v [J/kg/K]
-    2.5e-5,      # D_v [m²/s]
-    2.4e-2,      # k_a [W/m/K]
-)
 
 # ============================================================
 # 2. Initial aerosol: two atmospheric modes (Whitby 1978)
@@ -65,13 +53,6 @@ particle_thermo = vcat(
     fill(accum_thermo, n_accum),
 )
 
-# Compute theoretical critical supersaturation for each dry particle
-Sc_particles = zeros(n_sim)
-for i in 1:n_sim
-    m_dry = particles[i]  # [SO4, H2O] at t=0 (H2O=0)
-    Sc_particles[i] = critical_supersaturation(m_dry, particle_thermo[i], densities, T0)
-end
-
 # ============================================================
 # 3. Run simulation at a fixed supersaturation
 # ============================================================
@@ -81,7 +62,7 @@ p_v0 = p_sat_0 * (1.0 + S_target)
 
 gas_fn = t -> SVector(T0, p_v0)  # Fixed environment
 
-# Use average κ for the condensation process
+# Simplification: use average κ for condensation (production code would use per-particle κ)
 avg_thermo = ThermodynamicsParams(
     SVector(0.455, 0.0),  # average of 0.30 and 0.61
     0.072, 1000.0, 18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2)
@@ -98,7 +79,6 @@ println("Done.\n")
 # 4. Determine activation status at final time
 # ============================================================
 u_final = sol.u[end]
-sys = prob.prob.p
 
 is_activated = falses(n_sim)
 for i in 1:n_sim
