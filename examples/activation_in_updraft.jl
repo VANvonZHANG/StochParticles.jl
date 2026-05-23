@@ -76,16 +76,16 @@ sol = solve(prob, TRBDF2(autodiff=false); saveat = [0.0, 600.0])
 println("Done.\n")
 
 # ============================================================
-# 4. Determine activation status at final time
+# 4. Determine activation status: Köhler theory criterion
 # ============================================================
-u_final = sol.u[end]
-
+# A particle is activated if S_env > Sc(d_dry, κ).
+# This uses the exact same criterion as the theoretical cutoff lines,
+# avoiding ODE numerical artifacts (negative masses, overshoot).
 is_activated = falses(n_sim)
 for i in 1:n_sim
-    μ = get_particle(u_final, i, Val(2))
-    V_total = μ[1] / densities[1] + μ[2] / densities[2]
-    R = cbrt(3.0 * V_total / (4.0 * π))
-    is_activated[i] = R >= 1.0e-6
+    m_dry_i = SVector{2,Float64}(particles[i][1], 0.0)
+    Sc_i = critical_supersaturation(m_dry_i, particle_thermo[i], densities, T0)
+    is_activated[i] = S_target > Sc_i
 end
 
 n_activated = count(is_activated)
