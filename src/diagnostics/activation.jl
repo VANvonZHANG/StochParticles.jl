@@ -28,7 +28,7 @@ function activation_fraction(
         sys::ParticleSystem{A},
         ::Val{A};
         mode::Symbol = :radius_threshold,
-        kwargs...,
+        kwargs...
 ) where {A}
     if mode == :radius_threshold
         return _activation_fraction_radius(u, sys, Val(A); kwargs...)
@@ -44,7 +44,7 @@ function _activation_fraction_radius(
         sys::ParticleSystem{A},
         ::Val{A};
         threshold::Float64 = 1.0e-6,
-        densities::SVector{A, Float64},
+        densities::SVector{A, Float64}
 ) where {A}
     n_active = sys.n_active
     count = 0
@@ -69,7 +69,7 @@ function _activation_fraction_sc(
         S_env::Float64,
         thermo::ThermodynamicsParams{A},
         densities::SVector{A, Float64},
-        T::Float64,
+        T::Float64
 ) where {A}
     n_active = sys.n_active
     count = 0
@@ -110,7 +110,7 @@ function cloud_droplet_concentration(
         sys::ParticleSystem{A},
         ::Val{A};
         mode::Symbol = :radius_threshold,
-        kwargs...,
+        kwargs...
 ) where {A}
     frac = activation_fraction(u, sys, Val(A); mode = mode, kwargs...)
     return frac * sys.n_active / sys.volume

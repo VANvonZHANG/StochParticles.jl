@@ -89,7 +89,7 @@ function (flux::H2OCondensationFlux{A})(
         μ::SVector{A, Float64},
         env::SVector{2, Float64},
         sys,
-        t,
+        t
 ) where {A}
     h2o_idx = flux.h2o_idx
     thermo = flux.thermo
@@ -156,7 +156,7 @@ function H2OCondensationProcess(
         thermo::ThermodynamicsParams{A},
         densities::SVector{A, Float64};
         h2o_idx::Int = A,
-        w::Float64 = 1.0,
+        w::Float64 = 1.0
 ) where {A}
     flux = H2OCondensationFlux(thermo, h2o_idx, densities, w)
     return CondensationProcess((μ, g, t) -> flux(μ, g, nothing, t))

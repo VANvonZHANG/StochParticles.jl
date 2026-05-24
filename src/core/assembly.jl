@@ -120,7 +120,7 @@ function extract_parcel(u::Vector{Float64}, n_sim::Int, A::Int)
         u[offset + 1],  # T
         u[offset + 2],  # p
         u[offset + 3],  # qv
-        u[offset + 4],  # S
+        u[offset + 4]  # S
     )
 end
 

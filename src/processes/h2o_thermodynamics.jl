@@ -50,9 +50,9 @@ D_v' = [1/D_v + (L_v / (k_a·T)) · (L_v/(R_v·T) - 1) · p_sat / p_v ]^(-1)
 For the limit p_v → p_sat (near equilibrium), we use p_v ≈ p_sat.
 """
 function modified_diffusion_coefficient(
-    thermo::ThermodynamicsParams,
-    T::Float64,
-    p_sat::Float64,
+        thermo::ThermodynamicsParams,
+        T::Float64,
+        p_sat::Float64
 )
     D_v = thermo.D_v
     L_v = thermo.L_v
@@ -93,10 +93,10 @@ where V_w = m_w / ρ_w, V_dry = Σ m_k / ρ_k, and κ_mix = Σ ε_k · κ_k
 with ε_k = V_k / V_dry.
 """
 function water_activity(
-    m_dry::SVector{A, Float64},
-    m_w::Float64,
-    κ_values::SVector{A, Float64},
-    densities::SVector{A, Float64},
+        m_dry::SVector{A, Float64},
+        m_w::Float64,
+        κ_values::SVector{A, Float64},
+        densities::SVector{A, Float64}
 ) where {A}
     ρ_w = densities[end]  # last species is water
     V_w = m_w / ρ_w
@@ -127,9 +127,9 @@ Compute wet particle radius from dry masses and water mass.
 Assumes volume-additive mixing.
 """
 function particle_wet_radius(
-    m_dry::SVector{A, Float64},
-    m_w::Float64,
-    densities::SVector{A, Float64},
+        m_dry::SVector{A, Float64},
+        m_w::Float64,
+        densities::SVector{A, Float64}
 ) where {A}
     # Total volume = dry volume + water volume
     V_total = m_w / densities[end]  # water volume
@@ -154,11 +154,11 @@ p_eq = p_sat(T) · a_w · exp(2σ / (R_v · T · ρ_w · R))
 - `T` — temperature [K]
 """
 function equilibrium_vapor_pressure(
-    m_dry::SVector{A, Float64},
-    m_w::Float64,
-    thermo::ThermodynamicsParams{A},
-    densities::SVector{A, Float64},
-    T::Float64,
+        m_dry::SVector{A, Float64},
+        m_w::Float64,
+        thermo::ThermodynamicsParams{A},
+        densities::SVector{A, Float64},
+        T::Float64
 ) where {A}
     p_sat = saturation_vapor_pressure(T)
     a_w = water_activity(m_dry, m_w, thermo.κ_values, densities)
@@ -184,7 +184,7 @@ function _kohler_supersaturation(
         V_dry::Float64,
         κ_mix::Float64,
         thermo::ThermodynamicsParams,
-        T::Float64,
+        T::Float64
 )
     V_w = (4.0 / 3.0) * π * R^3 - V_dry
     if V_w <= 0.0
@@ -223,7 +223,7 @@ function critical_supersaturation(
         m_dry::SVector{A, Float64},
         thermo::ThermodynamicsParams{A},
         densities::SVector{A, Float64},
-        T::Float64,
+        T::Float64
 ) where {A}
     # Compute dry volume and volume-weighted κ
     V_dry = 0.0

@@ -42,7 +42,7 @@ end
         2.5e6,                     # L_v [J/kg]
         461.5,                     # R_v [J/kg/K]
         2.5e-5,                    # D_v [m²/s]
-        2.4e-2,                    # k_a [W/m/K]
+        2.4e-2                    # k_a [W/m/K]
     )
 
     T = 293.15
@@ -57,7 +57,7 @@ end
 @testset "Equilibrium vapor pressure" begin
     thermo = ThermodynamicsParams(
         SVector(0.61, 0.0, 0.0),
-        0.072, 1000.0, 18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2,
+        0.072, 1000.0, 18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2
     )
     densities = SVector(1770.0, 1800.0, 1000.0)
     T = 293.15
@@ -88,7 +88,7 @@ end
 @testset "Critical supersaturation" begin
     thermo = ThermodynamicsParams(
         SVector(0.61, 0.0, 0.0),
-        0.072, 1000.0, 18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2,
+        0.072, 1000.0, 18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2
     )
     densities = SVector(1770.0, 1800.0, 1000.0)
     T = 293.15
