@@ -21,16 +21,22 @@ export CoagulationKernel, CoagulationSampling
 export BrownianKernel, GlobalMajorant, CompositeKernel, GravitationalKernel,
        AyalaTurbulentKernel, AtmosphericParameters, make_kernel
 export CoagulationProcess, CondensationProcess, SpeciesDependentCondensation,
-       EmissionProcess, DilutionProcess
+       H2OCondensationFlux,
+       H2OCondensationProcess, EmissionProcess, DilutionProcess
 export apply_drift, make_ode_func
 export compute_majorant, majorant_rate
 export cnmc_merge!, cnmc_clone!, cnmc_volume_rescale!, cnmc_coagulate!
 export make_coagulation_jump, make_emission_jump
 export dilution_death_affect!, dilution_birth_affect!, make_dilution_jumps
+export water_activity, ThermodynamicsParams, saturation_vapor_pressure,
+       modified_diffusion_coefficient, particle_wet_radius, equilibrium_vapor_pressure,
+       critical_supersaturation
+export ParcelState, parcel_drift, extract_parcel, set_parcel!
 export number_concentration, mass_concentration, species_mass_concentration,
        species_fractions,
        mixing_state_index, particle_mixing_entropy, shannon_entropy
 export reconstruct_volumes, extract_concentrations
+export activation_fraction, cloud_droplet_concentration
 export check_mass_conservation
 export particle_diameters, compute_size_distribution
 export bin_size_distribution
@@ -48,7 +54,9 @@ include("core/cnmc.jl")
 
 # ---- Process implementations ----
 include("processes/coagulation.jl")
+include("processes/h2o_thermodynamics.jl")
 include("processes/condensation.jl")
+include("processes/parcel_model.jl")
 include("processes/emission.jl")
 include("processes/dilution.jl")
 
@@ -61,6 +69,7 @@ include("diagnostics/mixing_state.jl")
 include("diagnostics/reconstruction.jl")
 include("diagnostics/distributions.jl")
 include("diagnostics/validation.jl")
+include("diagnostics/activation.jl")
 
 # ---- Plotting ----
 include("plotting/core.jl")
