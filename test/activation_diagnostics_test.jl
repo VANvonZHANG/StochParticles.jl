@@ -124,3 +124,48 @@ end
     # 2 out of 3 activated in volume 1e-6 → 2e6 m⁻³
     @test N_d ≈ 2.0e6 atol = 1.0e6
 end
+
+@testset "activation_fraction rejects invalid mode" begin
+    A = 2
+    u = [1e-18, 1e-18]
+    sys = ParticleSystem(Val(2), 1, 1.0e-6, t -> SVector(0.0, 0.0))
+    @test_throws ArgumentError activation_fraction(u, sys, Val(A); mode = :invalid)
+end
+
+@testset "activation_fraction zero activation" begin
+    A = 2
+    densities = SVector(1770.0, 1000.0)
+    κ_values = SVector(0.61, 0.0)
+    thermo = ThermodynamicsParams(
+        κ_values, 0.072, 1000.0, 18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2
+    )
+    # All very small particles → none activated at low S_env
+    u = [
+        1e-20, 1e-21,  # tiny particle 1
+        1e-20, 1e-21   # tiny particle 2
+    ]
+    sys = ParticleSystem(Val(2), 2, 1.0e-6, t -> SVector(0.0, 0.0))
+
+    frac = activation_fraction(u, sys, Val(A);
+        mode = :critical_supersaturation,
+        S_env = 1e-6,  # extremely low supersaturation
+        thermo = thermo,
+        densities = densities,
+        T = 293.15
+    )
+    @test frac ≈ 0.0 atol = 0.01
+end
+
+@testset "cloud_droplet_concentration zero activation" begin
+    A = 2
+    densities = SVector(1770.0, 1000.0)
+    # All tiny particles with tiny water mass → radius < 1μm
+    u = [
+        1e-20, 1e-21,
+        1e-20, 1e-21
+    ]
+    sys = ParticleSystem(Val(2), 2, 1.0e-6, t -> SVector(0.0, 0.0))
+    N_d = cloud_droplet_concentration(
+        u, sys, Val(A); threshold = 1.0e-6, densities = densities)
+    @test N_d ≈ 0.0 atol = 1.0
+end

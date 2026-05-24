@@ -113,3 +113,32 @@ end
     Sc = critical_supersaturation(m_dry, thermo, densities, T)
     @test 0.001 < Sc < 0.003  # ~0.15%
 end
+
+@testset "water_activity pure water (V_dry=0)" begin
+    κ = SVector(0.0, 0.0)
+    densities = SVector(1000.0, 1000.0)
+    m_dry = SVector(0.0, 0.0)
+    m_w = 1e-18
+    a_w = water_activity(m_dry, m_w, κ, densities)
+    @test a_w == 1.0
+end
+
+@testset "critical_supersaturation zero dry mass" begin
+    thermo = ThermodynamicsParams(
+        SVector(0.61, 0.0),
+        0.072, 1000.0, 18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2
+    )
+    densities = SVector(1770.0, 1000.0)
+    m_dry = SVector(0.0, 0.0)
+    Sc = critical_supersaturation(m_dry, thermo, densities, 293.15)
+    @test Sc == 0.0
+end
+
+@testset "particle_wet_radius zero water" begin
+    densities = SVector(1770.0, 1000.0)
+    m_dry = SVector(1e-18, 0.0)
+    R = particle_wet_radius(m_dry, 0.0, densities)
+    # Only dry volume contributes
+    V_dry = 1e-18 / 1770.0
+    @test R ≈ cbrt(3.0 * V_dry / (4.0 * π)) atol = 1e-12
+end

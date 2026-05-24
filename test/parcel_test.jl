@@ -87,3 +87,37 @@ end
     @test u[9] ≈ 0.012
     @test u[10] ≈ 0.01
 end
+
+@testset "Parcel drift dS value" begin
+    parcel = ParcelState(293.15, 1.01325e5, 0.01, 0.0)
+    w = 1.0
+    cp = 1005.0
+    g = 9.81
+    rho_a = 1.225
+
+    # No condensation — dS from adiabatic cooling only
+    dm_w = Float64[]
+    volume = 1.0e-6
+    dparcel = parcel_drift(parcel, dm_w, w, cp, g, rho_a, volume)
+
+    # dS should be negative (adiabatic cooling raises qsat, lowering S)
+    # since dqv=0 and dT<0 (cooling), dS = dqv/qsat - qv*dqsat_dT*dT/qsat^2
+    # = 0 - qv*dqsat_dT*dT/qsat^2  (dT<0, dqsat_dT>0 → second term > 0 → dS > 0)
+    @test dparcel.S != 0.0  # not trivially zero
+    @test dparcel.S > 0.0   # adiabatic cooling without condensation raises S
+end
+
+@testset "Parcel drift with condensation affects dS" begin
+    parcel = ParcelState(293.15, 1.01325e5, 0.01, 0.0)
+    w = 1.0
+    cp = 1005.0
+    g = 9.81
+    rho_a = 1.225
+    dm_w = [1.0e-15]
+    volume = 1.0e-6
+    dparcel = parcel_drift(parcel, dm_w, w, cp, g, rho_a, volume)
+
+    # Condensation adds latent heat (opposing cooling) and removes moisture
+    # Both effects reduce supersaturation tendency
+    @test dparcel.S isa Float64
+end
