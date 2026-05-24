@@ -5,7 +5,7 @@ using Test
 @testset "H2OCondensationFlux basic" begin
     thermo = ThermodynamicsParams(
         SVector(0.61, 0.0),
-        0.072, 1000.0, 18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2,
+        0.072, 1000.0, 18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2
     )
     densities = SVector(1770.0, 1000.0)  # SO4, H2O
     h2o_idx = 2
@@ -35,7 +35,7 @@ end
 @testset "H2OCondensationFlux condensation" begin
     thermo = ThermodynamicsParams(
         SVector(0.61, 0.0),
-        0.072, 1000.0, 18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2,
+        0.072, 1000.0, 18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2
     )
     densities = SVector(1770.0, 1000.0)
     h2o_idx = 2
@@ -60,11 +60,11 @@ end
 @testset "H2OCondensationProcess convenience constructor" begin
     thermo = ThermodynamicsParams(
         SVector(0.61, 0.0),
-        0.072, 1000.0, 18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2,
+        0.072, 1000.0, 18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2
     )
     densities = SVector(1770.0, 1000.0)
 
-    proc = H2OCondensationProcess(thermo, densities; h2o_idx=2, w=1.0)
+    proc = H2OCondensationProcess(thermo, densities; h2o_idx = 2, w = 1.0)
 
     @test proc isa CondensationProcess
     @test provides_drift(proc) == true

@@ -40,7 +40,7 @@ function parcel_drift(
         cp::Float64,
         g::Float64,
         rho_a::Float64,
-        volume::Float64,
+        volume::Float64
 )
     total_condensation = sum(dm_w_rates)
     L_v = 2.5e6  # [J/kg]
