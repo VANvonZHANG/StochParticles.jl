@@ -279,3 +279,40 @@ function critical_supersaturation(
     R_opt = (a + b) / 2.0
     return max(_kohler_supersaturation(R_opt, V_dry, κ_mix, thermo, T), 0.0)
 end
+
+"""
+    equilibrium_water_mass(m_dry, thermo, densities, T, p_v) -> Float64
+
+Compute the equilibrium water mass for a non-activated particle by solving
+p_eq(m_w) = p_v via binary search.
+
+# Arguments
+- `m_dry` — dry species masses
+- `thermo` — ThermodynamicsParams
+- `densities` — per-species densities
+- `T` — temperature [K]
+- `p_v` — ambient vapor pressure [Pa]
+
+# Returns
+- Equilibrium water mass m_w [kg]
+"""
+function equilibrium_water_mass(
+        m_dry::SVector{A,Float64},
+        thermo::ThermodynamicsParams{A},
+        densities::SVector{A,Float64},
+        T::Float64,
+        p_v::Float64
+) where {A}
+    lo = 1e-25
+    hi = 1e-15
+    for _ in 1:60
+        mid = sqrt(lo * hi)
+        p_eq = equilibrium_vapor_pressure(m_dry, mid, thermo, densities, T)
+        if p_eq < p_v
+            lo = mid
+        else
+            hi = mid
+        end
+    end
+    return sqrt(lo * hi)
+end
