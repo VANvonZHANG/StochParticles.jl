@@ -75,3 +75,52 @@ end
     dμ = apply_drift(proc, μ, sys, 0.0)
     @test dμ isa SVector{2, Float64}
 end
+
+@testset "pre_equilibrate!" begin
+    T = 293.15
+    p_sat = saturation_vapor_pressure(T)
+    S = 0.003
+    p_v = p_sat * (1.0 + S)
+    densities = SVector(1770.0, 1000.0)
+    thermo = ThermodynamicsParams(
+        SVector(0.455, 0.0), 0.072, 1000.0, 18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2)
+
+    # Mix: small (non-activated) and large (activated) particles
+    m_small = SVector{2,Float64}((π/6.0)*(20e-9)^3*1770.0, 0.0)
+    m_large = SVector{2,Float64}((π/6.0)*(150e-9)^3*1770.0, 0.0)
+    particles = [m_small, m_large]
+
+    result = pre_equilibrate!(particles, thermo, densities, T, p_v; h2o_idx=2)
+
+    # Returns the same vector (in-place)
+    @test result === particles
+    # Small particle should now have positive equilibrium water mass
+    @test particles[1][2] > 0.0
+    # Large particle (activated) should stay at 0
+    @test particles[2][2] == 0.0
+end
+
+@testset "H2OCondensationFlux QSSA mode" begin
+    T = 293.15
+    p_sat = saturation_vapor_pressure(T)
+    S = 0.003
+    p_v = p_sat * (1.0 + S)
+    densities = SVector(1770.0, 1000.0)
+    thermo = ThermodynamicsParams(
+        SVector(0.455, 0.0), 0.072, 1000.0, 18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2)
+
+    flux = H2OCondensationFlux(thermo, 2, densities, 0.0)
+    env = SVector(T, p_v)
+
+    # Non-activated particle at equilibrium: flux should be zero
+    m_small = SVector{2,Float64}((π/6.0)*(20e-9)^3*1770.0, 0.0)
+    m_eq = equilibrium_water_mass(m_small, thermo, densities, T, p_v)
+    mu_eq = SVector{2,Float64}(m_small[1], m_eq)
+    dmu = flux(mu_eq, env, nothing, 0.0)
+    @test dmu[2] == 0.0
+
+    # Activated particle: flux should be positive (condensing)
+    m_large = SVector{2,Float64}((π/6.0)*(150e-9)^3*1770.0, 0.0)
+    dmu = flux(m_large, env, nothing, 0.0)
+    @test dmu[2] > 0.0
+end

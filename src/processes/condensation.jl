@@ -107,6 +107,13 @@ function (flux::H2OCondensationFlux{A})(
     end
     m_w = μ[h2o_idx]
 
+    # Always check activation: non-activated particles get zero flux
+    Sc = critical_supersaturation(m_dry, thermo, densities, T)
+    S_env = p_v / saturation_vapor_pressure(T) - 1.0
+    if S_env <= Sc
+        return zero(SVector{A, Float64})
+    end
+
     # Equilibrium vapor pressure over droplet
     p_eq = equilibrium_vapor_pressure(m_dry, m_w, thermo, densities, T)
 
@@ -160,4 +167,46 @@ function H2OCondensationProcess(
 ) where {A}
     flux = H2OCondensationFlux(thermo, h2o_idx, densities, w)
     return CondensationProcess((μ, g, t) -> flux(μ, g, nothing, t))
+end
+
+"""
+    pre_equilibrate!(particles, thermo, densities, T, p_v; h2o_idx)
+
+Pre-equilibrate non-activated particles to their Köhler equilibrium.
+
+Modifies `particles` in-place: non-activated particles (S_env <= Sc) get
+m_w set to equilibrium water mass. Activated particles are unchanged.
+
+# Arguments
+- `particles::Vector{SVector{A,Float64}}` — particle states (modified in-place)
+- `thermo` — ThermodynamicsParams
+- `densities` — per-species densities
+- `T` — temperature [K]
+- `p_v` — ambient vapor pressure [Pa]
+- `h2o_idx` — index of H2O in species vector
+"""
+function pre_equilibrate!(
+        particles::Vector{SVector{A, Float64}},
+        thermo::ThermodynamicsParams{A},
+        densities::SVector{A, Float64},
+        T::Float64,
+        p_v::Float64;
+        h2o_idx::Int = A
+) where {A}
+    for i in eachindex(particles)
+        μ = particles[i]
+        m_dry = zero(SVector{A, Float64})
+        for k in 1:(A - 1)
+            if k != h2o_idx
+                m_dry = setindex(m_dry, μ[k], k)
+            end
+        end
+        Sc = critical_supersaturation(m_dry, thermo, densities, T)
+        S_env = p_v / saturation_vapor_pressure(T) - 1.0
+        if S_env <= Sc  # Non-activated: equilibrate
+            m_eq = equilibrium_water_mass(m_dry, thermo, densities, T, p_v)
+            particles[i] = setindex(μ, m_eq, h2o_idx)
+        end
+    end
+    return particles
 end
