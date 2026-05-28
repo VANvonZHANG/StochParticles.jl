@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### QSSA (Quasi-Steady State Approximation) for H2O condensation
+- `equilibrium_water_mass(m_dry, thermo, densities, T, p_v)` — binary search for Köhler equilibrium water mass.
+- `pre_equilibrate!(particles, thermo, densities, T, p_v; h2o_idx)` — in-place initialization of non-activated particles to Köhler equilibrium before ODE solve.
+- `H2OCondensationFlux` now applies QSSA flux freezing: non-activated particles receive zero condensation flux during integration, preventing unphysical negative water masses.
+
+#### Thermodynamics API documentation
+- New `docs/src/api/thermodynamics.md` reference page documenting all exported thermodynamics functions: `ThermodynamicsParams`, `saturation_vapor_pressure`, `equilibrium_vapor_pressure`, `modified_diffusion_coefficient`, `water_activity`, `particle_wet_radius`, `critical_supersaturation`, `equilibrium_water_mass`.
+
+#### Documentation updates
+- `api/processes.md` now documents `pre_equilibrate!` and `H2OCondensationProcess`.
+- `index.md` features list includes QSSA pre-equilibration.
+- `tutorial.md` includes a complete QSSA condensation simulation walkthrough.
+
+#### Testing
+- Integration test verifying no-negative-mass invariant for 200 particles over 60-second QSSA condensation simulation.
+- Unit tests for `equilibrium_water_mass` (equilibrium verification, size ordering).
+- Unit tests for `pre_equilibrate!` (in-place modification, activated vs. non-activated behavior).
+- Unit tests for QSSA flux freezing (zero flux at equilibrium, positive flux for activated particles).
+
+### Fixed
+- `[m/s]` docstring brackets in `condensation.jl` were incorrectly parsed as Markdown links by Documenter.
+- `H2OCondensationFlux` and `pre_equilibrate!` loop bounds: changed `1:(A - 1)` to `1:A` to correctly handle `h2o_idx != A` cases.
+- JuliaFormatter v2.5.0 formatting applied to all files (parentheses around range endpoints).
+
 ## [0.2.0] - 2026-05-16
 
 ### Added
