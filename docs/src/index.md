@@ -31,6 +31,7 @@ StochParticles.jl models particle populations as Piecewise Deterministic Markov 
 - **Trait-based process system** — each physics process declares whether it provides ODE drift and/or jumps
 - **CNMC particle management** — Constant Number Monte Carlo with mass-conserving merge, clone, and volume rescale
 - **SciML integration** — produces standard `JumpProblem` objects solvable with `Tsit5()`, `SSC1()`, or any SciML algorithm
+- **QSSA pre-equilibration** — Köhler equilibrium initialization for non-activated particles prevents unphysical negative water masses during condensation solves
 
 ## Installation
 
