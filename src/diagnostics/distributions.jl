@@ -15,7 +15,7 @@ function particle_diameters(
         u::Vector{Float64}, sys::ParticleSystem, densities::SVector{A, Float64}) where {A}
     A_val = species_val(sys)
     diams = Vector{Float64}(undef, sys.n_active)
-    for i in 1:sys.n_active
+    for i in 1:(sys.n_active)
         μ = get_particle(u, i, A_val)
         V_p = 0.0
         for k in 1:A

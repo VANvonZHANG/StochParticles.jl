@@ -14,3 +14,10 @@ dilution_death_affect!
 dilution_birth_affect!
 make_dilution_jumps
 ```
+
+## H2O Condensation
+
+```@docs
+H2OCondensationProcess
+pre_equilibrate!
+```

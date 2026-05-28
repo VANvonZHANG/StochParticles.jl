@@ -91,3 +91,54 @@ M = mass_concentration(u_final, A_val, sys)
 - `number_concentration(sys)` — zeroth moment [particles/m³]
 - `mass_concentration(u, Val(A), sys)` — first moment [kg/m³]
 - `species_mass_concentration(u, idx, Val(A), sys)` — single-species mass [kg/m³]
+
+## QSSA Condensation Simulation
+
+This section demonstrates a multi-species condensation simulation with QSSA (Quasi-Steady State Approximation) pre-equilibration to prevent unphysical negative water masses.
+
+### Physical Setup
+
+```@repl tutorial
+T0 = 293.15
+p_sat = saturation_vapor_pressure(T0)
+S_target = 0.003
+p_v0 = p_sat * (1.0 + S_target)
+
+densities = SVector(1770.0, 1000.0)
+h2o_idx = 2
+
+avg_thermo = ThermodynamicsParams(
+    SVector(0.455, 0.0), 0.072, 1000.0, 18.015e-3,
+    2.5e6, 461.5, 2.5e-5, 2.4e-2)
+```
+
+### Create Particles
+
+Generate dry particles with no initial water:
+
+```@repl tutorial
+particles_dry = lognormal_masses(100, 5.0e-8, 1.6, densities)
+particles = [SVector{2, Float64}(m[1], 0.0) for m in particles_dry]
+```
+
+### Pre-Equilibrate (QSSA)
+
+Set non-activated particles to their Köhler equilibrium before the ODE solve:
+
+```@repl tutorial
+pre_equilibrate!(particles, avg_thermo, densities, T0, p_v0; h2o_idx = h2o_idx)
+```
+
+### Solve with H2OCondensationProcess
+
+```@repl tutorial
+gas_fn = t -> SVector(T0, p_v0)
+cond = H2OCondensationProcess(avg_thermo, densities; h2o_idx = h2o_idx, w = 0.0)
+
+prob = ParticleProblem(particles, 1.0e-6, gas_fn, (cond,);
+    tspan = (0.0, 600.0), n_sim = 100)
+
+sol = solve(prob, Tsit5(); saveat = 0.0:60.0:600.0)
+```
+
+During integration, `H2OCondensationProcess` automatically freezes non-activated particles (zero flux) while allowing activated particles to condense normally.
