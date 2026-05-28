@@ -67,7 +67,7 @@ function cnmc_coagulate!(
     vacated_slot = j
 
     # Step 2: Clone a random particle into vacated slot
-    clone_source = rand(1:sys.n_active)
+    clone_source = rand(1:(sys.n_active))
     cnmc_clone!(u, sys, vacated_slot, clone_source)
 
     # Step 3: Volume rescale

@@ -70,5 +70,6 @@ Higher entropy = more mixed. Zero = pure single-species particle.
 """
 function particle_mixing_entropy(u::Vector{Float64}, sys::ParticleSystem{A}) where {A}
     A_val = Val(A)
-    [shannon_entropy(species_fractions(get_particle(u, i, A_val))) for i in 1:sys.n_active]
+    [shannon_entropy(species_fractions(get_particle(u, i, A_val)))
+     for i in 1:(sys.n_active)]
 end
