@@ -19,6 +19,7 @@ makedocs(;
         "API Reference" => [
             "Core Types" => "api/core.md",
             "Physics Processes" => "api/processes.md",
+            "Thermodynamics" => "api/thermodynamics.md",
             "Coagulation Kernels" => "api/kernels.md",
             "CNMC Operations" => "api/cnmc.md",
             "Diagnostics" => "api/diagnostics.md"

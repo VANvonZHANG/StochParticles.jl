@@ -32,7 +32,7 @@ function dilution_death_affect!(integrator, proc::DilutionProcess)
     end
     A_val = species_val(p)
     # Swap-delete: replace random particle with last active
-    target = rand(1:p.n_active)
+    target = rand(1:(p.n_active))
     if target < p.n_active
         μ_last = get_particle(integrator.u, p.n_active, A_val)
         set_particle!(integrator.u, target, A_val, μ_last)

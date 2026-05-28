@@ -547,9 +547,9 @@ Compute the majorant kernel value K_max ≥ K(μ_i, μ_j) for all active pairs.
 function compute_majorant(
         sampling::GlobalMajorant, kernel, u::Vector{Float64}, sys::ParticleSystem{A}) where {A}
     K_max = 0.0
-    for i in 1:sys.n_active
+    for i in 1:(sys.n_active)
         μ_i = get_particle(u, i, Val(A))
-        for j in (i + 1):sys.n_active
+        for j in (i + 1):(sys.n_active)
             μ_j = get_particle(u, j, Val(A))
             K_max = max(K_max, kernel(μ_i, μ_j))
         end

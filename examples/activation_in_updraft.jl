@@ -68,19 +68,20 @@ avg_thermo = ThermodynamicsParams(
     0.072, 1000.0, 18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2)
 cond = H2OCondensationProcess(avg_thermo, densities; h2o_idx = h2o_idx, w = 0.0)
 
+# Pre-equilibrate non-activated particles to Köhler equilibrium (QSSA)
+pre_equilibrate!(particles, avg_thermo, densities, T0, p_v0; h2o_idx = h2o_idx)
+
 prob = ParticleProblem(particles, V, gas_fn, (cond,);
     tspan = (0.0, 600.0), n_sim = n_sim)
 
 println("Solving at S = $(@sprintf("%.2f%%", S_target*100)) with $(n_sim) particles...")
-sol = solve(prob, TRBDF2(autodiff = false); saveat = [0.0, 600.0])
+sol = solve(prob, Tsit5(); saveat = [0.0, 600.0])
 println("Done.\n")
 
 # ============================================================
 # 4. Determine activation status: Köhler theory criterion
 # ============================================================
 # A particle is activated if S_env > Sc(d_dry, κ).
-# This uses the exact same criterion as the theoretical cutoff lines,
-# avoiding ODE numerical artifacts (negative masses, overshoot).
 is_activated = falses(n_sim)
 for i in 1:n_sim
     m_dry_i = SVector{2, Float64}(particles[i][1], 0.0)
@@ -99,7 +100,7 @@ println("CCN concentration: $(@sprintf("%.2e", N_ccn)) m⁻³")
 # ============================================================
 # 5. Size-resolved activation fraction (simulation)
 # ============================================================
-bin_edges = 10.0 .^ range(-8.3, -6.3; length = 20)
+bin_edges = 10.0 .^ range(-8.3, -6.3; length = 100)
 n_bins = length(bin_edges) - 1
 bin_centers = @. sqrt(bin_edges[1:(end - 1)] * bin_edges[2:end])
 

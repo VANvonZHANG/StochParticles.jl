@@ -58,10 +58,10 @@ using Random
         sys = ParticleSystem(Val(A), 10, 1.0, gas_fn)
 
         for _ in 1:50
-            i = rand(1:sys.n_active)
-            j = rand(1:sys.n_active)
+            i = rand(1:(sys.n_active))
+            j = rand(1:(sys.n_active))
             while j == i
-                j = rand(1:sys.n_active)
+                j = rand(1:(sys.n_active))
             end
             cnmc_coagulate!(u, sys, Val(A), i, j)
         end
