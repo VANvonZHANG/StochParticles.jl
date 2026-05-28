@@ -75,7 +75,7 @@ prob = ParticleProblem(particles, V, gas_fn, (cond,);
     tspan = (0.0, 600.0), n_sim = n_sim)
 
 println("Solving at S = $(@sprintf("%.2f%%", S_target*100)) with $(n_sim) particles...")
-sol = solve(prob, TRBDF2(autodiff = false); saveat = [0.0, 600.0])
+sol = solve(prob, Tsit5(); saveat = [0.0, 600.0])
 println("Done.\n")
 
 # ============================================================
@@ -100,7 +100,7 @@ println("CCN concentration: $(@sprintf("%.2e", N_ccn)) m⁻³")
 # ============================================================
 # 5. Size-resolved activation fraction (simulation)
 # ============================================================
-bin_edges = 10.0 .^ range(-8.3, -6.3; length = 20)
+bin_edges = 10.0 .^ range(-8.3, -6.3; length = 100)
 n_bins = length(bin_edges) - 1
 bin_centers = @. sqrt(bin_edges[1:(end - 1)] * bin_edges[2:end])
 
