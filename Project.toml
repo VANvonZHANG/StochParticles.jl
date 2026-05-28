@@ -1,6 +1,6 @@
 name = "StochParticles"
 uuid = "48f1789a-3b45-4590-abaa-0579032d20b3"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Fan Zhang <vanvonzhang@gmail.com>"]
 description = "SciML-native framework for particle-resolved Monte Carlo simulation of aerosol/colloidal population dynamics via PDMPs"
 
