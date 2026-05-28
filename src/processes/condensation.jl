@@ -100,7 +100,7 @@ function (flux::H2OCondensationFlux{A})(
 
     # Extract dry masses and water mass
     m_dry = zero(SVector{A, Float64})
-    for k in 1:(A - 1)
+    for k in 1:A
         if k != h2o_idx
             m_dry = setindex(m_dry, μ[k], k)
         end
@@ -196,7 +196,7 @@ function pre_equilibrate!(
     for i in eachindex(particles)
         μ = particles[i]
         m_dry = zero(SVector{A, Float64})
-        for k in 1:(A - 1)
+        for k in 1:A
             if k != h2o_idx
                 m_dry = setindex(m_dry, μ[k], k)
             end
