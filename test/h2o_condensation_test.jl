@@ -86,11 +86,11 @@ end
         SVector(0.455, 0.0), 0.072, 1000.0, 18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2)
 
     # Mix: small (non-activated) and large (activated) particles
-    m_small = SVector{2,Float64}((π/6.0)*(20e-9)^3*1770.0, 0.0)
-    m_large = SVector{2,Float64}((π/6.0)*(150e-9)^3*1770.0, 0.0)
+    m_small = SVector{2, Float64}((π/6.0)*(20e-9)^3*1770.0, 0.0)
+    m_large = SVector{2, Float64}((π/6.0)*(150e-9)^3*1770.0, 0.0)
     particles = [m_small, m_large]
 
-    result = pre_equilibrate!(particles, thermo, densities, T, p_v; h2o_idx=2)
+    result = pre_equilibrate!(particles, thermo, densities, T, p_v; h2o_idx = 2)
 
     # Returns the same vector (in-place)
     @test result === particles
@@ -113,14 +113,14 @@ end
     env = SVector(T, p_v)
 
     # Non-activated particle at equilibrium: flux should be zero
-    m_small = SVector{2,Float64}((π/6.0)*(20e-9)^3*1770.0, 0.0)
+    m_small = SVector{2, Float64}((π/6.0)*(20e-9)^3*1770.0, 0.0)
     m_eq = equilibrium_water_mass(m_small, thermo, densities, T, p_v)
-    mu_eq = SVector{2,Float64}(m_small[1], m_eq)
+    mu_eq = SVector{2, Float64}(m_small[1], m_eq)
     dmu = flux(mu_eq, env, nothing, 0.0)
     @test dmu[2] == 0.0
 
     # Activated particle: flux should be positive (condensing)
-    m_large = SVector{2,Float64}((π/6.0)*(150e-9)^3*1770.0, 0.0)
+    m_large = SVector{2, Float64}((π/6.0)*(150e-9)^3*1770.0, 0.0)
     dmu = flux(m_large, env, nothing, 0.0)
     @test dmu[2] > 0.0
 end

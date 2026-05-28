@@ -297,9 +297,9 @@ p_eq(m_w) = p_v via binary search.
 - Equilibrium water mass m_w [kg]
 """
 function equilibrium_water_mass(
-        m_dry::SVector{A,Float64},
+        m_dry::SVector{A, Float64},
         thermo::ThermodynamicsParams{A},
-        densities::SVector{A,Float64},
+        densities::SVector{A, Float64},
         T::Float64,
         p_v::Float64
 ) where {A}

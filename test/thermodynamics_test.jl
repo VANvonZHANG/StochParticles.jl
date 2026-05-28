@@ -155,26 +155,26 @@ end
     # Small particle (non-activated, Sc > S)
     d_dry = 20e-9
     m_so4 = (π / 6.0) * d_dry^3 * densities[1]
-    m_dry = SVector{2,Float64}(m_so4, 0.0)
+    m_dry = SVector{2, Float64}(m_so4, 0.0)
     m_eq = equilibrium_water_mass(m_dry, thermo, densities, T, p_v)
     @test m_eq > 0.0
     # At equilibrium, p_eq should equal p_v
     p_eq_at_eq = equilibrium_vapor_pressure(m_dry, m_eq, thermo, densities, T)
-    @test isapprox(p_eq_at_eq, p_v; rtol=1e-10)
+    @test isapprox(p_eq_at_eq, p_v; rtol = 1e-10)
 
     # Larger particle (non-activated)
     d_dry = 50e-9
     m_so4 = (π / 6.0) * d_dry^3 * densities[1]
-    m_dry = SVector{2,Float64}(m_so4, 0.0)
+    m_dry = SVector{2, Float64}(m_so4, 0.0)
     m_eq = equilibrium_water_mass(m_dry, thermo, densities, T, p_v)
     @test m_eq > 0.0
     p_eq_at_eq = equilibrium_vapor_pressure(m_dry, m_eq, thermo, densities, T)
-    @test isapprox(p_eq_at_eq, p_v; rtol=1e-10)
+    @test isapprox(p_eq_at_eq, p_v; rtol = 1e-10)
 
     # Larger particle should have larger equilibrium water mass
     m_eq_small = equilibrium_water_mass(
-        SVector{2,Float64}((π/6.0)*(20e-9)^3*densities[1], 0.0), thermo, densities, T, p_v)
+        SVector{2, Float64}((π/6.0)*(20e-9)^3*densities[1], 0.0), thermo, densities, T, p_v)
     m_eq_large = equilibrium_water_mass(
-        SVector{2,Float64}((π/6.0)*(50e-9)^3*densities[1], 0.0), thermo, densities, T, p_v)
+        SVector{2, Float64}((π/6.0)*(50e-9)^3*densities[1], 0.0), thermo, densities, T, p_v)
     @test m_eq_large > m_eq_small
 end
