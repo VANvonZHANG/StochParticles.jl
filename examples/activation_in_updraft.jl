@@ -68,6 +68,9 @@ avg_thermo = ThermodynamicsParams(
     0.072, 1000.0, 18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2)
 cond = H2OCondensationProcess(avg_thermo, densities; h2o_idx = h2o_idx, w = 0.0)
 
+# Pre-equilibrate non-activated particles to Köhler equilibrium (QSSA)
+pre_equilibrate!(particles, avg_thermo, densities, T0, p_v0; h2o_idx = h2o_idx)
+
 prob = ParticleProblem(particles, V, gas_fn, (cond,);
     tspan = (0.0, 600.0), n_sim = n_sim)
 
@@ -79,8 +82,6 @@ println("Done.\n")
 # 4. Determine activation status: Köhler theory criterion
 # ============================================================
 # A particle is activated if S_env > Sc(d_dry, κ).
-# This uses the exact same criterion as the theoretical cutoff lines,
-# avoiding ODE numerical artifacts (negative masses, overshoot).
 is_activated = falses(n_sim)
 for i in 1:n_sim
     m_dry_i = SVector{2, Float64}(particles[i][1], 0.0)
