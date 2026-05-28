@@ -62,7 +62,7 @@ Physically rigorous H2O condensation flux implementing κ-Köhler theory.
 - `thermo::ThermodynamicsParams` — thermodynamic parameters
 - `h2o_idx::Int` — index of H2O in the species vector
 - `densities::SVector{A,Float64}` — per-species densities
-- `w::Float64` — updraft velocity [m/s] (used when parcel model is active)
+- `w::Float64` — updraft velocity `m/s` (used when parcel model is active)
 """
 struct H2OCondensationFlux{A}
     thermo::ThermodynamicsParams{A}
@@ -147,7 +147,7 @@ Convenience constructor for a `CondensationProcess` with physically rigorous H2O
 - `thermo::ThermodynamicsParams` — thermodynamic parameters
 - `densities::SVector{A,Float64}` — per-species densities
 - `h2o_idx::Int` — index of H2O in species vector (default: last species)
-- `w::Float64` — updraft velocity [m/s] (default: 1.0)
+- `w::Float64` — updraft velocity `m/s` (default: 1.0)
 
 # Returns
 - `CondensationProcess` with `H2OCondensationFlux`
