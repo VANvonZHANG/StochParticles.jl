@@ -71,13 +71,13 @@ Returns a `NamedTuple`:
 - `densities::SVector{A,Float64}`      — per-species densities
 - `kappas::SVector{A,Float64}`         — per-species hygroscopicity
 - `molar_masses::SVector{A,Float64}`   — per-species molar masses
-- `names::Vector{String}`              — species names for diagnostics
+- `names::SVector{A,String}`           — species names for diagnostics
 - `h2o_idx::Int`                       — index of H₂O in the list
 
 # Example
 ```julia
 params = species_vectors(AS, BC, H2O)
-thermo = ThermodynamicsParams(params.kappas, 0.072, 1000.0, 18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2)
+thermo = ThermodynamicsParams(params.kappas, 0.072, 1000.0, params.molar_masses[params.h2o_idx], 2.5e6, 461.5, 2.5e-5, 2.4e-2)
 cond = H2OCondensationProcess(thermo, params.densities; h2o_idx = params.h2o_idx)
 ```
 """
@@ -88,7 +88,7 @@ function species_vectors(species::Species...)
     densities     = SVector{A}(s.density      for s in species)
     kappas        = SVector{A}(s.kappa        for s in species)
     molar_masses  = SVector{A}(s.molar_mass   for s in species)
-    names         = [String(s.name) for s in species]
+    names         = SVector{A}(String(s.name) for s in species)
 
     h2o_idx = findfirst(s -> s.name === :H2O, species)
     h2o_idx === nothing && throw(ArgumentError(

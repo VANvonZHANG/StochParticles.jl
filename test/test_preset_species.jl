@@ -63,7 +63,7 @@ end
 end
 
 @testset "species_vectors type stability" begin
-    params = species_vectors(AS, BC, H2O)
+    params = @inferred species_vectors(AS, BC, H2O)
     @test params.densities isa SVector{3, Float64}
     @test params.kappas isa SVector{3, Float64}
     @test params.molar_masses isa SVector{3, Float64}
