@@ -41,6 +41,8 @@ export check_mass_conservation
 export particle_diameters, compute_size_distribution
 export bin_size_distribution
 export standard_aerosol_atmosphere, standard_cloud_atmosphere
+export Species, species_vectors
+export AS, AN, BC, OA, H2O
 export lognormal_masses, diameters_from_masses
 export plot_concentration_evolution, plot_size_distribution_heatmap,
        plot_kernel_contributions, plot_simulation_summary
@@ -79,6 +81,7 @@ include("plotting/recipes.jl")
 include("utils/binning.jl")
 include("utils/parameters.jl")
 include("utils/initial_conditions.jl")
+include("utils/preset_species.jl")
 
 # ---- I/O ----
 include("io/hdf5.jl")
