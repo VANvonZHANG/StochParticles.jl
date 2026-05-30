@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### Preset Species Library
+- `Species` struct — `@kwdef` struct holding `name`, `density`, `kappa`, `molar_mass` for any aerosol species. Supports both positional and keyword constructors.
+- Preset species constants with literature values:
+  - `AS` — Ammonium sulfate (NH₄)₂SO₄, κ = 0.61
+  - `AN` — Ammonium nitrate NH₄NO₃, κ = 0.67
+  - `BC` — Black carbon (elemental carbon), κ = 0.0
+  - `OA` — Organic aerosol (bulk surrogate), κ = 0.1
+  - `H2O` — Water
+- `species_vectors(species::Species...)` — vararg combiner returning a `NamedTuple` with fully type-stable `SVector{A}` parameter vectors (`densities`, `kappas`, `molar_masses`, `names`) plus auto-detected `h2o_idx`.
+- Custom species support: users can define `Species(:CUSTOM, ...)` and mix with presets.
+
+#### Testing
+- 44 new tests for preset species: struct construction, preset values, combiner correctness, `h2o_idx` positioning, type stability (`@inferred`), error handling, and custom species mixing.
+
 ## [0.3.0] - 2026-05-28
 
 ### Added
