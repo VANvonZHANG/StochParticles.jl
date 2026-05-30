@@ -85,10 +85,10 @@ function species_vectors(species::Species...)
     A = length(species)
     A == 0 && throw(ArgumentError("at least one species required"))
 
-    densities     = SVector{A}(s.density      for s in species)
-    kappas        = SVector{A}(s.kappa        for s in species)
-    molar_masses  = SVector{A}(s.molar_mass   for s in species)
-    names         = SVector{A}(String(s.name) for s in species)
+    densities = SVector{A}(s.density for s in species)
+    kappas = SVector{A}(s.kappa for s in species)
+    molar_masses = SVector{A}(s.molar_mass for s in species)
+    names = SVector{A}(String(s.name) for s in species)
 
     h2o_idx = findfirst(s -> s.name === :H2O, species)
     h2o_idx === nothing && throw(ArgumentError(

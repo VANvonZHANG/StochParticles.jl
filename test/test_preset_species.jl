@@ -10,7 +10,7 @@ using StaticArrays
     @test s.molar_mass == 0.200
 
     # keyword constructor
-    s2 = Species(name=:KWD, density=1600.0, kappa=0.3, molar_mass=0.180)
+    s2 = Species(name = :KWD, density = 1600.0, kappa = 0.3, molar_mass = 0.180)
     @test s2.name == :KWD
     @test s2.density == 1600.0
 end
