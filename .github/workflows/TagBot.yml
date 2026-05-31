@@ -36,11 +36,16 @@ jobs:
           if [ -n "$NOTES" ]; then
             EXISTING=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body -q '.body' 2>/dev/null || echo "")
             if [ -n "$EXISTING" ]; then
-              CLEANED=$(printf '%s\n' "$EXISTING" | sed '/^[[:space:]]*See CHANGELOG/d; /^[[:space:]]*Release notes:/d' | sed '/./,$!d')
+              # Extract title (first non-empty line, e.g. "StochParticles v0.4.0")
+              TITLE=$(printf '%s\n' "$EXISTING" | awk 'NF{print; exit}')
+              # Extract body: everything after the first non-empty line
+              BODY=$(printf '%s\n' "$EXISTING" | awk 'found{print; next} NF{found=1}')
+              # Strip registrator release-notes summary from body
+              CLEANED=$(printf '%s\n' "$BODY" | sed '/^[[:space:]]*See CHANGELOG/d; /^[[:space:]]*Release notes:/d' | sed '/./,$!d')
               if [ -n "$CLEANED" ]; then
-                COMBINED="${NOTES}"$'\n\n---\n\n'"${CLEANED}"
+                COMBINED="${TITLE}"$'\n\n'"${NOTES}"$'\n\n---\n\n'"${CLEANED}"
               else
-                COMBINED="${NOTES}"
+                COMBINED="${TITLE}"$'\n\n'"${NOTES}"
               fi
               gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes "${COMBINED}"
             fi
