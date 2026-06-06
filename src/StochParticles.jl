@@ -40,6 +40,7 @@ export reconstruct_volumes, extract_concentrations
 export activation_fraction, cloud_droplet_concentration
 export check_mass_conservation
 export particle_diameters, compute_size_distribution
+export kde_log_diameter, smooth_histogram_diameter
 export bin_size_distribution
 export standard_aerosol_atmosphere, standard_cloud_atmosphere
 export Species, species_vectors
