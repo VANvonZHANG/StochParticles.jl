@@ -22,7 +22,8 @@ makedocs(;
             "Thermodynamics" => "api/thermodynamics.md",
             "Coagulation Kernels" => "api/kernels.md",
             "CNMC Operations" => "api/cnmc.md",
-            "Diagnostics" => "api/diagnostics.md"
+            "Diagnostics" => "api/diagnostics.md",
+            "Plotting" => "api/plotting.md"
         ]
     ]
 )
