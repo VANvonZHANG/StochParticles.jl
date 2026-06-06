@@ -55,7 +55,8 @@ println("Diagnostics saved to $h5_path")
 
 # ---- Plot ----
 pl = plot_simulation_summary(sol, prob, bin_edges, 1800.0;
-    time_unit = "min", diameter_unit = "μm")
+    time_unit = "min", diameter_unit = "μm",
+    method = :kde, bandwidth_factor = 1.0)
 fig_path = joinpath(outdir, "aerosol_brownian_coagulation.png")
 savefig(pl, fig_path)
 println("Plot saved to $fig_path")

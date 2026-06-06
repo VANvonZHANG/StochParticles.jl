@@ -57,7 +57,8 @@ end
 println("Diagnostics saved to $h5_path")
 
 # ---- Plot summary (concentration + size distribution) ----
-pl_summary = plot_simulation_summary(sol, prob, bin_edges, 1000.0)
+pl_summary = plot_simulation_summary(sol, prob, bin_edges, 1000.0;
+    method = :kde, bandwidth_factor = 1.0)
 
 # ---- Kernel contribution comparison ----
 K_brown = BrownianKernel(params.T, params.p, densities)
