@@ -71,6 +71,7 @@ include("diagnostics/moments.jl")
 include("diagnostics/mixing_state.jl")
 include("diagnostics/reconstruction.jl")
 include("diagnostics/distributions.jl")
+include("diagnostics/kde.jl")
 include("diagnostics/validation.jl")
 include("diagnostics/activation.jl")
 
