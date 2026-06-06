@@ -99,7 +99,7 @@ using Test
         # All values non-negative
         @test all(result .>= 0.0)
 
-        # With smooth_factor=1, should behave like raw histogram (but via spline)
+        # With smooth_factor=1, should behave like raw histogram (single fine bin per original bin)
         result_sf1 = StochParticles.smooth_histogram_diameter(
             diams, bin_edges, V_t; smooth_factor = 1)
         @test length(result_sf1) == length(bin_edges) - 1

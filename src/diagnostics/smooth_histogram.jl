@@ -43,22 +43,14 @@ function smooth_histogram_diameter(
     # dN/dlogD on fine grid: counts / (log width × volume)
     dNdlogD_fine = Float64.(h.weights) ./ dlogD_fine ./ V_t
 
-    # Average fine-bin dN/dlogD values back into each original bin
+    # Average fine-bin dN/dlogD values back into each original bin.
+    # Since fine bins are a uniform subdivision, each original bin contains
+    # exactly `smooth_factor` fine bins — use direct index slicing.
     dNdlogD = zeros(Float64, n_bins)
     for j in 1:n_bins
-        lo = log_edges[j]
-        hi = log_edges[j + 1]
-        n_fine_in_bin = 0
-        for k in 1:n_fine
-            fc = 0.5 * (fine_edges[k] + fine_edges[k + 1])
-            if fc >= lo && fc < hi
-                dNdlogD[j] += dNdlogD_fine[k]
-                n_fine_in_bin += 1
-            end
-        end
-        if n_fine_in_bin > 0
-            dNdlogD[j] /= n_fine_in_bin
-        end
+        k_lo = (j - 1) * smooth_factor + 1
+        k_hi = j * smooth_factor
+        dNdlogD[j] = mean(dNdlogD_fine[k_lo:k_hi])
     end
 
     return dNdlogD
