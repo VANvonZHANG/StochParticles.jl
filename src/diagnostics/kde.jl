@@ -1,6 +1,7 @@
 # src/diagnostics/kde.jl
 using KernelDensity
 using Interpolations
+using Statistics
 
 """
     kde_log_diameter(diameters, bin_centers, V_t;
