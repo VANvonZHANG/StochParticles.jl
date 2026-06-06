@@ -81,4 +81,38 @@ using Test
         # Wider bandwidth should produce smaller max value (more spread out)
         @test maximum(result_wide) < maximum(result_narrow)
     end
+
+    @testset "smooth_histogram_diameter" begin
+        using Random
+        Random.seed!(42)
+        diams = 1e-6 .* exp.(0.3 .* randn(1000))
+
+        bin_edges = 10.0 .^ range(-7, -5; length=11)  # 10 bins
+        V_t = 1.0
+
+        result = StochParticles.smooth_histogram_diameter(diams, bin_edges, V_t)
+
+        # Result has one value per bin (length(edges) - 1)
+        @test length(result) == length(bin_edges) - 1
+
+        # All values non-negative
+        @test all(result .>= 0.0)
+
+        # With smooth_factor=1, should behave like raw histogram (but via spline)
+        result_sf1 = StochParticles.smooth_histogram_diameter(
+            diams, bin_edges, V_t; smooth_factor = 1)
+        @test length(result_sf1) == length(bin_edges) - 1
+        @test all(result_sf1 .>= 0.0)
+
+        # With smooth_factor=5, still produces valid results
+        result_sf5 = StochParticles.smooth_histogram_diameter(
+            diams, bin_edges, V_t; smooth_factor = 5)
+        @test length(result_sf5) == length(bin_edges) - 1
+        @test all(result_sf5 .>= 0.0)
+
+        # Empty input returns zeros
+        result_empty = StochParticles.smooth_histogram_diameter(
+            Float64[], bin_edges, V_t)
+        @test all(result_empty .== 0.0)
+    end
 end
