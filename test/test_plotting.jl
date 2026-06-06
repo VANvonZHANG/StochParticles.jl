@@ -36,11 +36,12 @@ using Test
         sol = solve(prob, Tsit5(); saveat = 0.1)
 
         bin_edges = [0.0, 1.0e-6, 2.0e-6]
-        pl = plot_simulation_summary(sol, prob, bin_edges, 1000.0)
+        pl = plot_simulation_summary(sol, prob, bin_edges, 1000.0; method = :histogram)
         @test pl !== nothing
 
         # Test with time_unit="min"
-        pl_min = plot_simulation_summary(sol, prob, bin_edges, 1000.0; time_unit = "min")
+        pl_min = plot_simulation_summary(sol, prob, bin_edges, 1000.0;
+            time_unit = "min", method = :histogram)
         @test pl_min !== nothing
     end
 

@@ -2,7 +2,9 @@
 
 """
     plot_simulation_summary(sol, prob, bin_edges, rho; time_unit="s", diameter_unit="μm",
-                             n_snapshots=30, layout=(1,2), size=(1400,500), kwargs...)
+                             n_snapshots=30, method=:kde, bandwidth_factor=1.0,
+                             n_eval_points=200, smooth_factor=3,
+                             layout=(1,2), size=(1400,500), kwargs...)
 
 Generate a combined summary plot for a particle simulation.
 
@@ -17,6 +19,10 @@ Right panel: size distribution heatmap over time
 - `time_unit`: unit for time axis (default "s"), e.g. "min" for aerosol plots
 - `diameter_unit`: unit for diameter axis (default "μm"), e.g. "nm" for aerosol plots
 - `n_snapshots`: number of time snapshots for size distribution (default 30)
+- `method`: distribution method, `:histogram`, `:kde`, or `:histogram_smooth` (default `:kde`)
+- `bandwidth_factor`: bandwidth multiplier for `:kde` method (default 1.0)
+- `n_eval_points`: number of evaluation points for `:kde` method (default 200)
+- `smooth_factor`: oversampling factor for `:histogram_smooth` method (default 3)
 - `layout`: plot layout tuple (default (1,2))
 - `size`: figure size in pixels (default (1400,500))
 - `kwargs`: additional kwargs passed to the combined plot
@@ -34,7 +40,12 @@ savefig(pl, "simulation_summary.png")
 """
 function plot_simulation_summary(sol, prob, bin_edges::Vector{Float64}, rho::Float64;
         time_unit::String = "s", diameter_unit::String = "μm",
-        n_snapshots::Int = 30, layout::Tuple{Int, Int} = (1, 2),
+        n_snapshots::Int = 30,
+        method::Symbol = :kde,
+        bandwidth_factor::Float64 = 1.0,
+        n_eval_points::Int = 200,
+        smooth_factor::Int = 3,
+        layout::Tuple{Int, Int} = (1, 2),
         size::Tuple{Int, Int} = (1400, 500), kwargs...)
     # Extract concentrations
     t, N_conc, M_conc = extract_concentrations(sol, prob)
@@ -56,7 +67,12 @@ function plot_simulation_summary(sol, prob, bin_edges::Vector{Float64}, rho::Flo
     # Right panel: size distribution heatmap
     snapshot_times, bin_centers,
     matrix = compute_size_distribution(
-        sol, prob, bin_edges, rho; n_snapshots = n_snapshots)
+        sol, prob, bin_edges, rho;
+        n_snapshots = n_snapshots,
+        method = method,
+        bandwidth_factor = bandwidth_factor,
+        n_eval_points = n_eval_points,
+        smooth_factor = smooth_factor)
 
     # Convert snapshot times to display unit
     snapshot_times_display = if time_unit == "min"
