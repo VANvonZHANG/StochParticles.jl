@@ -51,30 +51,32 @@ function compute_size_distribution(sol, sys, bin_edges;
 ### Parameters
 
 - `method`: `:histogram` | `:histogram_smooth` | `:kde` (default: `:kde`)
-- `bandwidth_factor`: KDE bandwidth multiplier. `> 1` = smoother, `< 1` = more sensitive (default: `1.0`)
+- `bandwidth_factor`: KDE bandwidth multiplier. `> 1` = smoother, `< 1` = more sensitive (default: `1.0`). Applies only to `:kde` method.
 - `n_eval_points`: Number of evaluation points for KDE fine grid (default: `200`)
 - `smooth_factor`: Oversampling multiplier for `:histogram_smooth`. Original bins × smooth_factor = fine bins (default: `3`)
 
 ## Method: `:kde` Algorithm
 
 ```julia
-function kde_log_diameter(diameters, bin_centers, N_total, V_t;
+function kde_log_diameter(diameters, bin_centers, V_t;
     bandwidth_factor=1.0, n_eval_points=200)
 
     x = log10.(diameters)
+    n_particles = length(x)
+    number_conc = n_particles / V_t  # [particles / m³]
 
     # 1. Silverman bandwidth
     sigma = std(x)
     iqr_val = quantile(x, 0.75) - quantile(x, 0.25)
-    h = 0.9 * min(sigma, iqr_val / 1.34) * length(x)^(-0.2) * bandwidth_factor
+    h = 0.9 * min(sigma, iqr_val / 1.34) * n_particles^(-0.2) * bandwidth_factor
 
     # 2. KDE on fine grid
     eval_points = range(minimum(x), maximum(x); length=n_eval_points)
     kde_result = KernelDensity.kde(x, eval_points; bandwidth=h)
 
-    # 3. Convert to dN/dlogD
-    density = kde_result.density
-    dNdlogD_fine = density .* N_total ./ V_t
+    # 3. Convert to dN/dlogD: density (probability) × number concentration
+    density = kde_result.density  # integrates to 1 over log10(d)
+    dNdlogD_fine = density .* number_conc  # [particles / m³ / unit(log10(d))]
 
     # 4. Interpolate to bin_centers
     itp = Interpolations.linear_interpolation(eval_points, dNdlogD_fine)
@@ -94,7 +96,7 @@ Key points:
 ## Method: `:histogram_smooth` Algorithm
 
 ```julia
-function smooth_histogram_diameter(diameters, bin_edges, N_total, V_t;
+function smooth_histogram_diameter(diameters, bin_edges, V_t;
     smooth_factor=3)
 
     x = log10.(diameters)
@@ -105,10 +107,10 @@ function smooth_histogram_diameter(diameters, bin_edges, N_total, V_t;
     fine_edges = range(log_edges[1], log_edges[end]; length=n_fine+1)
     fine_centers = 0.5 .* (fine_edges[1:end-1] .+ fine_edges[2:end])
 
-    # 2. StatsBase binning
+    # 2. StatsBase binning → dN/dlogD (same normalization as existing :histogram)
     h = fit(Histogram, x, fine_edges)
     dlogD_fine = diff(fine_edges)
-    dNdlogD_fine = h.weights ./ dlogD_fine ./ V_t .* (N_total / length(diameters))
+    dNdlogD_fine = h.weights ./ dlogD_fine ./ V_t  # counts / (log width × volume)
 
     # 3. B-spline smoothing
     itp = Interpolations.cubic_spline_interpolation(fine_centers, dNdlogD_fine)
