@@ -36,7 +36,8 @@ function kde_log_diameter(
         h = 0.1 * bandwidth_factor
     else
         iqr_val = quantile(x, 0.75) - quantile(x, 0.25)
-        h = 0.9 * min(sigma, iqr_val / 1.34) * n_particles^(-0.2) * bandwidth_factor
+        spread = iqr_val > 0 ? min(sigma, iqr_val / 1.34) : sigma
+        h = 0.9 * spread * n_particles^(-0.2) * bandwidth_factor
     end
 
     # Evaluate KDE on a fine grid spanning the data range (with padding)
