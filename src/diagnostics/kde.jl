@@ -31,12 +31,16 @@ function kde_log_diameter(
 
     # Silverman bandwidth: h = 0.9 * min(σ, IQR/1.34) * n^(-1/5)
     sigma = std(x)
-    if sigma == 0.0
-        # All particles have the same diameter — use a small default bandwidth
+    iqr_val = quantile(x, 0.75) - quantile(x, 0.25)
+    spread = iqr_val > 0 ? min(sigma, iqr_val / 1.34) : sigma
+    if spread < 1e-6
+        # All (or nearly all) particles have the same diameter — use a small
+        # default bandwidth.  The exact-zero check is insufficient because
+        # floating-point round-off in std() can produce a tiny nonzero sigma
+        # even when all values are identical, yielding an eval grid so narrow
+        # that no bin center falls inside it.
         h = 0.1 * bandwidth_factor
     else
-        iqr_val = quantile(x, 0.75) - quantile(x, 0.25)
-        spread = iqr_val > 0 ? min(sigma, iqr_val / 1.34) : sigma
         h = 0.9 * spread * n_particles^(-0.2) * bandwidth_factor
     end
 
