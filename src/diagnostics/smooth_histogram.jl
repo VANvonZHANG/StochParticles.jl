@@ -1,11 +1,15 @@
 # src/diagnostics/smooth_histogram.jl
-using Interpolations
 
 """
     smooth_histogram_diameter(diameters, bin_edges, V_t;
                               smooth_factor=3) -> Vector{Float64}
 
-Compute smooth dN/dlogD via oversampled histogram binning + cubic spline interpolation.
+Compute smooth dN/dlogD via oversampled histogram binning + linear interpolation.
+
+Uses fine-grained bins (`smooth_factor` subdivisions per original bin) to produce
+a smoother histogram, then averages the fine-bin dN/dlogD values back into each
+original bin.  This avoids interpolation artifacts (cubic-spline oscillation /
+Runge's phenomenon) that arise with sparse, spiky data.
 
 # Arguments
 - `diameters`: particle diameters [m]
@@ -31,7 +35,6 @@ function smooth_histogram_diameter(
     # Create oversampled fine bin edges
     n_fine = n_bins * smooth_factor
     fine_edges = collect(range(log_edges[1], log_edges[end]; length = n_fine + 1))
-    fine_centers_vec = 0.5 .* (fine_edges[1:(end - 1)] .+ fine_edges[2:end])
 
     # Histogram on fine grid using StatsBase (imported in module header)
     h = fit(Histogram, x, fine_edges; closed = :left)
@@ -40,16 +43,23 @@ function smooth_histogram_diameter(
     # dN/dlogD on fine grid: counts / (log width × volume)
     dNdlogD_fine = Float64.(h.weights) ./ dlogD_fine ./ V_t
 
-    # Cubic spline interpolation with zero extrapolation
-    # cubic_spline_interpolation requires AbstractRange for knot positions
-    fine_range = range(fine_centers_vec[1], fine_centers_vec[end];
-        length = length(fine_centers_vec))
-    itp = cubic_spline_interpolation(fine_range, dNdlogD_fine;
-        extrapolation_bc = 0.0)
+    # Average fine-bin dN/dlogD values back into each original bin
+    dNdlogD = zeros(Float64, n_bins)
+    for j in 1:n_bins
+        lo = log_edges[j]
+        hi = log_edges[j + 1]
+        n_fine_in_bin = 0
+        for k in 1:n_fine
+            fc = 0.5 * (fine_edges[k] + fine_edges[k + 1])
+            if fc >= lo && fc < hi
+                dNdlogD[j] += dNdlogD_fine[k]
+                n_fine_in_bin += 1
+            end
+        end
+        if n_fine_in_bin > 0
+            dNdlogD[j] /= n_fine_in_bin
+        end
+    end
 
-    # Evaluate at original bin centers (geometric mean in log space = arithmetic mean of log)
-    orig_log_centers = 0.5 .* (log_edges[1:(end - 1)] .+ log_edges[2:end])
-    dNdlogD = itp.(orig_log_centers)
-
-    return max.(dNdlogD, 0.0)
+    return dNdlogD
 end
