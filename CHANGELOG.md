@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### Smooth Distribution Plotting
+- Three methods for computing particle size distributions (dN/dlogD): `:kde` (default), `:histogram_smooth`, `:histogram`, selectable via `method` keyword in `compute_size_distribution` and `plot_simulation_summary`.
+- `kde_log_diameter(diameters, bin_centers, V_t; bandwidth_factor, n_eval_points)` — Gaussian KDE on log₁₀(diameter) space with Silverman bandwidth and threshold-based fallback for degenerate data.
+- `smooth_histogram_diameter(diameters, bin_edges, V_t; smooth_factor)` — oversampled histogram with linear interpolation, avoiding cubic-spline oscillation on sparse data.
+- `plot_simulation_summary` now forwards `method`, `bandwidth_factor`, `n_eval_points`, `smooth_factor` parameters to `compute_size_distribution`.
+
+#### Examples
+- `examples/compare_distribution_methods.jl` — standalone example comparing all three methods on sparse (n=100) and dense (n=5000) synthetic data, plus bandwidth/smooth_factor sensitivity analysis.
+- Existing examples updated to use KDE method with finer bins (100) for smoother heatmaps.
+
+### Changed
+- `bin_size_distribution` refactored to use `StatsBase.fit(Histogram, ...)` internally.
+- Default method for `compute_size_distribution` changed from `:histogram` to `:kde`.
+
+### Fixed
+- KDE bandwidth uses threshold-based spread check (fallback for near-identical diameters).
+- `smooth_histogram` uses linear interpolation (not cubic) for sparse-data stability.
+- Explicit `Statistics` import in KDE module.
+- Exported `kde_log_diameter` and `smooth_histogram_diameter` for public API access.
+
+### Dependencies
+- Added `KernelDensity.jl` 0.6, `Interpolations.jl` 0.15/0.16, `StatsBase.jl` 0.34.
+
+### Documentation
+- Expanded `docs/src/api/diagnostics.md`: 3→17 documented functions across 6 sections (concentration, volume, diameters, size distribution, mixing state, activation).
+- New `docs/src/api/plotting.md` page for all plotting functions with method selection guide.
+- Updated `docs/make.jl` to include Plotting API page in navigation.
+
 ## [0.4.0] - 2026-05-31
 
 ### Added
