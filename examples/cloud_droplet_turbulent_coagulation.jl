@@ -42,22 +42,25 @@ println("Mass concentration relative error: $rel_error")
 @assert passed "Mass concentration not conserved! (rel_error=$rel_error)"
 
 # ---- Diagnostics export ----
-bin_edges = 10.0 .^ range(-6, -3; length = 21)
+bin_edges_diag = 10.0 .^ range(-6, -3; length = 21)
 sys = prob.prob.p
 A = 1
 
 h5_path = joinpath(outdir, "cloud_droplet_turbulent_coagulation.h5")
-init_diagnostics_file(h5_path, A, bin_edges;
+init_diagnostics_file(h5_path, A, bin_edges_diag;
     species_names = ["H2O"], chunk_size = 64)
 
 for (t, u) in zip(sol.t, sol.u)
     save_diagnostics(h5_path, t, u, sys, Val(A);
-        bin_edges = bin_edges, rho = 1000.0)
+        bin_edges = bin_edges_diag, rho = 1000.0)
 end
 println("Diagnostics saved to $h5_path")
 
 # ---- Plot summary (concentration + size distribution) ----
-pl_summary = plot_simulation_summary(sol, prob, bin_edges, 1000.0)
+# Use finer bins for smooth KDE heatmap (100 bins vs 20 for diagnostics)
+bin_edges_plot = 10.0 .^ range(-6, -3; length = 101)
+pl_summary = plot_simulation_summary(sol, prob, bin_edges_plot, 1000.0;
+    method = :kde, bandwidth_factor = 1.0)
 
 # ---- Kernel contribution comparison ----
 K_brown = BrownianKernel(params.T, params.p, densities)

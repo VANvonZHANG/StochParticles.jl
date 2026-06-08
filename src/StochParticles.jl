@@ -6,6 +6,7 @@ using JumpProcesses
 using OrdinaryDiffEq
 using Random
 using SpecialFunctions
+using StatsBase
 
 # ---- Trait layer (abstract types) ----
 include("processes/process_trait.jl")
@@ -39,6 +40,7 @@ export reconstruct_volumes, extract_concentrations
 export activation_fraction, cloud_droplet_concentration
 export check_mass_conservation
 export particle_diameters, compute_size_distribution
+export kde_log_diameter, smooth_histogram_diameter
 export bin_size_distribution
 export standard_aerosol_atmosphere, standard_cloud_atmosphere
 export Species, species_vectors
@@ -70,6 +72,8 @@ include("diagnostics/moments.jl")
 include("diagnostics/mixing_state.jl")
 include("diagnostics/reconstruction.jl")
 include("diagnostics/distributions.jl")
+include("diagnostics/kde.jl")
+include("diagnostics/smooth_histogram.jl")
 include("diagnostics/validation.jl")
 include("diagnostics/activation.jl")
 

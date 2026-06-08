@@ -39,23 +39,26 @@ println("Mass concentration relative error: $rel_error")
 @assert passed "Mass concentration not conserved! (rel_error=$rel_error)"
 
 # ---- Diagnostics export ----
-bin_edges = 10.0 .^ range(-9, -5; length = 26)
+bin_edges_diag = 10.0 .^ range(-9, -5; length = 26)
 sys = prob.prob.p
 A = 1
 
 h5_path = joinpath(outdir, "aerosol_brownian_coagulation.h5")
-init_diagnostics_file(h5_path, A, bin_edges;
+init_diagnostics_file(h5_path, A, bin_edges_diag;
     species_names = ["SO4"], chunk_size = 64)
 
 for (t, u) in zip(sol.t, sol.u)
     save_diagnostics(h5_path, t, u, sys, Val(A);
-        bin_edges = bin_edges, rho = 1800.0)
+        bin_edges = bin_edges_diag, rho = 1800.0)
 end
 println("Diagnostics saved to $h5_path")
 
 # ---- Plot ----
-pl = plot_simulation_summary(sol, prob, bin_edges, 1800.0;
-    time_unit = "min", diameter_unit = "μm")
+# Use finer bins for smooth KDE heatmap (100 bins vs 25 for diagnostics)
+bin_edges_plot = 10.0 .^ range(-9, -5; length = 101)
+pl = plot_simulation_summary(sol, prob, bin_edges_plot, 1800.0;
+    time_unit = "min", diameter_unit = "μm",
+    method = :kde, bandwidth_factor = 1.0)
 fig_path = joinpath(outdir, "aerosol_brownian_coagulation.png")
 savefig(pl, fig_path)
 println("Plot saved to $fig_path")
