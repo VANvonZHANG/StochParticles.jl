@@ -7,35 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-08
+
 ### Added
 
-#### Smooth Distribution Plotting
-- Three methods for computing particle size distributions (dN/dlogD): `:kde` (default), `:histogram_smooth`, `:histogram`, selectable via `method` keyword in `compute_size_distribution` and `plot_simulation_summary`.
-- `kde_log_diameter(diameters, bin_centers, V_t; bandwidth_factor, n_eval_points)` — Gaussian KDE on log₁₀(diameter) space with Silverman bandwidth and threshold-based fallback for degenerate data.
-- `smooth_histogram_diameter(diameters, bin_edges, V_t; smooth_factor)` — oversampled histogram with linear interpolation, avoiding cubic-spline oscillation on sparse data.
-- `plot_simulation_summary` now forwards `method`, `bandwidth_factor`, `n_eval_points`, `smooth_factor` parameters to `compute_size_distribution`.
+#### Smooth distribution plotting
+- `kde_log_diameter(diams; npoints=200)` — kernel density estimation for smooth dN/dlogD curves over log-spaced diameter grids.
+- `smooth_histogram_diameter(diams; nbins=100, npoints=200)` — oversampled-bin histogram with linear interpolation for smooth distribution curves.
+- Two new `compute_size_distribution` methods: `:kde` and `:histogram_smooth`, adding smooth alternatives to the existing `:histogram` method.
+- Method parameter forwarding through `plot_simulation_summary` for seamless smooth-plot integration.
+
+#### Dependencies
+- KernelDensity.jl — KDE-based smooth distribution estimation.
+- Interpolations.jl — linear interpolation for smooth histogram curves.
+- StatsBase.jl — `fit(Histogram, ...)` replacing hand-written binning logic.
 
 #### Examples
-- `examples/compare_distribution_methods.jl` — standalone example comparing all three methods on sparse (n=100) and dense (n=5000) synthetic data, plus bandwidth/smooth_factor sensitivity analysis.
-- Existing examples updated to use KDE method with finer bins (100) for smoother heatmaps.
+- `compare_distribution_methods.jl` — side-by-side comparison of `:histogram`, `:kde`, and `:histogram_smooth` distribution methods.
+
+#### Documentation
+- New `docs/src/api/diagnostics.md` — reference for all diagnostics functions.
+- New `docs/src/api/plotting.md` — reference for all plotting functions.
 
 ### Changed
+
 - `bin_size_distribution` refactored to use `StatsBase.fit(Histogram, ...)` internally.
-- Default method for `compute_size_distribution` changed from `:histogram` to `:kde`.
+- All source files reformatted with JuliaFormatter (SciML style, indent=4, margin=92).
+- Examples updated to use KDE for smooth distribution plots by default.
 
 ### Fixed
-- KDE bandwidth uses threshold-based spread check (fallback for near-identical diameters).
-- `smooth_histogram` uses linear interpolation (not cubic) for sparse-data stability.
-- Explicit `Statistics` import in KDE module.
-- Exported `kde_log_diameter` and `smooth_histogram_diameter` for public API access.
 
-### Dependencies
-- Added `KernelDensity.jl` 0.6, `Interpolations.jl` 0.15/0.16, `StatsBase.jl` 0.34.
-
-### Documentation
-- Expanded `docs/src/api/diagnostics.md`: 3→17 documented functions across 6 sections (concentration, volume, diameters, size distribution, mixing state, activation).
-- New `docs/src/api/plotting.md` page for all plotting functions with method selection guide.
-- Updated `docs/make.jl` to include Plotting API page in navigation.
+- Threshold-based spread check for KDE bandwidth to avoid oversmoothing with concentrated distributions.
+- Linear interpolation in `smooth_histogram` for sparse data stability.
 
 ## [0.4.0] - 2026-05-31
 
@@ -185,3 +188,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.2.0]: https://github.com/VANvonZHANG/StochParticles.jl/releases/tag/v0.2.0
 [0.3.0]: https://github.com/VANvonZHANG/StochParticles.jl/releases/tag/v0.3.0
 [0.4.0]: https://github.com/VANvonZHANG/StochParticles.jl/releases/tag/v0.4.0
+[0.5.0]: https://github.com/VANvonZHANG/StochParticles.jl/releases/tag/v0.5.0
