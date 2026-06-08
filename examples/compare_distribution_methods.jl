@@ -26,7 +26,7 @@ V_t = 1.0  # unit volume so number concentration = particle count
 
 """Generate bimodal lognormal diameters [m]."""
 function bimodal_diams(n; d1 = 50e-9, σ1 = 1.3, w1 = 0.7,
-                             d2 = 500e-9, σ2 = 1.5, w2 = 0.3)
+        d2 = 500e-9, σ2 = 1.5, w2 = 0.3)
     n1 = round(Int, n * w1 / (w1 + w2))
     n2 = n - n1
     d1_log = log10.(d1 .* σ1 .^ randn(n1))
@@ -42,12 +42,12 @@ end
 
 # ---------- generate data ----------
 diams_sparse = bimodal_diams(100)
-diams_dense  = bimodal_diams(5000)
+diams_dense = bimodal_diams(5000)
 
 # ---------- panel 1: three methods, sparse data ----------
-h_sparse  = histogram_dNdlogD(diams_sparse, bin_edges, dlogD, V_t)
-k_sparse  = StochParticles.kde_log_diameter(diams_sparse, bin_centers, V_t)
-s_sparse  = StochParticles.smooth_histogram_diameter(diams_sparse, bin_edges, V_t)
+h_sparse = histogram_dNdlogD(diams_sparse, bin_edges, dlogD, V_t)
+k_sparse = StochParticles.kde_log_diameter(diams_sparse, bin_centers, V_t)
+s_sparse = StochParticles.smooth_histogram_diameter(diams_sparse, bin_edges, V_t)
 
 p1 = plot(bin_centers, h_sparse;
     label = "Histogram", lw = 1.5, ls = :dash, color = :gray,
@@ -55,12 +55,13 @@ p1 = plot(bin_centers, h_sparse;
     title = "Sparse (n=100)", xscale = :log10,
     legend = :topright, grid = true)
 plot!(p1, bin_centers, k_sparse; label = "KDE", lw = 2, color = :steelblue)
-plot!(p1, bin_centers, s_sparse; label = "Smooth Histogram", lw = 2, ls = :dot, color = :orangered)
+plot!(p1, bin_centers, s_sparse; label = "Smooth Histogram",
+    lw = 2, ls = :dot, color = :orangered)
 
 # ---------- panel 2: three methods, dense data ----------
-h_dense  = histogram_dNdlogD(diams_dense, bin_edges, dlogD, V_t)
-k_dense  = StochParticles.kde_log_diameter(diams_dense, bin_centers, V_t)
-s_dense  = StochParticles.smooth_histogram_diameter(diams_dense, bin_edges, V_t)
+h_dense = histogram_dNdlogD(diams_dense, bin_edges, dlogD, V_t)
+k_dense = StochParticles.kde_log_diameter(diams_dense, bin_centers, V_t)
+s_dense = StochParticles.smooth_histogram_diameter(diams_dense, bin_edges, V_t)
 
 p2 = plot(bin_centers, h_dense;
     label = "Histogram", lw = 1.5, ls = :dash, color = :gray,
@@ -68,7 +69,8 @@ p2 = plot(bin_centers, h_dense;
     title = "Dense (n=5000)", xscale = :log10,
     legend = :topright, grid = true)
 plot!(p2, bin_centers, k_dense; label = "KDE", lw = 2, color = :steelblue)
-plot!(p2, bin_centers, s_dense; label = "Smooth Histogram", lw = 2, ls = :dot, color = :orangered)
+plot!(p2, bin_centers, s_dense; label = "Smooth Histogram",
+    lw = 2, ls = :dot, color = :orangered)
 
 # ---------- panel 3: KDE bandwidth sensitivity (sparse) ----------
 bw_values = [0.3, 1.0, 3.0]
