@@ -11,7 +11,7 @@ struct MockIntegrator
 end
 
 @testset "Code quality (Aqua.jl)" begin
-    Aqua.test_all(StochParticles; persistent_tasks=false)
+    Aqua.test_all(StochParticles; persistent_tasks = false)
 end
 
 @testset "StochParticles.jl" begin
