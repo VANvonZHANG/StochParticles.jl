@@ -51,7 +51,7 @@ using Test
         # 1000 particles centered around d ≈ 1e-6 m (1 μm)
         diams = 1e-6 .* exp.(0.3 .* randn(1000))
 
-        bin_edges = 10.0 .^ range(-7, -5; length=11)  # 10 bins
+        bin_edges = 10.0 .^ range(-7, -5; length = 11)  # 10 bins
         bin_centers = @. sqrt(bin_edges[1:(end - 1)] * bin_edges[2:end])
         V_t = 1.0  # unit volume
 
@@ -88,7 +88,7 @@ using Test
         Random.seed!(42)
         diams = 1e-6 .* exp.(0.3 .* randn(1000))
 
-        bin_edges = 10.0 .^ range(-7, -5; length=11)  # 10 bins
+        bin_edges = 10.0 .^ range(-7, -5; length = 11)  # 10 bins
         V_t = 1.0
 
         result = StochParticles.smooth_histogram_diameter(diams, bin_edges, V_t)
@@ -129,7 +129,8 @@ using Test
         bin_edges = 10.0 .^ range(-9, -5; length = 26)
 
         # Test :histogram method (existing behavior)
-        t1, c1, m1 = compute_size_distribution(
+        t1, c1,
+        m1 = compute_size_distribution(
             sol, prob, bin_edges, 1800.0; n_snapshots = 5, method = :histogram)
         @test length(t1) == 5
         @test length(c1) == 25
@@ -137,7 +138,8 @@ using Test
         @test all(m1 .>= 0.0)
 
         # Test :kde method (new default)
-        t2, c2, m2 = compute_size_distribution(
+        t2, c2,
+        m2 = compute_size_distribution(
             sol, prob, bin_edges, 1800.0; n_snapshots = 5, method = :kde)
         @test length(t2) == 5
         @test length(c2) == 25
@@ -145,7 +147,8 @@ using Test
         @test all(m2 .>= 0.0)
 
         # Test :histogram_smooth method
-        t3, c3, m3 = compute_size_distribution(
+        t3, c3,
+        m3 = compute_size_distribution(
             sol, prob, bin_edges, 1800.0; n_snapshots = 5, method = :histogram_smooth)
         @test length(t3) == 5
         @test length(c3) == 25
@@ -163,7 +166,8 @@ using Test
             sol, prob, bin_edges, 1800.0; method = :invalid)
 
         # Test that :kde passes bandwidth_factor through
-        t4, c4, m4 = compute_size_distribution(
+        t4, c4,
+        m4 = compute_size_distribution(
             sol, prob, bin_edges, 1800.0;
             n_snapshots = 3, method = :kde, bandwidth_factor = 2.0)
         @test size(m4) == (25, 3)
