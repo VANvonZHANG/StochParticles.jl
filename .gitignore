@@ -29,6 +29,7 @@ Thumbs.db
 # Example outputs
 examples/*.h5
 examples/*.png
+examples/*.csv
 
 # Documenter build output
 docs/build/
