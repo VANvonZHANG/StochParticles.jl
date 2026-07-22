@@ -195,9 +195,13 @@ function solve_with_records(prob, solver; saveat, record_func)
     saved = DiffEqCallbacks.SavedValues(Float64, Any)
     save_func = (u, t, integrator) -> record_func(t, u, integrator.p)
     saving = DiffEqCallbacks.SavingCallback(
-        save_func, saved; saveat = saveat, save_start = true, save_end = false)
+        save_func, saved; saveat = saveat, save_start = true, save_end = true)
     sol = solve(prob, solver; callback = saving, saveat = saveat)
-    return sol, collect(saved.saveval)
+    keep = trues(length(saved.t))
+    for i in 2:length(saved.t)
+        keep[i - 1] = !isapprox(saved.t[i - 1], saved.t[i]; rtol = 0.0, atol = eps(Float64))
+    end
+    return sol, collect(saved.saveval[keep])
 end
 
 const _COMMON_RECORD_FIELDS = Set([
