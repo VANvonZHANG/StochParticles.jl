@@ -447,7 +447,7 @@ def save_composite(data) -> None:
     for label, ax in axes.items():
         add_panel_label(ax, label)
 
-    save_png(fig, COMPOSITE_PATH, dpi=600)
+    save_png(fig, COMPOSITE_PATH)
     plt.close(fig)
 
 

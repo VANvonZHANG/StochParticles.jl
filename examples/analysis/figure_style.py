@@ -20,8 +20,8 @@ STYLE_RC = {
     "axes.facecolor": "white",
     "savefig.facecolor": "white",
     "legend.frameon": False,
-    "figure.dpi": 600,
-    "savefig.dpi": 600,
+    "figure.dpi": 650,
+    "savefig.dpi": 650,
 }
 
 
@@ -60,7 +60,7 @@ def add_panel_label(ax, label: str, x: float = -0.10, y: float = 1.04):
     )
 
 
-def save_png(fig, path: str | Path, dpi: int = 600) -> None:
+def save_png(fig, path: str | Path, dpi: int = 650) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=dpi, bbox_inches="tight")
@@ -68,7 +68,7 @@ def save_png(fig, path: str | Path, dpi: int = 600) -> None:
 
 def finish_panel(fig, path: str | Path) -> None:
     fig.tight_layout()
-    save_png(fig, path, dpi=600)
+    save_png(fig, path, dpi=650)
     plt.close(fig)
 
 

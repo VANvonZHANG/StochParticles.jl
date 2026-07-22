@@ -356,7 +356,7 @@ def save_composite(aerosol_reps: list[ReplicateData], cloud_reps: list[Replicate
     for label, ax in axes.items():
         add_panel_label(ax, label)
 
-    save_png(fig, COMPOSITE_PATH, dpi=600)
+    save_png(fig, COMPOSITE_PATH)
     plt.close(fig)
 
 
