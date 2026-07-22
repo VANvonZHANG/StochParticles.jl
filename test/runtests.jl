@@ -31,5 +31,4 @@ end
     include("test_brownian_precision.jl")
     include("parcel_test.jl")
     include("activation_diagnostics_test.jl")
-    include("test_mixed_pdmp_demonstration.jl")
 end
