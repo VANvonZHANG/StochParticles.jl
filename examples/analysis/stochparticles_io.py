@@ -12,7 +12,7 @@ import numpy as np
 
 EXAMPLES_DIR = Path(__file__).resolve().parents[1]
 DATA_DIR = EXAMPLES_DIR / "data"
-FIG_DIR = EXAMPLES_DIR / "figures"
+FIG_DIR = EXAMPLES_DIR / "fig"
 
 TIME_MAJOR_2D_DATASETS = {
     "diameter_samples",
