@@ -13,7 +13,7 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.colors import LogNorm, Normalize
+from matplotlib.colors import Normalize
 
 from analysis.activation_analysis import (
     activation_fraction,
@@ -34,7 +34,6 @@ from analysis.smoothing import (
     dense_log_grid,
     linear_edges_from_centers,
     log_edges_from_centers,
-    mask_low_relative_density,
     replicate_kde_heatmap,
     select_replicate_for_heatmap,
 )
@@ -69,7 +68,6 @@ CASE_COLORS = {
 
 KDE_DENSITY_LABEL = "KDE number density (m$^{-3}$ dex$^{-1}$)"
 KDE_MAX_BANDWIDTH_DEX = 0.06
-KDE_RELATIVE_FLOOR = 1.0e-3
 
 
 def _all_positive_samples(scene_reps, key: str, final_only: bool = False) -> np.ndarray:
@@ -92,6 +90,15 @@ def _log_grid_from_samples(samples: np.ndarray, n: int) -> np.ndarray:
     lo = min(float(lo), float(np.min(samples)))
     hi = max(float(hi), float(np.max(samples)))
     return dense_log_grid(lo, hi, n=n)
+
+
+def _log_grid_from_bin_edges_or_samples(reps, samples: np.ndarray, n: int) -> np.ndarray:
+    for rep in reps:
+        edges = np.asarray(rep.arrays.get("bin_edges", []), dtype=float)
+        edges = edges[np.isfinite(edges) & (edges > 0.0)]
+        if edges.size >= 2 and edges[-1] > edges[0]:
+            return dense_log_grid(float(edges[0]), float(edges[-1]), n=n)
+    return _log_grid_from_samples(samples, n=n)
 
 
 def _time_minutes(time: np.ndarray) -> np.ndarray:
@@ -130,7 +137,7 @@ def _apply_log_x_distribution_style(ax, ylabel: str) -> None:
     ax.grid(True, which="both", color="#d9d9d9", lw=0.45, alpha=0.65)
 
 
-def _kde_norm_from_reference(*heatmaps: np.ndarray) -> LogNorm | Normalize:
+def _kde_norm_from_reference(*heatmaps: np.ndarray) -> Normalize:
     finite_values = []
     positive_values = []
     for heatmap in heatmaps:
@@ -152,12 +159,9 @@ def _kde_norm_from_reference(*heatmaps: np.ndarray) -> LogNorm | Normalize:
         return Normalize(vmin=0.0, vmax=vmax)
 
     positive = np.concatenate(positive_values)
-    vmin = max(float(np.percentile(positive, 5.0)), np.finfo(float).tiny)
     vmax = float(np.percentile(positive, 99.5))
-    if not np.isfinite(vmax) or vmax <= vmin:
+    if not np.isfinite(vmax) or vmax <= 0.0:
         vmax = float(np.max(positive))
-    if vmax > vmin:
-        return LogNorm(vmin=vmin, vmax=vmax)
     return Normalize(vmin=0.0, vmax=max(vmax, 1.0))
 
 
@@ -166,10 +170,9 @@ def _plot_heatmap(
     time: np.ndarray,
     diameter_grid: np.ndarray,
     heatmap: np.ndarray,
-    norm: LogNorm | Normalize,
+    norm: Normalize,
 ):
     cmap = plt.get_cmap("cividis").copy()
-    cmap.set_bad(color="white")
     mesh = ax.pcolormesh(
         linear_edges_from_centers(_time_minutes(time)),
         log_edges_from_centers(diameter_grid * 1e6),
@@ -196,7 +199,9 @@ def prepare_scene():
         raise KeyError(f"required case missing from {DATA_PATH}; available cases: {available}") from exc
 
     wet_samples = _all_positive_samples((only_reps, coag_reps), "diameter_samples")
-    wet_grid = _log_grid_from_samples(wet_samples, n=280)
+    wet_grid = _log_grid_from_bin_edges_or_samples(
+        only_reps + coag_reps, wet_samples, n=280
+    )
     dry_samples = _all_positive_samples(
         (only_reps, coag_reps), "dry_diameter_samples", final_only=True
     )
@@ -210,17 +215,15 @@ def prepare_scene():
         grid=wet_grid,
         bandwidth_factor=1.1,
         max_bandwidth=KDE_MAX_BANDWIDTH_DEX,
-        smooth_passes=0,
+        smooth_passes=1,
     )
     coag_time, _, coag_heatmap = replicate_kde_heatmap(
         coag_rep,
         grid=wet_grid,
         bandwidth_factor=1.1,
         max_bandwidth=KDE_MAX_BANDWIDTH_DEX,
-        smooth_passes=0,
+        smooth_passes=1,
     )
-    only_heatmap = mask_low_relative_density(only_heatmap, KDE_RELATIVE_FLOOR)
-    coag_heatmap = mask_low_relative_density(coag_heatmap, KDE_RELATIVE_FLOOR)
     heatmap_norm = _kde_norm_from_reference(only_heatmap, coag_heatmap)
 
     activation_radius = float(

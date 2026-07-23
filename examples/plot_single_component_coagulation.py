@@ -13,7 +13,7 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.colors import LogNorm
+from matplotlib.colors import Normalize
 
 from analysis.coagulation_analysis import (
     kernel_fraction_series,
@@ -33,7 +33,6 @@ from analysis.smoothing import (
     kde_log_diameter,
     linear_edges_from_centers,
     log_edges_from_centers,
-    mask_low_relative_density,
     replicate_kde_heatmap,
     select_replicate_for_heatmap,
 )
@@ -69,7 +68,6 @@ KERNEL_COLORS = {
 }
 
 KDE_MAX_BANDWIDTH_DEX = 0.06
-KDE_RELATIVE_FLOOR = 1.0e-3
 
 
 def _positive_diameter_samples(reps: list[ReplicateData]) -> np.ndarray:
@@ -85,6 +83,11 @@ def _positive_diameter_samples(reps: list[ReplicateData]) -> np.ndarray:
 
 
 def _diameter_grid(reps: list[ReplicateData], n: int = 260) -> np.ndarray:
+    if reps and "bin_edges" in reps[0].arrays:
+        edges = np.asarray(reps[0].arrays["bin_edges"], dtype=float)
+        edges = edges[np.isfinite(edges) & (edges > 0.0)]
+        if edges.size >= 2 and edges[-1] > edges[0]:
+            return dense_log_grid(float(edges[0]), float(edges[-1]), n=n)
     samples = _positive_diameter_samples(reps)
     lo, hi = np.percentile(samples, [0.5, 99.5])
     lo = min(float(lo), float(np.min(samples)))
@@ -141,23 +144,21 @@ def plot_spectrum_heatmap(
         grid=grid,
         bandwidth_factor=1.1,
         max_bandwidth=KDE_MAX_BANDWIDTH_DEX,
-        smooth_passes=0,
+        smooth_passes=1,
     )
     time_axis = time / time_scale
     diameter_um = diameter_grid * 1e6
-    z = mask_low_relative_density(heatmap, KDE_RELATIVE_FLOOR).T
+    z = np.asarray(heatmap, dtype=float).T
     positive = z[np.isfinite(z) & (z > 0.0)]
     if positive.size:
-        vmin = max(float(np.percentile(positive, 5.0)), np.finfo(float).tiny)
         vmax = float(np.percentile(positive, 99.5))
-        if not np.isfinite(vmax) or vmax <= vmin:
+        if not np.isfinite(vmax) or vmax <= 0.0:
             vmax = float(np.max(positive))
-        norm = LogNorm(vmin=vmin, vmax=vmax) if vmax > vmin else None
+        norm = Normalize(vmin=0.0, vmax=vmax) if vmax > 0.0 else None
     else:
         norm = None
 
     cmap = plt.get_cmap("cividis").copy()
-    cmap.set_bad(color="white")
     mesh = ax.pcolormesh(
         linear_edges_from_centers(time_axis),
         log_edges_from_centers(diameter_um),

@@ -95,21 +95,6 @@ def log_edges_from_centers(centers: np.ndarray) -> np.ndarray:
     return np.power(10.0, log_edges)
 
 
-def mask_low_relative_density(
-    values: np.ndarray, relative_floor: float = 1.0e-3
-) -> np.ndarray:
-    data = np.asarray(values, dtype=float).copy()
-    if relative_floor <= 0.0:
-        return data
-    for row in data:
-        finite_positive = row[np.isfinite(row) & (row > 0.0)]
-        if finite_positive.size == 0:
-            continue
-        cutoff = float(np.max(finite_positive)) * float(relative_floor)
-        row[row < cutoff] = np.nan
-    return data
-
-
 def _volume_at_time(rep: ReplicateData, time: np.ndarray) -> np.ndarray:
     volume = rep.arrays.get("volume")
     if volume is not None:

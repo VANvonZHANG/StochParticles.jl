@@ -168,6 +168,17 @@ def _log_edges(values: np.ndarray, n: int = 100) -> np.ndarray:
     return np.geomspace(lo, hi, n)
 
 
+def _diameter_edges_from_replicates(
+    reps: list[ReplicateData], fallback_values: np.ndarray
+) -> np.ndarray:
+    for rep in reps:
+        edges = np.asarray(rep.arrays.get("bin_edges", []), dtype=float)
+        edges = edges[np.isfinite(edges) & (edges > 0.0)]
+        if edges.size >= 2 and edges[-1] > edges[0]:
+            return edges
+    return _log_edges(fallback_values)
+
+
 def _count_norm(counts: np.ndarray) -> LogNorm | Normalize:
     positive = counts[np.isfinite(counts) & (counts > 0.0)]
     if positive.size == 0:
@@ -302,7 +313,7 @@ def plot_composition_distribution(ax, reps: list[ReplicateData]) -> None:
 
 def plot_size_composition_map(ax, fig, reps: list[ReplicateData], *, colorbar: bool = True):
     diameters, fractions = _final_size_fraction_pairs(reps)
-    diameter_edges = _log_edges(diameters)
+    diameter_edges = _diameter_edges_from_replicates(reps, diameters)
     counts, x_edges, y_edges = np.histogram2d(
         diameters * 1e6,
         fractions,
