@@ -31,6 +31,9 @@ from analysis.figure_style import (
 from analysis.smoothing import (
     dense_log_grid,
     kde_log_diameter,
+    linear_edges_from_centers,
+    log_edges_from_centers,
+    mask_low_relative_density,
     replicate_kde_heatmap,
     select_replicate_for_heatmap,
 )
@@ -64,6 +67,9 @@ KERNEL_COLORS = {
     "Gravitational": PALETTE["gravitational"],
     "Turbulent": PALETTE["turbulent"],
 }
+
+KDE_MAX_BANDWIDTH_DEX = 0.06
+KDE_RELATIVE_FLOOR = 1.0e-3
 
 
 def _positive_diameter_samples(reps: list[ReplicateData]) -> np.ndarray:
@@ -134,10 +140,12 @@ def plot_spectrum_heatmap(
         rep,
         grid=grid,
         bandwidth_factor=1.1,
+        max_bandwidth=KDE_MAX_BANDWIDTH_DEX,
+        smooth_passes=0,
     )
     time_axis = time / time_scale
     diameter_um = diameter_grid * 1e6
-    z = np.asarray(heatmap, dtype=float).T
+    z = mask_low_relative_density(heatmap, KDE_RELATIVE_FLOOR).T
     positive = z[np.isfinite(z) & (z > 0.0)]
     if positive.size:
         vmin = max(float(np.percentile(positive, 5.0)), np.finfo(float).tiny)
@@ -148,16 +156,18 @@ def plot_spectrum_heatmap(
     else:
         norm = None
 
-    time_mesh, diameter_mesh = np.meshgrid(time_axis, diameter_um)
+    cmap = plt.get_cmap("cividis").copy()
+    cmap.set_bad(color="white")
     mesh = ax.pcolormesh(
-        time_mesh,
-        diameter_mesh,
+        linear_edges_from_centers(time_axis),
+        log_edges_from_centers(diameter_um),
         np.ma.masked_invalid(z),
-        shading="gouraud",
-        cmap="cividis",
+        shading="flat",
+        cmap=cmap,
         norm=norm,
     )
     ax.set_yscale("log")
+    ax.set_xlim(float(time_axis[0]), float(time_axis[-1]))
     ax.set_xlabel(xlabel)
     ax.set_ylabel("Diameter (um)")
     ax.grid(False)

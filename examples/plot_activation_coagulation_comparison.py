@@ -32,6 +32,9 @@ from analysis.figure_style import (
 )
 from analysis.smoothing import (
     dense_log_grid,
+    linear_edges_from_centers,
+    log_edges_from_centers,
+    mask_low_relative_density,
     replicate_kde_heatmap,
     select_replicate_for_heatmap,
 )
@@ -65,6 +68,8 @@ CASE_COLORS = {
 }
 
 KDE_DENSITY_LABEL = "KDE number density (m$^{-3}$ dex$^{-1}$)"
+KDE_MAX_BANDWIDTH_DEX = 0.06
+KDE_RELATIVE_FLOOR = 1.0e-3
 
 
 def _all_positive_samples(scene_reps, key: str, final_only: bool = False) -> np.ndarray:
@@ -163,16 +168,18 @@ def _plot_heatmap(
     heatmap: np.ndarray,
     norm: LogNorm | Normalize,
 ):
-    time_mesh, diameter_mesh = np.meshgrid(_time_minutes(time), diameter_grid * 1e6)
+    cmap = plt.get_cmap("cividis").copy()
+    cmap.set_bad(color="white")
     mesh = ax.pcolormesh(
-        time_mesh,
-        diameter_mesh,
+        linear_edges_from_centers(_time_minutes(time)),
+        log_edges_from_centers(diameter_grid * 1e6),
         np.ma.masked_invalid(np.asarray(heatmap, dtype=float).T),
-        shading="gouraud",
-        cmap="cividis",
+        shading="flat",
+        cmap=cmap,
         norm=norm,
     )
     ax.set_yscale("log")
+    ax.set_xlim(float(_time_minutes(time)[0]), float(_time_minutes(time)[-1]))
     ax.set_xlabel("Time (min)")
     ax.set_ylabel("Wet diameter (um)")
     ax.grid(False)
@@ -199,11 +206,21 @@ def prepare_scene():
     only_rep = select_replicate_for_heatmap(only_reps, heatmap_rep_index)
     coag_rep = select_replicate_for_heatmap(coag_reps, heatmap_rep_index)
     only_time, _, only_heatmap = replicate_kde_heatmap(
-        only_rep, grid=wet_grid, bandwidth_factor=1.1
+        only_rep,
+        grid=wet_grid,
+        bandwidth_factor=1.1,
+        max_bandwidth=KDE_MAX_BANDWIDTH_DEX,
+        smooth_passes=0,
     )
     coag_time, _, coag_heatmap = replicate_kde_heatmap(
-        coag_rep, grid=wet_grid, bandwidth_factor=1.1
+        coag_rep,
+        grid=wet_grid,
+        bandwidth_factor=1.1,
+        max_bandwidth=KDE_MAX_BANDWIDTH_DEX,
+        smooth_passes=0,
     )
+    only_heatmap = mask_low_relative_density(only_heatmap, KDE_RELATIVE_FLOOR)
+    coag_heatmap = mask_low_relative_density(coag_heatmap, KDE_RELATIVE_FLOOR)
     heatmap_norm = _kde_norm_from_reference(only_heatmap, coag_heatmap)
 
     activation_radius = float(

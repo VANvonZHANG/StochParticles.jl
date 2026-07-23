@@ -47,7 +47,7 @@ PANEL_PATHS = {
 }
 
 FRACTION_BINS = np.linspace(0.0, 1.0, 41)
-FRACTION_HEATMAP_BINS = np.linspace(0.0, 1.0, 51)
+FRACTION_HEATMAP_BINS = np.linspace(0.0, 1.0, 101)
 
 
 def _time_minutes(time: np.ndarray) -> np.ndarray:
@@ -154,7 +154,7 @@ def _final_size_fraction_pairs(reps: list[ReplicateData]) -> tuple[np.ndarray, n
     return np.concatenate(diameters), np.concatenate(fractions)
 
 
-def _log_edges(values: np.ndarray, n: int = 52) -> np.ndarray:
+def _log_edges(values: np.ndarray, n: int = 100) -> np.ndarray:
     positive = np.asarray(values, dtype=float)
     positive = positive[np.isfinite(positive) & (positive > 0.0)]
     if positive.size == 0:
@@ -174,8 +174,44 @@ def _count_norm(counts: np.ndarray) -> LogNorm | Normalize:
         return Normalize(vmin=0.0, vmax=1.0)
     vmax = float(np.max(positive))
     if vmax > 1.0:
-        return LogNorm(vmin=1.0, vmax=vmax)
+        vmin = max(float(np.percentile(positive, 2.0)), np.finfo(float).tiny)
+        return LogNorm(vmin=vmin, vmax=vmax)
     return Normalize(vmin=0.0, vmax=1.0)
+
+
+def _gaussian_kernel1d(sigma: float) -> np.ndarray:
+    sigma = float(sigma)
+    if sigma <= 0.0:
+        return np.array([1.0], dtype=float)
+    radius = max(1, int(np.ceil(3.0 * sigma)))
+    offsets = np.arange(-radius, radius + 1, dtype=float)
+    kernel = np.exp(-0.5 * (offsets / sigma) ** 2)
+    return kernel / np.sum(kernel)
+
+
+def _smooth_2d_counts(
+    counts: np.ndarray, sigma_x: float = 1.1, sigma_y: float = 0.75
+) -> np.ndarray:
+    values = np.asarray(counts, dtype=float)
+    kernel_x = _gaussian_kernel1d(sigma_x)
+    kernel_y = _gaussian_kernel1d(sigma_y)
+    radius_x = kernel_x.size // 2
+    radius_y = kernel_y.size // 2
+
+    padded_x = np.pad(values, ((radius_x, radius_x), (0, 0)), mode="edge")
+    smoothed_x = np.empty_like(values, dtype=float)
+    for i in range(values.shape[0]):
+        smoothed_x[i, :] = np.sum(
+            padded_x[i : i + kernel_x.size, :] * kernel_x[:, None], axis=0
+        )
+
+    padded_y = np.pad(smoothed_x, ((0, 0), (radius_y, radius_y)), mode="edge")
+    smoothed = np.empty_like(values, dtype=float)
+    for j in range(values.shape[1]):
+        smoothed[:, j] = np.sum(
+            padded_y[:, j : j + kernel_y.size] * kernel_y[None, :], axis=1
+        )
+    return smoothed
 
 
 def load_replicates() -> list[ReplicateData]:
@@ -272,13 +308,17 @@ def plot_size_composition_map(ax, fig, reps: list[ReplicateData], *, colorbar: b
         fractions,
         bins=[diameter_edges * 1e6, FRACTION_HEATMAP_BINS],
     )
+    smoothed_counts = _smooth_2d_counts(counts)
+    smoothed_counts[smoothed_counts < 0.05] = np.nan
+    cmap = plt.get_cmap("cividis").copy()
+    cmap.set_bad(color="white")
     mesh = ax.pcolormesh(
         x_edges,
         y_edges,
-        np.ma.masked_where(counts.T <= 0.0, counts.T),
-        cmap="cividis",
-        norm=_count_norm(counts),
-        shading="auto",
+        np.ma.masked_invalid(smoothed_counts.T),
+        cmap=cmap,
+        norm=_count_norm(smoothed_counts),
+        shading="flat",
     )
     ax.set_xscale("log")
     ax.set_ylim(0.0, 1.0)
@@ -287,7 +327,7 @@ def plot_size_composition_map(ax, fig, reps: list[ReplicateData], *, colorbar: b
     ax.grid(False)
     if colorbar:
         cbar = fig.colorbar(mesh, ax=ax, pad=0.02, fraction=0.046)
-        cbar.set_label("Particle count")
+        cbar.set_label("Smoothed particle count")
     return mesh
 
 
