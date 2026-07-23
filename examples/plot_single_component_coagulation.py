@@ -54,11 +54,12 @@ PANEL_DIR = OUTPUT_ROOT / SCENE_NAME
 PANEL_PATHS = {
     "a": PANEL_DIR / "a_aerosol_number_decay.png",
     "b": PANEL_DIR / "b_aerosol_spectrum_heatmap.png",
-    "c": PANEL_DIR / "c_aerosol_distribution_shift.png",
-    "d": PANEL_DIR / "d_cloud_number_decay.png",
-    "e": PANEL_DIR / "e_cloud_spectrum_heatmap.png",
-    "f": PANEL_DIR / "f_cloud_kernel_fraction_timeseries.png",
-    "g": PANEL_DIR / "g_cloud_kernel_total_bar.png",
+    "c": PANEL_DIR / "c_aerosol_spectrum_early_zoom.png",
+    "d": PANEL_DIR / "d_aerosol_distribution_shift.png",
+    "e": PANEL_DIR / "e_cloud_number_decay.png",
+    "f": PANEL_DIR / "f_cloud_spectrum_heatmap.png",
+    "g": PANEL_DIR / "g_cloud_kernel_fraction_timeseries.png",
+    "h": PANEL_DIR / "h_cloud_kernel_total_bar.png",
 }
 
 KERNEL_COLORS = {
@@ -136,6 +137,9 @@ def plot_spectrum_heatmap(
     time_scale: float,
     xlabel: str,
     colorbar: bool = True,
+    xlim: tuple[float, float] | None = None,
+    ylim: tuple[float, float] | None = None,
+    title: str | None = None,
 ):
     grid = _diameter_grid(reps)
     rep = select_replicate_for_heatmap(reps)
@@ -168,7 +172,14 @@ def plot_spectrum_heatmap(
         norm=norm,
     )
     ax.set_yscale("log")
-    ax.set_xlim(float(time_axis[0]), float(time_axis[-1]))
+    if xlim is None:
+        ax.set_xlim(float(time_axis[0]), float(time_axis[-1]))
+    else:
+        ax.set_xlim(*xlim)
+    if ylim is not None:
+        ax.set_ylim(*ylim)
+    if title is not None:
+        ax.set_title(title, pad=4)
     ax.set_xlabel(xlabel)
     ax.set_ylabel("Diameter (um)")
     ax.grid(False)
@@ -286,9 +297,22 @@ def save_standalone_panels(aerosol_reps: list[ReplicateData], cloud_reps: list[R
                 xlabel="Time (min)",
             ),
         ),
-        ("c", lambda ax, fig: plot_distribution_shift(ax, aerosol_reps)),
         (
-            "d",
+            "c",
+            lambda ax, fig: plot_spectrum_heatmap(
+                ax,
+                fig,
+                aerosol_reps,
+                time_scale=60.0,
+                xlabel="Time (min)",
+                xlim=(0.0, 12.0),
+                ylim=(1.0e-3, 3.0e-2),
+                title="Early small mode",
+            ),
+        ),
+        ("d", lambda ax, fig: plot_distribution_shift(ax, aerosol_reps)),
+        (
+            "e",
             lambda ax, fig: plot_number_decay(
                 ax,
                 cloud_reps,
@@ -299,7 +323,7 @@ def save_standalone_panels(aerosol_reps: list[ReplicateData], cloud_reps: list[R
             ),
         ),
         (
-            "e",
+            "f",
             lambda ax, fig: plot_spectrum_heatmap(
                 ax,
                 fig,
@@ -308,8 +332,8 @@ def save_standalone_panels(aerosol_reps: list[ReplicateData], cloud_reps: list[R
                 xlabel="Time (s)",
             ),
         ),
-        ("f", lambda ax, fig: plot_kernel_fraction_timeseries(ax, cloud_reps)),
-        ("g", lambda ax, fig: plot_kernel_total_bar(ax, cloud_reps)),
+        ("g", lambda ax, fig: plot_kernel_fraction_timeseries(ax, cloud_reps)),
+        ("h", lambda ax, fig: plot_kernel_total_bar(ax, cloud_reps)),
     ]
 
     for label, plotter in panel_specs:
@@ -319,17 +343,18 @@ def save_standalone_panels(aerosol_reps: list[ReplicateData], cloud_reps: list[R
 
 
 def save_composite(aerosol_reps: list[ReplicateData], cloud_reps: list[ReplicateData]):
-    fig = plt.figure(figsize=(7.2, 9.2), constrained_layout=True)
+    fig = plt.figure(figsize=(7.2, 9.5), constrained_layout=True)
     gs = fig.add_gridspec(4, 2, height_ratios=[1.0, 1.15, 1.0, 1.0])
 
     axes = {
         "a": fig.add_subplot(gs[0, 0]),
         "b": fig.add_subplot(gs[0, 1]),
-        "c": fig.add_subplot(gs[1, :]),
-        "d": fig.add_subplot(gs[2, 0]),
-        "e": fig.add_subplot(gs[2, 1]),
-        "f": fig.add_subplot(gs[3, 0]),
-        "g": fig.add_subplot(gs[3, 1]),
+        "c": fig.add_subplot(gs[1, 0]),
+        "d": fig.add_subplot(gs[1, 1]),
+        "e": fig.add_subplot(gs[2, 0]),
+        "f": fig.add_subplot(gs[2, 1]),
+        "g": fig.add_subplot(gs[3, 0]),
+        "h": fig.add_subplot(gs[3, 1]),
     }
 
     plot_number_decay(
@@ -347,9 +372,19 @@ def save_composite(aerosol_reps: list[ReplicateData], cloud_reps: list[Replicate
         time_scale=60.0,
         xlabel="Time (min)",
     )
-    plot_distribution_shift(axes["c"], aerosol_reps)
+    plot_spectrum_heatmap(
+        axes["c"],
+        fig,
+        aerosol_reps,
+        time_scale=60.0,
+        xlabel="Time (min)",
+        xlim=(0.0, 12.0),
+        ylim=(1.0e-3, 3.0e-2),
+        title="Early small mode",
+    )
+    plot_distribution_shift(axes["d"], aerosol_reps)
     plot_number_decay(
-        axes["d"],
+        axes["e"],
         cloud_reps,
         color=PALETTE["cloud"],
         label="Cloud",
@@ -357,14 +392,14 @@ def save_composite(aerosol_reps: list[ReplicateData], cloud_reps: list[Replicate
         xlabel="Time (s)",
     )
     plot_spectrum_heatmap(
-        axes["e"],
+        axes["f"],
         fig,
         cloud_reps,
         time_scale=1.0,
         xlabel="Time (s)",
     )
-    plot_kernel_fraction_timeseries(axes["f"], cloud_reps)
-    plot_kernel_total_bar(axes["g"], cloud_reps)
+    plot_kernel_fraction_timeseries(axes["g"], cloud_reps)
+    plot_kernel_total_bar(axes["h"], cloud_reps)
 
     for label, ax in axes.items():
         add_panel_label(ax, label)
