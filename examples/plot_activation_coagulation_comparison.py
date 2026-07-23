@@ -30,7 +30,11 @@ from analysis.figure_style import (
     finish_panel,
     save_png,
 )
-from analysis.smoothing import dense_log_grid, replicate_mean_kde_heatmap
+from analysis.smoothing import (
+    dense_log_grid,
+    replicate_kde_heatmap,
+    select_replicate_for_heatmap,
+)
 from analysis.stochparticles_io import DATA_DIR, FIG_DIR, read_scene
 
 
@@ -191,11 +195,14 @@ def prepare_scene():
     )
     dry_edges = _log_grid_from_samples(dry_samples, n=44)
 
-    only_time, _, only_heatmap = replicate_mean_kde_heatmap(
-        only_reps, grid=wet_grid, bandwidth_factor=1.25
+    heatmap_rep_index = 0
+    only_rep = select_replicate_for_heatmap(only_reps, heatmap_rep_index)
+    coag_rep = select_replicate_for_heatmap(coag_reps, heatmap_rep_index)
+    only_time, _, only_heatmap = replicate_kde_heatmap(
+        only_rep, grid=wet_grid, bandwidth_factor=1.1
     )
-    coag_time, _, coag_heatmap = replicate_mean_kde_heatmap(
-        coag_reps, grid=wet_grid, bandwidth_factor=1.25
+    coag_time, _, coag_heatmap = replicate_kde_heatmap(
+        coag_rep, grid=wet_grid, bandwidth_factor=1.1
     )
     heatmap_norm = _kde_norm_from_reference(only_heatmap, coag_heatmap)
 
@@ -213,6 +220,7 @@ def prepare_scene():
             "activation_with_coagulation": (coag_time, wet_grid, coag_heatmap),
         },
         "heatmap_norm": heatmap_norm,
+        "heatmap_replicate_index": heatmap_rep_index,
         "activation_radius": activation_radius,
     }
 

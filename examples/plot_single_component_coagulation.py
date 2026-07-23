@@ -31,7 +31,8 @@ from analysis.figure_style import (
 from analysis.smoothing import (
     dense_log_grid,
     kde_log_diameter,
-    replicate_mean_kde_heatmap,
+    replicate_kde_heatmap,
+    select_replicate_for_heatmap,
 )
 from analysis.stochparticles_io import (
     DATA_DIR,
@@ -128,10 +129,11 @@ def plot_spectrum_heatmap(
     colorbar: bool = True,
 ):
     grid = _diameter_grid(reps)
-    time, diameter_grid, heatmap = replicate_mean_kde_heatmap(
-        reps,
+    rep = select_replicate_for_heatmap(reps)
+    time, diameter_grid, heatmap = replicate_kde_heatmap(
+        rep,
         grid=grid,
-        bandwidth_factor=1.25,
+        bandwidth_factor=1.1,
     )
     time_axis = time / time_scale
     diameter_um = diameter_grid * 1e6
@@ -161,7 +163,7 @@ def plot_spectrum_heatmap(
     ax.grid(False)
     if colorbar:
         cbar = fig.colorbar(mesh, ax=ax, pad=0.02, fraction=0.046)
-        cbar.set_label("KDE number density (m$^{-3}$)")
+        cbar.set_label("KDE number density (m$^{-3}$ dex$^{-1}$)")
     return mesh
 
 

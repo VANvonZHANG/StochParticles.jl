@@ -128,3 +128,47 @@ def replicate_mean_kde_heatmap(
 
     mean_heatmap = np.nanmean(np.stack(heatmaps, axis=0), axis=0)
     return common_time, grid, smooth_time(mean_heatmap)
+
+
+def replicate_kde_heatmap(
+    rep: ReplicateData,
+    diameter_key: str = "diameter_samples",
+    grid: np.ndarray | None = None,
+    bandwidth_factor: float = 1.0,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    require_arrays(rep, ("time", diameter_key))
+    rep_time = np.asarray(rep.arrays["time"], dtype=float)
+    samples_by_time = clean_sample_matrix(rep.arrays[diameter_key])
+    if len(samples_by_time) != rep_time.size:
+        raise ValueError(
+            f"Expected one {diameter_key!r} sample row per time value for "
+            f"case={rep.case_name!r}, replicate={rep.replicate_name!r}; "
+            f"got {len(samples_by_time)} sample rows and {rep_time.size} time values"
+        )
+
+    if grid is None:
+        all_samples = [samples for samples in samples_by_time if samples.size]
+        if not all_samples:
+            raise ValueError(f"no positive finite samples found for {diameter_key!r}")
+        pooled = np.concatenate(all_samples)
+        grid = dense_log_grid(float(np.min(pooled)), float(np.max(pooled)))
+    else:
+        grid = np.asarray(grid, dtype=float)
+
+    volumes = _volume_at_time(rep, rep_time)
+    heatmap = np.vstack(
+        [
+            kde_log_diameter(samples, grid, volumes[idx], bandwidth_factor)
+            for idx, samples in enumerate(samples_by_time)
+        ]
+    )
+    return rep_time, grid, smooth_time(heatmap, passes=1)
+
+
+def select_replicate_for_heatmap(
+    reps: list[ReplicateData], preferred_index: int = 0
+) -> ReplicateData:
+    if not reps:
+        raise ValueError("cannot select a heatmap replicate from an empty list")
+    index = min(max(int(preferred_index), 0), len(reps) - 1)
+    return reps[index]
