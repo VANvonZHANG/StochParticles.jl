@@ -3,9 +3,9 @@
 """
     number_concentration(sys::ParticleSystem) -> Float64
 
-Zeroth moment: n₀ = N_sim / V_comp [particles/m³].
+Zeroth moment: n₀ = N_active / V_comp [particles/m³].
 """
-number_concentration(sys::ParticleSystem) = sys.n_sim / sys.volume
+number_concentration(sys::ParticleSystem) = sys.n_active / sys.volume
 
 """
     mass_concentration(u, ::Val{A}, sys) -> Float64

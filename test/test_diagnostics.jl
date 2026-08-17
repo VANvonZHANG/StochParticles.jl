@@ -11,6 +11,8 @@ using StaticArrays
         u0 = fill(1.0, 100)
 
         @test number_concentration(sys) == 100 / 2.0  # N/V = 100/2 = 50
+        sys.n_active = 37
+        @test number_concentration(sys) == 37 / 2.0
     end
 
     @testset "first moment (total mass concentration)" begin

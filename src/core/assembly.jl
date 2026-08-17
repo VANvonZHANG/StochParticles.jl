@@ -48,6 +48,9 @@ _process_jumps(::PhysicsProcess, sys) = ()
 function _process_jumps(proc::CoagulationProcess, sys)
     (make_coagulation_jump(proc.kernel, proc.sampling),)
 end
+function _process_jumps(proc::NonCNMCCoagulationProcess, sys)
+    (make_non_cnmc_coagulation_jump(proc.kernel, proc.sampling),)
+end
 _process_jumps(proc::EmissionProcess, sys) = (make_emission_jump(proc),)
 _process_jumps(proc::DilutionProcess, sys) = make_dilution_jumps(proc)
 
@@ -75,7 +78,8 @@ Construct a SciML JumpProblem representing the PDMP for particle simulation.
 - `gas_phase_fn` — external gas concentration function g(t)
 - `processes::NTuple` — tuple of PhysicsProcess instances
 - `tspan` — (t_start, t_end)
-- `n_sim` — target particle count (CNMC). Default: length(particles)
+- `n_sim` — particle-slot capacity; for CNMC this is also the target count.
+  Default: length(particles)
 
 # Returns
 - `JumpProblem` ready for `solve(prob, Tsit5())`
