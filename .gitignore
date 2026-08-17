@@ -27,6 +27,8 @@ Thumbs.db
 .worktrees/
 
 # Example outputs
+examples/data/
+examples/fig/
 examples/*.h5
 examples/*.png
 examples/*.csv
