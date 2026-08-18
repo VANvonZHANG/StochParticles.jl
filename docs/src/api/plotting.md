@@ -47,4 +47,4 @@ pl = plot_simulation_summary(sol, prob, bin_edges, 1800.0;
                               method=:kde, bandwidth_factor=0.5)
 ```
 
-For a detailed comparison of all three methods, see the `examples/compare_distribution_methods.jl` example.
+For the current end-to-end plotting workflow, run `julia --project=examples examples/simulate_single_component_coagulation.jl` followed by `python examples/plot_single_component_coagulation.py`.

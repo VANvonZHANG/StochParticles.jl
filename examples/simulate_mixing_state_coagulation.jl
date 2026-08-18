@@ -8,6 +8,37 @@ include("simulation_io.jl")
 
 const MIXING_BASENAME = "mixing_state_coagulation"
 const A = 2
+const TIME_MAJOR_COMPAT_DATASETS = Set([
+    "bc_mass_fraction_samples",
+    "diameter_samples",
+    "size_distribution_raw",
+    "species_mass_concentration"
+])
+
+function write_datasets_compat_group!(rep_group)
+    datasets_group = create_group(rep_group, "datasets")
+    for name in collect(keys(rep_group))
+        name == "datasets" && continue
+        obj = rep_group[name]
+        if obj isa HDF5.Dataset
+            data = read(obj)
+            datasets_group[name] = name in TIME_MAJOR_COMPAT_DATASETS && ndims(data) == 2 ?
+                                   permutedims(data) : data
+        end
+    end
+    return datasets_group
+end
+
+function overwrite_initial_diameter_datasets!(rep_group, diameter_initial, bin_edges, volume)
+    diameters = Float64.(collect(diameter_initial))
+    summary = diameter_summary(diameters)
+    rep_group["mean_diameter"][1] = summary.mean
+    rep_group["median_diameter"][1] = summary.median
+    rep_group["p90_diameter"][1] = summary.p90
+    rep_group["diameter_samples"][1, :] = diameters
+    rep_group["size_distribution_raw"][1, :] = dNdlogD_from_diameters(diameters, bin_edges, volume)
+    return nothing
+end
 
 Base.@kwdef struct MixingStateCoagulationConfig
     species_names::Vector{String} = ["SO4", "BC"]
@@ -19,6 +50,7 @@ Base.@kwdef struct MixingStateCoagulationConfig
     p::Float64 = 1.01325e5
     densities::SVector{2, Float64} = SVector(1770.0, 1800.0)
     bin_edges::Vector{Float64} = collect(10.0 .^ range(-9, -6; length = 81))
+    initial_seed::Int = 2026092100
     seed_base::Int = 2026092100
     notes::String = "SO4/BC external-to-internal mixing by Brownian coagulation."
 end
@@ -76,8 +108,9 @@ function case_attributes(cfg::MixingStateCoagulationConfig)
 end
 
 function run_replicate!(case_group, cfg::MixingStateCoagulationConfig, replicate_idx)
-    seed = cfg.seed_base + replicate_idx
-    particles = initial_mixing_particles(cfg, seed)
+    process_seed = cfg.seed_base + replicate_idx
+    particles = initial_mixing_particles(cfg, cfg.initial_seed)
+    Random.seed!(process_seed)
     dry_diameter_initial = diameters_from_masses(particles, cfg.densities)
 
     coagulation = CoagulationProcess(
@@ -103,15 +136,23 @@ function run_replicate!(case_group, cfg::MixingStateCoagulationConfig, replicate
     @assert sol.retcode == ReturnCode.Success
 
     rep_group = create_replicate_group(case_group, replicate_idx)
-    attrs(rep_group)["seed"] = seed
+    seed_attrs = Dict{String, Any}(
+        "initial_seed" => cfg.initial_seed,
+        "process_seed" => process_seed,
+        "seed" => process_seed
+    )
+    _write_attrs!(rep_group, seed_attrs)
     write_records_common!(
         rep_group,
         records,
         cfg.n_sim,
         cfg.bin_edges;
         dry_diameter_initial = dry_diameter_initial,
-        extra_attrs = Dict{String, Any}("seed" => seed)
+        extra_attrs = seed_attrs
     )
+    overwrite_initial_diameter_datasets!(
+        rep_group, dry_diameter_initial, cfg.bin_edges, cfg.volume)
+    write_datasets_compat_group!(rep_group)
     return nothing
 end
 

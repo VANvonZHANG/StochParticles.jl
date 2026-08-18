@@ -99,29 +99,19 @@ The `examples/` directory contains runnable demonstration scripts.
 ### Setup
 
 ```bash
-cd examples
-julia --project=. -e 'using Pkg; Pkg.develop(path=".."); Pkg.instantiate()'
+julia --project=examples -e 'using Pkg; Pkg.develop(path="."); Pkg.instantiate()'
 ```
 
-### Aerosol Brownian Coagulation
+### Single-Component Coagulation
 
-Simulates 5000 sulfate aerosol particles (d_g = 0.1 μm) undergoing Brownian coagulation for 1 hour.
+Simulates single-component aerosol and cloud-droplet coagulation cases, then generates the summary figure with the Python analysis workflow.
 
 ```bash
-julia --project=. aerosol_brownian_coagulation.jl
+julia --project=examples examples/simulate_single_component_coagulation.jl
+python examples/plot_single_component_coagulation.py
 ```
 
-Output: `aerosol_brownian_coagulation.png`
-
-### Cloud Droplet Turbulent Coagulation
-
-Simulates 5000 cloud droplets (d_g = 10 μm) with composite coagulation (Brownian + gravitational + turbulent) for 10 minutes.
-
-```bash
-julia --project=. cloud_droplet_turbulent_coagulation.jl
-```
-
-Output: `cloud_droplet_turbulent_coagulation.png`
+Outputs: `examples/data/single_component_coagulation.h5` and `examples/fig/single_component_coagulation.png`.
 
 ## Testing
 

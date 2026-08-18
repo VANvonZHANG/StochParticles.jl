@@ -9,6 +9,42 @@ include("simulation_io.jl")
 const ACTIVATION_BASENAME = "activation_coagulation_comparison"
 const A = 2
 const EQUAL_KERNEL_FRACTIONS = (1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0)
+const TIME_MAJOR_COMPAT_DATASETS = Set([
+    "activation_flag_samples",
+    "diameter_samples",
+    "dry_diameter_samples",
+    "size_distribution_raw",
+    "species_mass_concentration"
+])
+
+function write_datasets_compat_group!(rep_group)
+    datasets_group = create_group(rep_group, "datasets")
+    for name in collect(keys(rep_group))
+        name == "datasets" && continue
+        obj = rep_group[name]
+        if obj isa HDF5.Dataset
+            data = read(obj)
+            datasets_group[name] = name in TIME_MAJOR_COMPAT_DATASETS && ndims(data) == 2 ?
+                                   permutedims(data) : data
+        end
+    end
+    return datasets_group
+end
+
+function overwrite_initial_diameter_datasets!(
+        rep_group, diameter_initial, bin_edges, volume; dry_diameter_initial = nothing)
+    diameters = Float64.(collect(diameter_initial))
+    summary = diameter_summary(diameters)
+    rep_group["mean_diameter"][1] = summary.mean
+    rep_group["median_diameter"][1] = summary.median
+    rep_group["p90_diameter"][1] = summary.p90
+    rep_group["diameter_samples"][1, :] = diameters
+    rep_group["size_distribution_raw"][1, :] = dNdlogD_from_diameters(diameters, bin_edges, volume)
+    if dry_diameter_initial !== nothing && haskey(rep_group, "dry_diameter_samples")
+        rep_group["dry_diameter_samples"][1, :] = Float64.(collect(dry_diameter_initial))
+    end
+    return nothing
+end
 
 Base.@kwdef struct ActivationComparisonConfig
     species_names::Vector{String} = ["SO4", "H2O"]
@@ -30,6 +66,7 @@ Base.@kwdef struct ActivationComparisonConfig
     epsilon::Float64 = 0.01
     r_lambda::Float64 = 50.0
     bin_edges::Vector{Float64} = collect(10.0 .^ range(-8.3, -4.5; length = 96))
+    initial_seed::Int = 2026072200
     seed_base::Int = 2026072200
 end
 
@@ -257,33 +294,50 @@ end
 
 function write_scenario_replicate!(
         case_group, cfg::ActivationComparisonConfig, replicate_idx, seed,
-        particles, dry_diameter_initial, thermo_labels, scenario)
-    sol, records = solve_activation_scenario(cfg, deepcopy(particles), scenario)
+        initial_seed, particles, dry_diameter_initial, thermo_labels, scenario)
+    scenario_particles = deepcopy(particles)
+    diameter_initial = diameters_from_masses(scenario_particles, cfg.densities)
+    Random.seed!(seed)
+    sol, records = solve_activation_scenario(cfg, scenario_particles, scenario)
     @assert sol.retcode == ReturnCode.Success
 
     rep_group = create_replicate_group(case_group, replicate_idx)
-    attrs(rep_group)["seed"] = seed
+    seed_attrs = Dict{String, Any}(
+        "initial_seed" => initial_seed,
+        "process_seed" => seed,
+        "seed" => seed
+    )
+    _write_attrs!(rep_group, seed_attrs)
     write_records_common!(
         rep_group,
         records,
         cfg.n_sim,
         cfg.bin_edges;
         dry_diameter_initial = dry_diameter_initial,
-        extra_attrs = Dict{String, Any}("seed" => seed)
+        extra_attrs = seed_attrs
     )
     write_vector(rep_group, "thermo_kappa_initial", thermo_labels)
+    overwrite_initial_diameter_datasets!(
+        rep_group,
+        diameter_initial,
+        cfg.bin_edges,
+        cfg.volume;
+        dry_diameter_initial = dry_diameter_initial
+    )
+    write_datasets_compat_group!(rep_group)
     return nothing
 end
 
 function run_replicate!(case_groups, cfg::ActivationComparisonConfig, replicate_idx)
-    seed = cfg.seed_base + replicate_idx
-    particles, dry_diameter_initial, thermo_labels = initial_activation_particles(cfg, seed)
+    process_seed = cfg.seed_base + replicate_idx
+    particles, dry_diameter_initial, thermo_labels = initial_activation_particles(cfg, cfg.initial_seed)
 
     write_scenario_replicate!(
         case_groups.activation_only,
         cfg,
         replicate_idx,
-        seed,
+        process_seed,
+        cfg.initial_seed,
         particles,
         dry_diameter_initial,
         thermo_labels,
@@ -293,7 +347,8 @@ function run_replicate!(case_groups, cfg::ActivationComparisonConfig, replicate_
         case_groups.activation_with_coagulation,
         cfg,
         replicate_idx,
-        seed,
+        process_seed,
+        cfg.initial_seed,
         particles,
         dry_diameter_initial,
         thermo_labels,

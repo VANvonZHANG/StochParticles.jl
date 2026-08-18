@@ -22,6 +22,7 @@ def kde_log_diameter(
     eval_diameters: np.ndarray,
     volume: float,
     bandwidth_factor: float = 1.0,
+    max_bandwidth: float | None = None,
 ) -> np.ndarray:
     eval_diameters = np.asarray(eval_diameters, dtype=float)
     result = np.zeros_like(eval_diameters, dtype=float)
@@ -41,6 +42,11 @@ def kde_log_diameter(
         if not np.isfinite(bandwidth) or bandwidth <= 0:
             bandwidth = 0.05
     bandwidth *= max(float(bandwidth_factor), np.finfo(float).eps)
+    if max_bandwidth is not None:
+        max_bandwidth = float(max_bandwidth)
+        if not np.isfinite(max_bandwidth) or max_bandwidth <= 0.0:
+            raise ValueError("max_bandwidth must be positive and finite")
+        bandwidth = min(bandwidth, max_bandwidth)
 
     z = (log_eval[:, None] - log_samples[None, :]) / bandwidth
     kernel = np.exp(-0.5 * z * z) / (np.sqrt(2.0 * np.pi) * bandwidth)
@@ -65,6 +71,30 @@ def smooth_time(values: np.ndarray, passes: int = 2) -> np.ndarray:
     return smoothed
 
 
+def linear_edges_from_centers(centers: np.ndarray) -> np.ndarray:
+    centers = np.asarray(centers, dtype=float)
+    if centers.ndim != 1 or centers.size < 2:
+        raise ValueError("centers must be a 1D array with at least two values")
+    deltas = np.diff(centers)
+    if np.any(~np.isfinite(deltas)) or np.any(deltas <= 0.0):
+        raise ValueError("centers must be finite and strictly increasing")
+    edges = np.empty(centers.size + 1, dtype=float)
+    edges[1:-1] = 0.5 * (centers[:-1] + centers[1:])
+    edges[0] = centers[0] - 0.5 * deltas[0]
+    edges[-1] = centers[-1] + 0.5 * deltas[-1]
+    return edges
+
+
+def log_edges_from_centers(centers: np.ndarray) -> np.ndarray:
+    centers = np.asarray(centers, dtype=float)
+    if centers.ndim != 1 or centers.size < 2:
+        raise ValueError("centers must be a 1D array with at least two values")
+    if np.any(~np.isfinite(centers)) or np.any(centers <= 0.0):
+        raise ValueError("log centers must be positive and finite")
+    log_edges = linear_edges_from_centers(np.log10(centers))
+    return np.power(10.0, log_edges)
+
+
 def _volume_at_time(rep: ReplicateData, time: np.ndarray) -> np.ndarray:
     volume = rep.arrays.get("volume")
     if volume is not None:
@@ -85,6 +115,7 @@ def replicate_mean_kde_heatmap(
     diameter_key: str = "diameter_samples",
     grid: np.ndarray | None = None,
     bandwidth_factor: float = 1.0,
+    max_bandwidth: float | None = None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     if not reps:
         empty_grid = np.asarray(grid if grid is not None else [], dtype=float)
@@ -115,7 +146,13 @@ def replicate_mean_kde_heatmap(
         volumes = _volume_at_time(rep, rep_time)
         heatmap = np.vstack(
             [
-                kde_log_diameter(samples, grid, volumes[idx], bandwidth_factor)
+                kde_log_diameter(
+                    samples,
+                    grid,
+                    volumes[idx],
+                    bandwidth_factor,
+                    max_bandwidth=max_bandwidth,
+                )
                 for idx, samples in enumerate(samples_by_time)
             ]
         )
@@ -128,3 +165,55 @@ def replicate_mean_kde_heatmap(
 
     mean_heatmap = np.nanmean(np.stack(heatmaps, axis=0), axis=0)
     return common_time, grid, smooth_time(mean_heatmap)
+
+
+def replicate_kde_heatmap(
+    rep: ReplicateData,
+    diameter_key: str = "diameter_samples",
+    grid: np.ndarray | None = None,
+    bandwidth_factor: float = 1.0,
+    max_bandwidth: float | None = None,
+    smooth_passes: int = 1,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    require_arrays(rep, ("time", diameter_key))
+    rep_time = np.asarray(rep.arrays["time"], dtype=float)
+    samples_by_time = clean_sample_matrix(rep.arrays[diameter_key])
+    if len(samples_by_time) != rep_time.size:
+        raise ValueError(
+            f"Expected one {diameter_key!r} sample row per time value for "
+            f"case={rep.case_name!r}, replicate={rep.replicate_name!r}; "
+            f"got {len(samples_by_time)} sample rows and {rep_time.size} time values"
+        )
+
+    if grid is None:
+        all_samples = [samples for samples in samples_by_time if samples.size]
+        if not all_samples:
+            raise ValueError(f"no positive finite samples found for {diameter_key!r}")
+        pooled = np.concatenate(all_samples)
+        grid = dense_log_grid(float(np.min(pooled)), float(np.max(pooled)))
+    else:
+        grid = np.asarray(grid, dtype=float)
+
+    volumes = _volume_at_time(rep, rep_time)
+    heatmap = np.vstack(
+        [
+            kde_log_diameter(
+                samples,
+                grid,
+                volumes[idx],
+                bandwidth_factor,
+                max_bandwidth=max_bandwidth,
+            )
+            for idx, samples in enumerate(samples_by_time)
+        ]
+    )
+    return rep_time, grid, smooth_time(heatmap, passes=smooth_passes)
+
+
+def select_replicate_for_heatmap(
+    reps: list[ReplicateData], preferred_index: int = 0
+) -> ReplicateData:
+    if not reps:
+        raise ValueError("cannot select a heatmap replicate from an empty list")
+    index = min(max(int(preferred_index), 0), len(reps) - 1)
+    return reps[index]
