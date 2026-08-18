@@ -10,7 +10,7 @@ include(joinpath(@__DIR__, "..", "examples", "coupled_condensation_composite_coa
         volume = 2.4e-6,
         tspan = (0.0, 2.0),
         saveat = 0.5,
-        seed = 42,
+        seed = 42
     )
 
     particles = build_initial_particles(cfg)
@@ -53,6 +53,6 @@ include(joinpath(@__DIR__, "..", "examples", "coupled_condensation_composite_coa
     @test isapprox(
         row.brownian_fraction + row.gravitational_fraction + row.turbulent_fraction,
         1.0;
-        atol = 1.0e-10,
+        atol = 1.0e-10
     )
 end

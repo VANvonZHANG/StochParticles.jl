@@ -55,12 +55,13 @@ function make_thermo(cfg::MixedPDMPConfig)
         2.5e6,
         461.5,
         2.5e-5,
-        2.4e-2,
+        2.4e-2
     )
 end
 
-vapor_pressure(cfg::MixedPDMPConfig) =
+function vapor_pressure(cfg::MixedPDMPConfig)
     saturation_vapor_pressure(cfg.T) * (1.0 + cfg.supersaturation)
+end
 
 gas_state_function(cfg::MixedPDMPConfig) = t -> SVector(cfg.T, vapor_pressure(cfg))
 
@@ -72,7 +73,7 @@ function make_cloud_params(cfg::MixedPDMPConfig)
         mu_f = cfg.mu_f,
         nu = cfg.nu,
         rho_p = cfg.rho_p,
-        g = cfg.g,
+        g = cfg.g
     )
 end
 
@@ -171,20 +172,19 @@ function evaluate_diagnostics(
     wet_diameters = particle_diameters(u, sys, cfg.densities)
     dry_mass = _species_mass(u, sys, 1)
     water_mass = _species_mass(u, sys, cfg.h2o_idx)
-    brownian_frac, gravitational_frac, turbulent_frac =
-        kernel_fraction_triplet(u, sys, cfg, kernel_parts)
+    brownian_frac, gravitational_frac, turbulent_frac = kernel_fraction_triplet(u, sys, cfg, kernel_parts)
 
     activation_frac = activation_fraction(
         u, sys, Val(2);
         mode = :radius_threshold,
         threshold = cfg.activation_radius,
-        densities = cfg.densities,
+        densities = cfg.densities
     )
     droplet_conc = cloud_droplet_concentration(
         u, sys, Val(2);
         mode = :radius_threshold,
         threshold = cfg.activation_radius,
-        densities = cfg.densities,
+        densities = cfg.densities
     )
 
     return (
@@ -203,7 +203,7 @@ function evaluate_diagnostics(
         cloud_droplet_concentration = droplet_conc,
         brownian_fraction = brownian_frac,
         gravitational_fraction = gravitational_frac,
-        turbulent_fraction = turbulent_frac,
+        turbulent_fraction = turbulent_frac
     )
 end
 
@@ -235,8 +235,8 @@ function build_mixed_pdmp_problem(cfg::MixedPDMPConfig)
         tspan = cfg.tspan, n_sim = cfg.n_sim)
 
     saved = callbacks.SavedValues(Float64, Any)
-    save_func = (u, t, integrator) ->
-        evaluate_diagnostics(u, integrator.p, cfg, kernel_parts, thermo, t)
+    save_func = (u, t, integrator) -> evaluate_diagnostics(
+        u, integrator.p, cfg, kernel_parts, thermo, t)
     saving = callbacks.SavingCallback(
         save_func, saved; saveat = cfg.saveat, save_start = true, save_end = true)
 
@@ -247,7 +247,7 @@ function build_mixed_pdmp_problem(cfg::MixedPDMPConfig)
         particles = particles,
         thermo = thermo,
         kernel_parts = kernel_parts,
-        params = params,
+        params = params
     )
 end
 
@@ -270,7 +270,7 @@ function spectrum_from_solution(sol, rows, cfg::MixedPDMPConfig; n_bins::Int = 5
         times = Float64[],
         bin_edges = Float64[],
         bin_centers = Float64[],
-        dNdlogD = zeros(Float64, 0, 0),
+        dNdlogD = zeros(Float64, 0, 0)
     )
 
     diameters_by_time = Vector{Vector{Float64}}(undef, length(rows))
@@ -287,7 +287,7 @@ function spectrum_from_solution(sol, rows, cfg::MixedPDMPConfig; n_bins::Int = 5
             times = [row.time for row in rows],
             bin_edges = Float64[],
             bin_centers = Float64[],
-            dNdlogD = zeros(Float64, 0, length(rows)),
+            dNdlogD = zeros(Float64, 0, length(rows))
         )
     end
 
@@ -307,7 +307,7 @@ function spectrum_from_solution(sol, rows, cfg::MixedPDMPConfig; n_bins::Int = 5
         times = [row.time for row in rows],
         bin_edges = bin_edges,
         bin_centers = bin_centers,
-        dNdlogD = dNdlogD,
+        dNdlogD = dNdlogD
     )
 end
 
@@ -342,7 +342,7 @@ function make_summary_figure(rows, spectrum, path)
         label = "N/N0 (step)",
         linewidth = 2,
         color = :black,
-        title = "A. Number and wet size",
+        title = "A. Number and wet size"
     )
     p1d = plots.plot(
         times, normalized_d;
@@ -350,7 +350,7 @@ function make_summary_figure(rows, spectrum, path)
         ylabel = "Dwet/Dwet0",
         label = "mean Dwet / Dwet0",
         linewidth = 2,
-        color = :darkorange,
+        color = :darkorange
     )
     p1 = plots.plot(p1n, p1d; layout = (2, 1))
 
@@ -362,9 +362,10 @@ function make_summary_figure(rows, spectrum, path)
         linewidth = 2,
         color = :steelblue,
         ylim = (0, 1),
-        title = "B. Pair-summed kernel fractions",
+        title = "B. Pair-summed kernel fractions"
     )
-    plots.plot!(p2, times, grav; label = "gravitational", linewidth = 2, color = :darkorange)
+    plots.plot!(
+        p2, times, grav; label = "gravitational", linewidth = 2, color = :darkorange)
     plots.plot!(p2, times, turb; label = "turbulent", linewidth = 2, color = :seagreen)
 
     p3 = plots.heatmap(
@@ -374,7 +375,7 @@ function make_summary_figure(rows, spectrum, path)
         xlabel = "Time [s]",
         ylabel = "Wet diameter [nm]",
         colorbar = false,
-        title = "C. Wet-diameter spectrum (dN/dlogD)",
+        title = "C. Wet-diameter spectrum (dN/dlogD)"
     )
     plots.plot!(p3; yscale = :log10)
 
@@ -386,7 +387,7 @@ function make_summary_figure(rows, spectrum, path)
         linewidth = 2,
         color = :purple,
         ylim = (0, 100),
-        title = "D. Threshold activation",
+        title = "D. Threshold activation"
     )
 
     fig = plots.plot(
@@ -394,7 +395,7 @@ function make_summary_figure(rows, spectrum, path)
         layout = (2, 2),
         size = (1700, 1000),
         dpi = 150,
-        margin = 6 * plots.mm,
+        margin = 6 * plots.mm
     )
     plots.savefig(fig, path)
     return path
@@ -406,7 +407,7 @@ function run_mixed_pdmp_demo(cfg::MixedPDMPConfig = MixedPDMPConfig())
         built.prob,
         Tsit5();
         callback = built.callback,
-        saveat = cfg.saveat,
+        saveat = cfg.saveat
     )
     rows = rows_from_saved(built.saved)
     spectrum = spectrum_from_solution(sol, rows, cfg)
@@ -419,7 +420,7 @@ function run_mixed_pdmp_demo(cfg::MixedPDMPConfig = MixedPDMPConfig())
         csv_path = cfg.csv_path,
         figure_path = cfg.figure_path,
         kernel_parts = built.kernel_parts,
-        thermo = built.thermo,
+        thermo = built.thermo
     )
 end
 
