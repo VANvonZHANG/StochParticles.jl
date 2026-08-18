@@ -42,12 +42,13 @@ function average_thermo(_cfg::ActivationComparisonConfig)
         2.5e6,
         461.5,
         2.5e-5,
-        2.4e-2,
+        2.4e-2
     )
 end
 
-vapor_pressure(cfg::ActivationComparisonConfig) =
+function vapor_pressure(cfg::ActivationComparisonConfig)
     saturation_vapor_pressure(cfg.T) * (1.0 + cfg.supersaturation)
+end
 
 gas_fn(cfg::ActivationComparisonConfig) = _t -> SVector(cfg.T, vapor_pressure(cfg))
 
@@ -76,7 +77,7 @@ function initial_activation_particles(cfg::ActivationComparisonConfig, seed)
         cfg.densities,
         cfg.T,
         vapor_pressure(cfg);
-        h2o_idx = cfg.h2o_idx,
+        h2o_idx = cfg.h2o_idx
     )
 
     return (particles, dry_diams, thermo_labels)
@@ -90,7 +91,7 @@ function cloud_params(cfg::ActivationComparisonConfig)
         mu_f = cfg.mu_f,
         nu = cfg.nu,
         rho_p = cfg.rho_p,
-        g = cfg.g,
+        g = cfg.g
     )
 end
 
@@ -106,14 +107,14 @@ function activation_kernel_parts(cfg::ActivationComparisonConfig)
         params.rho_f,
         params.rho_p,
         params.g,
-        cfg.densities,
+        cfg.densities
     )
     total = make_kernel(params, cfg.epsilon, cfg.r_lambda, cfg.densities)
     return (
         brownian = brownian,
         gravitational = gravitational,
         turbulent = turbulent,
-        total = total,
+        total = total
     )
 end
 
@@ -172,7 +173,7 @@ function record_extras(u, sys, cfg::ActivationComparisonConfig)
             Val(A);
             mode = :radius_threshold,
             threshold = cfg.activation_radius,
-            densities = cfg.densities,
+            densities = cfg.densities
         ),
         cloud_droplet_concentration = cloud_droplet_concentration(
             u,
@@ -180,10 +181,10 @@ function record_extras(u, sys, cfg::ActivationComparisonConfig)
             Val(A);
             mode = :radius_threshold,
             threshold = cfg.activation_radius,
-            densities = cfg.densities,
+            densities = cfg.densities
         ),
         dry_diameter_samples = dry_diameters_from_state(u, sys, cfg),
-        activation_flag_samples = activation_flags_from_state(u, sys, cfg),
+        activation_flag_samples = activation_flags_from_state(u, sys, cfg)
     )
 end
 
@@ -208,10 +209,11 @@ function solve_activation_scenario(cfg::ActivationComparisonConfig, particles, s
         gas_fn(cfg),
         processes;
         tspan = cfg.tspan,
-        n_sim = cfg.n_sim,
+        n_sim = cfg.n_sim
     )
 
-    parts = scenario == :activation_with_coagulation ? activation_kernel_parts(cfg) : nothing
+    parts = scenario == :activation_with_coagulation ? activation_kernel_parts(cfg) :
+            nothing
     record_func = (t, u, sys) -> begin
         base = base_diagnostic_record(t, u, sys, Val(A), cfg.densities, cfg.bin_edges)
         extras = record_extras(u, sys, cfg)
@@ -219,8 +221,7 @@ function solve_activation_scenario(cfg::ActivationComparisonConfig, particles, s
             return merge_record(base, extras)
         end
 
-        brownian_frac, gravitational_frac, turbulent_frac =
-            kernel_fraction_triplet(u, sys, parts)
+        brownian_frac, gravitational_frac, turbulent_frac = kernel_fraction_triplet(u, sys, parts)
         return merge_record(
             base,
             merge(
@@ -228,9 +229,9 @@ function solve_activation_scenario(cfg::ActivationComparisonConfig, particles, s
                 (
                     kernel_fraction_brownian = brownian_frac,
                     kernel_fraction_gravitational = gravitational_frac,
-                    kernel_fraction_turbulent = turbulent_frac,
-                ),
-            ),
+                    kernel_fraction_turbulent = turbulent_frac
+                )
+            )
         )
     end
 
@@ -250,7 +251,7 @@ function case_attributes(cfg::ActivationComparisonConfig, scenario)
         "saveat" => cfg.saveat,
         "supersaturation" => cfg.supersaturation,
         "activation_radius" => cfg.activation_radius,
-        "notes" => notes,
+        "notes" => notes
     )
 end
 
@@ -268,7 +269,7 @@ function write_scenario_replicate!(
         cfg.n_sim,
         cfg.bin_edges;
         dry_diameter_initial = dry_diameter_initial,
-        extra_attrs = Dict{String, Any}("seed" => seed),
+        extra_attrs = Dict{String, Any}("seed" => seed)
     )
     write_vector(rep_group, "thermo_kappa_initial", thermo_labels)
     return nothing
@@ -276,8 +277,7 @@ end
 
 function run_replicate!(case_groups, cfg::ActivationComparisonConfig, replicate_idx)
     seed = cfg.seed_base + replicate_idx
-    particles, dry_diameter_initial, thermo_labels =
-        initial_activation_particles(cfg, seed)
+    particles, dry_diameter_initial, thermo_labels = initial_activation_particles(cfg, seed)
 
     write_scenario_replicate!(
         case_groups.activation_only,
@@ -287,7 +287,7 @@ function run_replicate!(case_groups, cfg::ActivationComparisonConfig, replicate_
         particles,
         dry_diameter_initial,
         thermo_labels,
-        :activation_only,
+        :activation_only
     )
     write_scenario_replicate!(
         case_groups.activation_with_coagulation,
@@ -297,7 +297,7 @@ function run_replicate!(case_groups, cfg::ActivationComparisonConfig, replicate_
         particles,
         dry_diameter_initial,
         thermo_labels,
-        :activation_with_coagulation,
+        :activation_with_coagulation
     )
     return nothing
 end
@@ -310,7 +310,7 @@ function main()
         h5_path;
         scene_name = ACTIVATION_BASENAME,
         n_replicates = n_replicates,
-        notes = "Paired activation-only and activation-with-coagulation simulations.",
+        notes = "Paired activation-only and activation-with-coagulation simulations."
     )
 
     h5open(h5_path, "r+") do file
@@ -318,13 +318,13 @@ function main()
             activation_only = ensure_case_group(
                 file,
                 "activation_only";
-                attrs_dict = case_attributes(cfg, :activation_only),
+                attrs_dict = case_attributes(cfg, :activation_only)
             ),
             activation_with_coagulation = ensure_case_group(
                 file,
                 "activation_with_coagulation";
-                attrs_dict = case_attributes(cfg, :activation_with_coagulation),
-            ),
+                attrs_dict = case_attributes(cfg, :activation_with_coagulation)
+            )
         )
         for replicate_idx in 1:n_replicates
             run_replicate!(case_groups, cfg, replicate_idx)

@@ -133,7 +133,7 @@ function diameter_summary(diameters)
     return (
         mean = mean(values),
         median = median(values),
-        p90 = quantile(values, 0.90),
+        p90 = quantile(values, 0.90)
     )
 end
 
@@ -156,7 +156,8 @@ function _density_vector(::Val{A}, densities::AbstractVector) where {A}
 end
 
 function _density_vector(::Val{A}, density::Real) where {A}
-    A == 1 || throw(ArgumentError("scalar density is only valid for single-species systems"))
+    A == 1 ||
+        throw(ArgumentError("scalar density is only valid for single-species systems"))
     return SVector{1, Float64}(Float64(density))
 end
 
@@ -182,7 +183,7 @@ function base_diagnostic_record(t, u, sys, ::Val{A}, densities, bin_edges) where
         median_diameter = summary.median,
         p90_diameter = summary.p90,
         diameter_samples = diameters,
-        size_distribution_raw = dNdlogD_from_diameters(diameters, bin_edges, sys.volume),
+        size_distribution_raw = dNdlogD_from_diameters(diameters, bin_edges, sys.volume)
     )
 end
 
@@ -210,7 +211,7 @@ const _COMMON_RECORD_FIELDS = Set([
     :median_diameter,
     :p90_diameter,
     :diameter_samples,
-    :size_distribution_raw,
+    :size_distribution_raw
 ])
 
 function _record_vector(records, field)

@@ -50,7 +50,7 @@ function case_attributes(cfg)
         "t_start" => Float64(cfg.tspan[1]),
         "t_end" => Float64(cfg.tspan[2]),
         "saveat" => cfg.saveat,
-        "notes" => cfg.notes,
+        "notes" => cfg.notes
     )
 end
 
@@ -73,7 +73,7 @@ function build_aerosol_case()
             initial_particles(200, 5.0e-9, 1.5, 1.0e-7, 1.5, 1800.0)
         end,
         build_kernel = () -> BrownianKernel(params.T, params.p, densities),
-        record_extras = nothing,
+        record_extras = nothing
     )
 end
 
@@ -104,14 +104,13 @@ function build_cloud_case()
         end,
         build_kernel = () -> make_kernel(params, 0.01, 50.0, densities),
         record_extras = (u, sys) -> begin
-            brownian_frac, gravitational_frac, turbulent_frac =
-                kernel_fraction_triplet(u, sys, parts)
+            brownian_frac, gravitational_frac, turbulent_frac = kernel_fraction_triplet(u, sys, parts)
             return (
                 kernel_fraction_brownian = brownian_frac,
                 kernel_fraction_gravitational = gravitational_frac,
-                kernel_fraction_turbulent = turbulent_frac,
+                kernel_fraction_turbulent = turbulent_frac
             )
-        end,
+        end
     )
 end
 
@@ -145,7 +144,7 @@ function run_replicate!(case_group, cfg, replicate_idx)
         cfg.n_sim,
         cfg.bin_edges;
         dry_diameter_initial = dry_diameter_initial,
-        extra_attrs = Dict{String, Any}("seed" => seed),
+        extra_attrs = Dict{String, Any}("seed" => seed)
     )
     return nothing
 end
@@ -165,7 +164,7 @@ function main()
         h5_path;
         scene_name = SINGLE_COMPONENT_BASENAME,
         n_replicates = n_replicates,
-        notes = "Single-component aerosol Brownian and cloud composite coagulation simulations.",
+        notes = "Single-component aerosol Brownian and cloud composite coagulation simulations."
     )
 
     cases = (build_aerosol_case(), build_cloud_case())
