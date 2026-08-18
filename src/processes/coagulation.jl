@@ -589,6 +589,37 @@ end
 provides_drift(::CoagulationProcess) = false
 
 """
+    NonCNMCCoagulationProcess{K, S} <: PhysicsProcess
+
+Stochastic coagulation process without constant-number Monte Carlo resampling.
+Accepted events merge two particles and remove one active particle, leaving the
+computational volume unchanged.
+"""
+struct NonCNMCCoagulationProcess{K <: CoagulationKernel{<:Any}, S <: CoagulationSampling} <:
+       PhysicsProcess
+    kernel::K
+    sampling::S
+end
+
+provides_drift(::NonCNMCCoagulationProcess) = false
+
+function non_cnmc_coagulate!(
+        u::Vector{Float64}, sys::ParticleSystem{A}, ::Val{A}, i::Int, j::Int) where {A}
+    A_val = Val(A)
+    μ_i = get_particle(u, i, A_val)
+    μ_j = get_particle(u, j, A_val)
+    set_particle!(u, i, A_val, μ_i + μ_j)
+    if j < sys.n_active
+        μ_last = get_particle(u, sys.n_active, A_val)
+        set_particle!(u, j, A_val, μ_last)
+    end
+    zero_μ = zero(μ_i)
+    set_particle!(u, sys.n_active, A_val, zero_μ)
+    sys.n_active -= 1
+    return nothing
+end
+
+"""
     make_coagulation_jump(kernel, sampling) -> ConstantRateJump
 
 Create a SciML ConstantRateJump for the coagulation process using
@@ -628,6 +659,48 @@ function make_coagulation_jump(kernel, sampling)
             cnmc_coagulate!(u, p, A_val, i, j)
         end
         nothing
+    end
+
+    return ConstantRateJump(rate, affect!)
+end
+
+"""
+    make_non_cnmc_coagulation_jump(kernel, sampling) -> ConstantRateJump
+
+Create a coagulation jump without CNMC cloning or volume rescaling.
+"""
+function make_non_cnmc_coagulation_jump(kernel, sampling)
+    rate = (u, p, t) -> begin
+        if p.n_active < 2
+            return 0.0
+        end
+        K_max = compute_majorant(sampling, kernel, u, p)
+        p._cached_majorant = K_max
+        return K_max / p.volume * p.n_active * (p.n_active - 1) / 2
+    end
+
+    affect! = (integrator) -> begin
+        u = integrator.u
+        p = integrator.p
+        N = p.n_active
+        if N < 2
+            return nothing
+        end
+
+        i = rand(1:N)
+        j = rand(1:(N - 1))
+        j = j >= i ? j + 1 : j
+
+        A_val = species_val(p)
+        μ_i = get_particle(u, i, A_val)
+        μ_j = get_particle(u, j, A_val)
+
+        K_actual = kernel(μ_i, μ_j)
+        K_max = p._cached_majorant
+        if K_max > 0 && rand() < K_actual / K_max
+            non_cnmc_coagulate!(u, p, A_val, i, j)
+        end
+        return nothing
     end
 
     return ConstantRateJump(rate, affect!)

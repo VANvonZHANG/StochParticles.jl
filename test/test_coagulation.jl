@@ -181,3 +181,61 @@ end
         @test conc_after ≈ conc_before rtol=1e-10
     end
 end
+
+@testset "NonCNMCCoagulationProcess" begin
+    @testset "provides no drift" begin
+        kernel = BrownianKernel(293.15, 101325.0, SVector(1000.0))
+        proc = NonCNMCCoagulationProcess(kernel, GlobalMajorant())
+        @test provides_drift(proc) == false
+    end
+
+    @testset "merge decrements active count without rescaling volume" begin
+        A = 2
+        u = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+        gas_fn = t -> SVector(0.0, 0.0)
+        sys = ParticleSystem(Val(A), 3, 2.0, gas_fn)
+        mass_before = total_mass(u, Val(A), sys.n_active)
+        volume_before = sys.volume
+
+        StochParticles.non_cnmc_coagulate!(u, sys, Val(A), 1, 2)
+
+        @test sys.n_active == 2
+        @test sys.volume == volume_before
+        @test get_particle(u, 1, Val(A)) == SVector(4.0, 6.0)
+        @test get_particle(u, 2, Val(A)) == SVector(5.0, 6.0)
+        @test get_particle(u, 3, Val(A)) == SVector(0.0, 0.0)
+        @test total_mass(u, Val(A), sys.n_active) ≈ mass_before
+    end
+
+    @testset "merge clears last active slot when removing the last particle" begin
+        A = 1
+        u = [1.0, 2.0, 3.0]
+        gas_fn = t -> SVector(0.0)
+        sys = ParticleSystem(Val(A), 3, 1.0, gas_fn)
+        mass_before = total_mass(u, Val(A), sys.n_active)
+
+        StochParticles.non_cnmc_coagulate!(u, sys, Val(A), 1, 3)
+
+        @test sys.n_active == 2
+        @test get_particle(u, 1, Val(A)) == SVector(4.0)
+        @test get_particle(u, 2, Val(A)) == SVector(2.0)
+        @test get_particle(u, 3, Val(A)) == SVector(0.0)
+        @test total_mass(u, Val(A), sys.n_active) ≈ mass_before
+    end
+
+    @testset "non-CNMC jump stops below two active particles" begin
+        kernel = BrownianKernel(293.15, 101325.0, SVector(1000.0))
+        sampling = GlobalMajorant()
+        gas_fn = t -> SVector(0.0)
+        sys = ParticleSystem(Val(1), 3, 1.0, gas_fn)
+        sys.n_active = 1
+        u = [1.0, 0.0, 0.0]
+        jump = make_non_cnmc_coagulation_jump(kernel, sampling)
+
+        @test jump.rate(u, sys, 0.0) == 0.0
+        mock_int = MockIntegrator(u, sys, 0.0)
+        jump.affect!(mock_int)
+        @test sys.n_active == 1
+        @test mock_int.u == u
+    end
+end

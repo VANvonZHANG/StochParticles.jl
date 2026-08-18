@@ -16,6 +16,7 @@ import numpy as np
 from matplotlib.colors import Normalize
 
 from analysis.coagulation_analysis import (
+    effective_number_loss_rate,
     kernel_fraction_series,
     kernel_total_bars,
     normalized_number,
@@ -58,8 +59,8 @@ PANEL_PATHS = {
     "d": PANEL_DIR / "d_aerosol_distribution_shift.png",
     "e": PANEL_DIR / "e_cloud_number_decay.png",
     "f": PANEL_DIR / "f_cloud_spectrum_heatmap.png",
-    "g": PANEL_DIR / "g_cloud_kernel_fraction_timeseries.png",
-    "h": PANEL_DIR / "h_cloud_kernel_total_bar.png",
+    "g": PANEL_DIR / "g_relative_kernel_strength.png",
+    "h": PANEL_DIR / "h_kernel_composition.png",
 }
 
 KERNEL_COLORS = {
@@ -202,9 +203,23 @@ def _distribution_shift_rows(
     return np.vstack(initial_rows), np.vstack(final_rows)
 
 
+def _initial_final_max_diameters_um(reps: list[ReplicateData]) -> tuple[np.ndarray, np.ndarray]:
+    initial_max = []
+    final_max = []
+    for rep in reps:
+        samples_by_time = clean_sample_matrix(rep.arrays["diameter_samples"])
+        initial = samples_by_time[0]
+        final = samples_by_time[-1]
+        if initial.size and final.size:
+            initial_max.append(float(np.max(initial) * 1e6))
+            final_max.append(float(np.max(final) * 1e6))
+    return np.asarray(initial_max), np.asarray(final_max)
+
+
 def plot_distribution_shift(ax, reps: list[ReplicateData]):
     grid = _diameter_grid(reps)
     initial_rows, final_rows = _distribution_shift_rows(reps, grid)
+    initial_max_um, final_max_um = _initial_final_max_diameters_um(reps)
     diameter_um = grid * 1e6
     draw_replicates_with_mean(
         ax,
@@ -221,52 +236,145 @@ def plot_distribution_shift(ax, reps: list[ReplicateData]):
         "Final",
     )
     ax.set_xscale("log")
-    ax.set_xlabel("Diameter (um)")
-    ax.set_ylabel("KDE number density (m$^{-3}$)")
-    ax.grid(True, which="both", color="#d9d9d9", lw=0.45, alpha=0.65)
-    ax.legend(loc="best")
-
-
-def plot_kernel_fraction_timeseries(ax, reps: list[ReplicateData]):
-    time, series = kernel_fraction_series(reps)
-    for label in ("Brownian", "Gravitational", "Turbulent"):
-        draw_replicates_with_mean(
-            ax,
-            time,
-            series[label],
-            KERNEL_COLORS[label],
-            label,
-            lw_mean=1.65,
+    if initial_max_um.size and final_max_um.size:
+        initial_mean = float(np.mean(initial_max_um))
+        final_mean = float(np.mean(final_max_um))
+        ax.axvline(
+            initial_mean,
+            color=PALETTE["neutral"],
+            lw=1.0,
+            ls=":",
+            alpha=0.9,
+            label="_nolegend_",
         )
-    _style_time_series_axis(ax, "Time (s)", "Kernel fraction", ylim=(-0.02, 1.02))
-    ax.legend(loc="best", ncols=1)
+        ax.axvline(
+            final_mean,
+            color=PALETTE["aerosol"],
+            lw=1.2,
+            ls=":",
+            alpha=0.95,
+            label="_nolegend_",
+        )
+        ax.plot(
+            final_max_um,
+            np.full_like(final_max_um, 0.04),
+            "|",
+            color=PALETTE["aerosol"],
+            ms=8,
+            mew=0.8,
+            alpha=0.45,
+            transform=ax.get_xaxis_transform(),
+            clip_on=False,
+        )
+        ax.text(
+            0.04,
+            0.91,
+            f"max D: {initial_mean:.3f} -> {final_mean:.3f} um",
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            color="#333333",
+            fontsize=6.5,
+        )
+    ax.set_xlabel("Diameter (um)")
+    ax.set_ylabel("KDE number density (m$^{-3}$ dex$^{-1}$)")
+    ax.grid(True, which="both", color="#d9d9d9", lw=0.45, alpha=0.65)
+    ax.legend(loc="upper right")
 
 
-def plot_kernel_total_bar(ax, reps: list[ReplicateData]):
-    totals = kernel_total_bars(reps)
-    labels = ["Brownian", "Gravitational", "Turbulent"]
-    x = np.arange(len(labels))
-    rows = [np.asarray(totals[label], dtype=float) for label in labels]
+def plot_relative_kernel_strength(
+    ax, aerosol_reps: list[ReplicateData], cloud_reps: list[ReplicateData]
+):
+    aerosol_rates = effective_number_loss_rate(aerosol_reps)
+    cloud_rates = effective_number_loss_rate(cloud_reps)
+    baseline = float(np.nanmean(aerosol_rates))
+    if not np.isfinite(baseline) or baseline <= 0.0:
+        baseline = 1.0
+
+    rows = [
+        np.asarray(aerosol_rates / baseline, dtype=float),
+        np.asarray(cloud_rates / baseline, dtype=float),
+    ]
     means = [float(np.nanmean(row)) for row in rows]
-    colors = [KERNEL_COLORS[label] for label in labels]
+    colors = [PALETTE["aerosol"], PALETTE["cloud"]]
+    labels = ["Aerosol", "Cloud"]
+    x = np.arange(len(labels))
 
-    ax.bar(x, means, color=colors, alpha=0.82, width=0.62, edgecolor="white", linewidth=0.6)
+    ax.bar(x, means, color=colors, alpha=0.82, width=0.58, edgecolor="white", linewidth=0.6)
     for idx, row in enumerate(rows):
-        offsets = np.zeros(row.size) if row.size == 1 else np.linspace(-0.12, 0.12, row.size)
+        finite = row[np.isfinite(row)]
+        offsets = np.zeros(finite.size) if finite.size == 1 else np.linspace(-0.10, 0.10, finite.size)
         ax.scatter(
-            np.full(row.size, x[idx]) + offsets,
-            row,
-            s=14,
+            np.full(finite.size, x[idx]) + offsets,
+            finite,
+            s=13,
             facecolor="white",
             edgecolor=colors[idx],
             linewidth=0.75,
             zorder=3,
         )
+
+    ax.set_yscale("log")
     ax.set_xticks(x)
-    ax.set_xticklabels(labels, rotation=20, ha="right")
-    ax.set_ylabel("Time-averaged fraction")
-    ax.set_ylim(0.0, 1.05)
+    ax.set_xticklabels(labels)
+    ax.set_ylabel("Relative effective kernel strength")
+    ax.set_title("Relative kernel strength", pad=4)
+    ax.grid(True, axis="y", which="both", color="#d9d9d9", lw=0.45, alpha=0.7)
+
+
+def _kernel_composition_rows(cloud_reps: list[ReplicateData]) -> dict[str, np.ndarray]:
+    cloud_totals = kernel_total_bars(cloud_reps)
+    n_reps = max(len(cloud_reps), 1)
+    return {
+        "Brownian": np.concatenate(
+            [np.ones(1, dtype=float), np.asarray(cloud_totals["Brownian"], dtype=float)]
+        ),
+        "Gravitational": np.concatenate(
+            [np.zeros(1, dtype=float), np.asarray(cloud_totals["Gravitational"], dtype=float)]
+        ),
+        "Turbulent": np.concatenate(
+            [np.zeros(1, dtype=float), np.asarray(cloud_totals["Turbulent"], dtype=float)]
+        ),
+        "_case_index": np.concatenate([np.zeros(1, dtype=int), np.ones(n_reps, dtype=int)]),
+    }
+
+
+def plot_kernel_composition(ax, cloud_reps: list[ReplicateData]):
+    labels = ["Aerosol", "Cloud"]
+    components = ["Brownian", "Gravitational", "Turbulent"]
+    rows = _kernel_composition_rows(cloud_reps)
+    case_index = rows["_case_index"]
+    x = np.arange(len(labels))
+    bottom = np.zeros(len(labels), dtype=float)
+
+    for component in components:
+        values = np.asarray(rows[component], dtype=float)
+        means = np.array(
+            [
+                float(np.nanmean(values[case_index == case_idx]))
+                for case_idx in range(len(labels))
+            ]
+        )
+        ax.bar(
+            x,
+            means,
+            bottom=bottom,
+            color=KERNEL_COLORS[component],
+            alpha=0.86,
+            width=0.58,
+            edgecolor="white",
+            linewidth=0.6,
+            label=component,
+        )
+        bottom += means
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels)
+    ax.set_ylabel("Time-averaged kernel fraction")
+    ax.set_ylim(0.0, 1.02)
+    ax.set_title("Kernel composition", pad=4)
     ax.grid(True, axis="y", color="#d9d9d9", lw=0.45, alpha=0.7)
+    ax.legend(loc="upper right", frameon=False)
 
 
 def _finish_standalone(fig, ax, label: str, path):
@@ -332,8 +440,8 @@ def save_standalone_panels(aerosol_reps: list[ReplicateData], cloud_reps: list[R
                 xlabel="Time (s)",
             ),
         ),
-        ("g", lambda ax, fig: plot_kernel_fraction_timeseries(ax, cloud_reps)),
-        ("h", lambda ax, fig: plot_kernel_total_bar(ax, cloud_reps)),
+        ("g", lambda ax, fig: plot_relative_kernel_strength(ax, aerosol_reps, cloud_reps)),
+        ("h", lambda ax, fig: plot_kernel_composition(ax, cloud_reps)),
     ]
 
     for label, plotter in panel_specs:
@@ -398,8 +506,8 @@ def save_composite(aerosol_reps: list[ReplicateData], cloud_reps: list[Replicate
         time_scale=1.0,
         xlabel="Time (s)",
     )
-    plot_kernel_fraction_timeseries(axes["g"], cloud_reps)
-    plot_kernel_total_bar(axes["h"], cloud_reps)
+    plot_relative_kernel_strength(axes["g"], aerosol_reps, cloud_reps)
+    plot_kernel_composition(axes["h"], cloud_reps)
 
     for label, ax in axes.items():
         add_panel_label(ax, label)

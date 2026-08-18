@@ -54,3 +54,23 @@ def kernel_total_bars(reps: list[ReplicateData]) -> dict[str, np.ndarray]:
         else:
             totals[label] = np.nanmean(rows, axis=1)
     return totals
+
+
+def effective_number_loss_rate(reps: list[ReplicateData]) -> np.ndarray:
+    """Return replicate-level first-order number-loss rates [s^-1]."""
+
+    rates = []
+    for rep in reps:
+        time = np.asarray(rep.arrays["time"], dtype=float)
+        number = np.asarray(rep.arrays["number_concentration"], dtype=float)
+        if time.size < 2 or number.size < 2:
+            rates.append(np.nan)
+            continue
+        n0 = float(number[0])
+        n1 = float(number[-1])
+        duration = float(time[-1] - time[0])
+        if n0 <= 0.0 or n1 <= 0.0 or duration <= 0.0:
+            rates.append(np.nan)
+            continue
+        rates.append(-np.log(n1 / n0) / duration)
+    return np.asarray(rates, dtype=float)

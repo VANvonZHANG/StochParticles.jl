@@ -16,7 +16,7 @@ Fields:
 - `n_active::Int` — current number of active particles
 - `volume::Float64` — computational volume V_comp(t)
 - `gas_phase::F` — external function g(t) returning gas-phase concentrations
-- `n_sim::Int` — target particle count for CNMC
+- `n_sim::Int` — particle capacity; also the target particle count for CNMC
 - `_mass_total_cache::Float64` — internal: cached total mass for CNMC volume rescale
 - `_cached_majorant::Float64` — internal: cached K_max for coagulation accept/reject
 """
@@ -32,7 +32,8 @@ end
 """
     ParticleSystem(::Val{A}, n_sim, volume, gas_phase_fn)
 
-Construct a ParticleSystem with `n_sim` active particles.
+Construct a ParticleSystem with `n_sim` active particles and capacity for
+`n_sim` particle slots.
 """
 function ParticleSystem(::Val{A}, n_sim::Int, volume::Float64, gas_phase_fn::F) where {A, F}
     ParticleSystem{A, F}(n_sim, volume, gas_phase_fn, n_sim, 0.0, 0.0)
