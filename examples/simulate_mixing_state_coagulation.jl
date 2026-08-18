@@ -11,7 +11,7 @@ const TIME_MAJOR_COMPAT_DATASETS = Set([
     "bc_mass_fraction_samples",
     "diameter_samples",
     "size_distribution_raw",
-    "species_mass_concentration",
+    "species_mass_concentration"
 ])
 
 function write_datasets_compat_group!(rep_group)
@@ -21,8 +21,8 @@ function write_datasets_compat_group!(rep_group)
         obj = rep_group[name]
         if obj isa HDF5.Dataset
             data = read(obj)
-            datasets_group[name] =
-                name in TIME_MAJOR_COMPAT_DATASETS && ndims(data) == 2 ? permutedims(data) : data
+            datasets_group[name] = name in TIME_MAJOR_COMPAT_DATASETS && ndims(data) == 2 ?
+                                   permutedims(data) : data
         end
     end
     return datasets_group
@@ -35,8 +35,7 @@ function overwrite_initial_diameter_datasets!(rep_group, diameter_initial, bin_e
     rep_group["median_diameter"][1] = summary.median
     rep_group["p90_diameter"][1] = summary.p90
     rep_group["diameter_samples"][1, :] = diameters
-    rep_group["size_distribution_raw"][1, :] =
-        dNdlogD_from_diameters(diameters, bin_edges, volume)
+    rep_group["size_distribution_raw"][1, :] = dNdlogD_from_diameters(diameters, bin_edges, volume)
     return nothing
 end
 
@@ -56,7 +55,8 @@ Base.@kwdef struct MixingStateCoagulationConfig
     notes::String = "SO4/BC external-to-internal mixing by Brownian coagulation."
 end
 
-function early_dense_then_regular_saveat(t_start, dense_end, t_end, dense_step, regular_step)
+function early_dense_then_regular_saveat(
+        t_start, dense_end, t_end, dense_step, regular_step)
     dense_times = collect(t_start:dense_step:dense_end)
     regular_times = collect((dense_end + regular_step):regular_step:t_end)
     return vcat(dense_times, regular_times)
@@ -93,14 +93,14 @@ function initial_mixing_particles(cfg::MixingStateCoagulationConfig, seed)
         1.0e-7,
         1.5,
         cfg.densities;
-        fractions = SVector(1.0, 0.0),
+        fractions = SVector(1.0, 0.0)
     )
     bc_particles = lognormal_masses(
         n_bc,
         5.0e-8,
         1.3,
         cfg.densities;
-        fractions = SVector(0.0, 1.0),
+        fractions = SVector(0.0, 1.0)
     )
     return vcat(so4_particles, bc_particles)
 end
@@ -177,7 +177,7 @@ function mixing_state_record(t, particles, active_particles, cfg::MixingStateCoa
         diameter_samples = diameters,
         size_distribution_raw = dNdlogD_from_diameters(diameters, cfg.bin_edges, cfg.volume),
         mixing_state_index = direct_mixing_state_index(particles, active_particles),
-        bc_mass_fraction_samples = bc_mass_fraction_samples(particles, active_particles),
+        bc_mass_fraction_samples = bc_mass_fraction_samples(particles, active_particles)
     )
 end
 
@@ -185,7 +185,8 @@ function pair_kernel_value(kernel, μ_i, μ_j)
     return max(kernel(μ_i, μ_j), 0.0)
 end
 
-function initialize_kernel_cache!(kernel_cache, row_sums, particles, active_particles, kernel)
+function initialize_kernel_cache!(
+        kernel_cache, row_sums, particles, active_particles, kernel)
     fill!(kernel_cache, 0.0)
     fill!(row_sums, 0.0)
     total = 0.0
@@ -203,7 +204,8 @@ function initialize_kernel_cache!(kernel_cache, row_sums, particles, active_part
     return total
 end
 
-function refresh_cache_index!(kernel_cache, row_sums, particles, active_particles, kernel, idx)
+function refresh_cache_index!(
+        kernel_cache, row_sums, particles, active_particles, kernel, idx)
     if idx < 1 || idx > active_particles
         return nothing
     end
@@ -275,7 +277,8 @@ function update_after_coagulation!(
 
     refresh_cache_index!(kernel_cache, row_sums, particles, new_active_particles, kernel, i)
     if j <= new_active_particles
-        refresh_cache_index!(kernel_cache, row_sums, particles, new_active_particles, kernel, j)
+        refresh_cache_index!(
+            kernel_cache, row_sums, particles, new_active_particles, kernel, j)
     end
 
     return new_active_particles
@@ -328,7 +331,7 @@ function case_attributes(cfg::MixingStateCoagulationConfig)
         "t_start" => Float64(cfg.tspan[1]),
         "t_end" => Float64(cfg.tspan[2]),
         "saveat" => cfg.saveat,
-        "notes" => cfg.notes,
+        "notes" => cfg.notes
     )
 end
 
@@ -343,7 +346,7 @@ function run_replicate!(case_group, cfg::MixingStateCoagulationConfig, replicate
     seed_attrs = Dict{String, Any}(
         "initial_seed" => cfg.initial_seed,
         "process_seed" => process_seed,
-        "seed" => process_seed,
+        "seed" => process_seed
     )
     _write_attrs!(rep_group, seed_attrs)
     write_records_common!(
@@ -352,7 +355,7 @@ function run_replicate!(case_group, cfg::MixingStateCoagulationConfig, replicate
         cfg.n_sim,
         cfg.bin_edges;
         dry_diameter_initial = dry_diameter_initial,
-        extra_attrs = seed_attrs,
+        extra_attrs = seed_attrs
     )
     overwrite_initial_diameter_datasets!(
         rep_group, dry_diameter_initial, cfg.bin_edges, cfg.volume)
@@ -368,14 +371,14 @@ function main()
         h5_path;
         scene_name = MIXING_BASENAME,
         n_replicates = n_replicates,
-        notes = cfg.notes,
+        notes = cfg.notes
     )
 
     h5open(h5_path, "r+") do file
         case_group = ensure_case_group(
             file,
             MIXING_BASENAME;
-            attrs_dict = case_attributes(cfg),
+            attrs_dict = case_attributes(cfg)
         )
         for replicate_idx in 1:n_replicates
             run_replicate!(case_group, cfg, replicate_idx)

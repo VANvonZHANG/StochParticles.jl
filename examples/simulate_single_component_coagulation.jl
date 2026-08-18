@@ -12,7 +12,7 @@ const SINGLE_COMPONENT_DEFAULT_N_SIM = 1000
 const TIME_MAJOR_COMPAT_DATASETS = Set([
     "diameter_samples",
     "size_distribution_raw",
-    "species_mass_concentration",
+    "species_mass_concentration"
 ])
 
 function write_datasets_compat_group!(rep_group)
@@ -22,8 +22,8 @@ function write_datasets_compat_group!(rep_group)
         obj = rep_group[name]
         if obj isa HDF5.Dataset
             data = read(obj)
-            datasets_group[name] =
-                name in TIME_MAJOR_COMPAT_DATASETS && ndims(data) == 2 ? permutedims(data) : data
+            datasets_group[name] = name in TIME_MAJOR_COMPAT_DATASETS && ndims(data) == 2 ?
+                                   permutedims(data) : data
         end
     end
     return datasets_group
@@ -36,8 +36,7 @@ function overwrite_initial_diameter_datasets!(rep_group, diameter_initial, bin_e
     rep_group["median_diameter"][1] = summary.median
     rep_group["p90_diameter"][1] = summary.p90
     rep_group["diameter_samples"][1, :] = diameters
-    rep_group["size_distribution_raw"][1, :] =
-        dNdlogD_from_diameters(diameters, bin_edges, volume)
+    rep_group["size_distribution_raw"][1, :] = dNdlogD_from_diameters(diameters, bin_edges, volume)
     return nothing
 end
 
@@ -91,7 +90,8 @@ function single_component_n_sim(default::Int = SINGLE_COMPONENT_DEFAULT_N_SIM)
     return n_sim
 end
 
-function early_dense_then_regular_saveat(t_start, dense_end, t_end, dense_step, regular_step)
+function early_dense_then_regular_saveat(
+        t_start, dense_end, t_end, dense_step, regular_step)
     dense_times = collect(t_start:dense_step:dense_end)
     regular_times = collect((dense_end + regular_step):regular_step:t_end)
     return vcat(dense_times, regular_times)
@@ -107,7 +107,7 @@ function case_attributes(cfg)
         "t_start" => Float64(cfg.tspan[1]),
         "t_end" => Float64(cfg.tspan[2]),
         "saveat" => cfg.saveat,
-        "notes" => cfg.notes,
+        "notes" => cfg.notes
     )
 end
 
@@ -132,7 +132,7 @@ function build_aerosol_case()
             initial_particles(n_sim, 5.0e-9, 1.5, 1.0e-7, 1.5, 1800.0)
         end,
         build_kernel = () -> BrownianKernel(params.T, params.p, densities),
-        kernel_parts = nothing,
+        kernel_parts = nothing
     )
 end
 
@@ -164,7 +164,7 @@ function build_cloud_case()
             initial_particles(n_sim, 5.0e-6, 1.3, 2.5e-5, 1.3, 1000.0)
         end,
         build_kernel = () -> make_kernel(params, 0.01, 50.0, densities),
-        kernel_parts = () -> parts,
+        kernel_parts = () -> parts
     )
 end
 
@@ -211,16 +211,18 @@ function coagulation_record(t, masses, active_particles, cfg, component_sums)
         median_diameter = summary.median,
         p90_diameter = summary.p90,
         diameter_samples = diameters,
-        size_distribution_raw = dNdlogD_from_diameters(diameters, cfg.bin_edges, cfg.volume),
+        size_distribution_raw = dNdlogD_from_diameters(diameters, cfg.bin_edges, cfg.volume)
     )
 
     component_sums === nothing && return base
-    brownian_frac, gravitational_frac, turbulent_frac = kernel_fraction_triplet(component_sums)
-    return merge_record(base, (
-        kernel_fraction_brownian = brownian_frac,
-        kernel_fraction_gravitational = gravitational_frac,
-        kernel_fraction_turbulent = turbulent_frac,
-    ))
+    brownian_frac, gravitational_frac,
+    turbulent_frac = kernel_fraction_triplet(component_sums)
+    return merge_record(base,
+        (
+            kernel_fraction_brownian = brownian_frac,
+            kernel_fraction_gravitational = gravitational_frac,
+            kernel_fraction_turbulent = turbulent_frac
+        ))
 end
 
 function pair_kernel_value(kernel, mass_i, mass_j)
@@ -278,7 +280,7 @@ function component_sums_from_caches(component_caches, active_particles)
     return (
         sum_upper(component_caches[1], active_particles),
         sum_upper(component_caches[2], active_particles),
-        sum_upper(component_caches[3], active_particles),
+        sum_upper(component_caches[3], active_particles)
     )
 end
 
@@ -298,7 +300,8 @@ function refresh_cache_index!(cache, masses, active_particles, kernel, idx)
     return nothing
 end
 
-function refresh_component_cache_index!(component_caches, masses, active_particles, parts, idx)
+function refresh_component_cache_index!(
+        component_caches, masses, active_particles, parts, idx)
     kernels = (parts.brownian, parts.gravitational, parts.turbulent)
     for component_idx in eachindex(component_caches)
         refresh_cache_index!(
@@ -349,9 +352,11 @@ function update_after_coagulation!(
     end
 
     if component_caches !== nothing
-        refresh_component_cache_index!(component_caches, masses, new_active_particles, parts, i)
+        refresh_component_cache_index!(
+            component_caches, masses, new_active_particles, parts, i)
         if j <= new_active_particles
-            refresh_component_cache_index!(component_caches, masses, new_active_particles, parts, j)
+            refresh_component_cache_index!(
+                component_caches, masses, new_active_particles, parts, j)
         end
     end
 
@@ -398,7 +403,7 @@ function direct_coagulation_records(cfg, initial_masses)
                 kernel,
                 parts,
                 i,
-                j,
+                j
             )
             total_kernel_sum = sum_upper(kernel_cache, active_particles)
             if component_caches !== nothing
@@ -424,7 +429,7 @@ function run_replicate!(case_group, cfg, replicate_idx)
     seed_attrs = Dict{String, Any}(
         "initial_seed" => cfg.initial_seed,
         "process_seed" => process_seed,
-        "seed" => process_seed,
+        "seed" => process_seed
     )
     _write_attrs!(rep_group, seed_attrs)
     write_records_common!(
@@ -433,7 +438,7 @@ function run_replicate!(case_group, cfg, replicate_idx)
         cfg.n_sim,
         cfg.bin_edges;
         dry_diameter_initial = dry_diameter_initial,
-        extra_attrs = seed_attrs,
+        extra_attrs = seed_attrs
     )
     overwrite_initial_diameter_datasets!(
         rep_group, dry_diameter_initial, cfg.bin_edges, cfg.volume)
@@ -456,7 +461,7 @@ function main()
         h5_path;
         scene_name = SINGLE_COMPONENT_BASENAME,
         n_replicates = n_replicates,
-        notes = "Single-component aerosol Brownian and cloud composite coagulation simulations.",
+        notes = "Single-component aerosol Brownian and cloud composite coagulation simulations."
     )
 
     cases = (build_aerosol_case(), build_cloud_case())
