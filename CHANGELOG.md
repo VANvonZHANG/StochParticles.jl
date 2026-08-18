@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-18
+
+### Added
+
+#### Non-CNMC coagulation
+- `NonCNMCCoagulationProcess` — stochastic coagulation process without constant-number Monte Carlo resampling: accepted events merge two particles and decrement `n_active`, leaving the computational volume unchanged.
+- `make_non_cnmc_coagulation_jump(kernel, sampling)` — `ConstantRateJump` for the non-CNMC path, using a majorant rate with acceptance-rejection thinning.
+- Process wiring in `ParticleSystem` assembly and moment diagnostics for the variable-`n_active` regime.
+- Tests for the non-CNMC coagulation path and mixing-state example configuration.
+
+#### Example suite overhaul (`examples/`)
+- `simulation_io.jl` — HDF5-based simulation record export (schema `examples-v1`), data/figure directory helpers, and replicate control via `STOCHPARTICLES_EXAMPLE_REPLICATES`.
+- New simulation scripts: `simulate_single_component_coagulation.jl`, `simulate_activation_coagulation_comparison.jl`, `simulate_mixing_state_coagulation.jl`; coagulation runs via direct SSA (`direct_ssa_non_cnmc`) with dense-then-regular save schedules and configurable particle counts.
+- Python analysis package `examples/analysis/` — HDF5 reader, per-study analysis modules (coagulation, activation, mixing state), KDE smoothing, shared figure style — plus top-level plot scripts producing high-DPI PNG figures, including KDE heatmaps with an aerosol-regime zoom panel.
+
+### Changed
+
+- `number_concentration` and zeroth-moment diagnostics now use `n_active` instead of `n_sim`: identical for CNMC processes, correct number decay under non-CNMC coagulation.
+- Example HDF5 exports store time-major datasets with a compatibility group for downstream readers.
+
+### Fixed
+
+- Example exports now include the final simulation record (deduplicated coincident timestamps).
+- Replicates use fixed initial particles so replicate spread reflects stochasticity only.
+
+### Removed
+
+- Legacy example scripts (`activation_in_updraft.jl`, `aerosol_brownian_coagulation.jl`, `cloud_droplet_turbulent_coagulation.jl`, `compare_distribution_methods.jl`, `mixing_state_coagulation.jl`, and the mixed PDMP demonstration) together with their ad-hoc Python analysis scripts, replaced by the new example suite.
+
 ## [0.5.0] - 2026-06-08
 
 ### Added
@@ -189,3 +218,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.3.0]: https://github.com/VANvonZHANG/StochParticles.jl/releases/tag/v0.3.0
 [0.4.0]: https://github.com/VANvonZHANG/StochParticles.jl/releases/tag/v0.4.0
 [0.5.0]: https://github.com/VANvonZHANG/StochParticles.jl/releases/tag/v0.5.0
+[0.6.0]: https://github.com/VANvonZHANG/StochParticles.jl/releases/tag/v0.6.0
