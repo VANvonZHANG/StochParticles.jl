@@ -155,3 +155,84 @@ def critical_supersaturations(
         b = np.where(take_right, b, d)
     r_opt = 0.5 * (a + b)
     return np.maximum(_kohler_supersaturation(r_opt, v_dry, kappas, temperature), 0.0)
+
+
+CCN_SUPERSSATURATIONS = (0.001, 0.003, 0.01)
+
+
+def _active_samples(rep: ReplicateData, row_index: int) -> tuple[np.ndarray, np.ndarray]:
+    """(diameters, BC mass fractions) of active particles at one time row."""
+
+    diameters = np.asarray(rep.arrays["diameter_samples"], dtype=float)
+    fractions = np.asarray(rep.arrays["bc_mass_fraction_samples"], dtype=float)
+    d_row = diameters[row_index, :] if diameters.ndim == 2 else diameters
+    f_row = fractions[row_index, :] if fractions.ndim == 2 else fractions
+    n = min(d_row.size, f_row.size)
+    d_row = np.ravel(d_row)[:n]
+    f_row = np.ravel(f_row)[:n]
+    mask = (
+        np.isfinite(d_row)
+        & (d_row > 0.0)
+        & np.isfinite(f_row)
+        & (f_row >= 0.0)
+        & (f_row <= 1.0)
+    )
+    return d_row[mask], f_row[mask]
+
+
+def _n_times(reps: list[ReplicateData]) -> int:
+    return np.asarray(reps[0].arrays["time"], dtype=float).size
+
+
+def _series_on_common_time(
+    reps: list[ReplicateData], errors: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    common_time = np.asarray(reps[0].arrays["time"], dtype=float)
+    for rep_idx, rep in enumerate(reps):
+        time = np.asarray(rep.arrays["time"], dtype=float)
+        if not np.array_equal(time, common_time):
+            aligned = np.empty((errors.shape[1], common_time.size), dtype=float)
+            for row in range(errors.shape[1]):
+                aligned[row] = np.interp(common_time, time, errors[rep_idx, row])
+            errors[rep_idx] = aligned
+    return common_time, errors
+
+
+def ccn_error_series(
+    reps: list[ReplicateData],
+    supersaturations: tuple[float, ...] = CCN_SUPERSSATURATIONS,
+    temperature: float = TEMPERATURE,
+) -> tuple[np.ndarray, np.ndarray]:
+    """CCN mixing-state error (Riemer et al. 2019): relative error in CCN number
+    when every particle is assumed to carry the bulk volume-weighted kappa.
+
+    Returns (time, errors) with errors shaped (n_reps, n_supersaturations, n_time);
+    NaN where the actual CCN number is zero.
+    """
+
+    supersaturations = np.asarray(supersaturations, dtype=float)
+    errors = np.full((len(reps), supersaturations.size, _n_times(reps)), np.nan)
+    for rep_idx, rep in enumerate(reps):
+        n_time = np.asarray(rep.arrays["time"], dtype=float).size
+        for t_idx in range(n_time):
+            diameters, fractions = _active_samples(rep, t_idx)
+            if diameters.size == 0:
+                continue
+            kappas = particle_kappas(diameters, fractions)
+            v_so4, v_bc = particle_species_volumes(diameters, fractions)
+            kappa_bulk = (
+                SPECIES_KAPPA[0] * v_so4.sum() + SPECIES_KAPPA[1] * v_bc.sum()
+            ) / (v_so4.sum() + v_bc.sum())
+            sc_actual = critical_supersaturations(diameters, kappas, temperature)
+            sc_internal = critical_supersaturations(
+                diameters, np.full_like(kappas, kappa_bulk), temperature
+            )
+            n_actual = (sc_actual[None, :] <= supersaturations[:, None]).sum(axis=1)
+            n_internal = (sc_internal[None, :] <= supersaturations[:, None]).sum(axis=1)
+            with np.errstate(divide="ignore", invalid="ignore"):
+                errors[rep_idx, :, t_idx] = np.where(
+                    n_actual > 0,
+                    (n_internal - n_actual) / n_actual,
+                    np.nan,
+                )
+    return _series_on_common_time(reps, errors)
