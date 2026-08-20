@@ -249,7 +249,7 @@ def plot_ccn_error(ax, reps: list[ReplicateData]) -> None:
         )
     ax.axhline(0.0, color="#555555", lw=0.7, alpha=0.8)
     _style_time_axis(ax, "CCN error $\\varepsilon_{CCN}$")
-    ax.legend(loc="upper right", ncols=3)
+    ax.legend(loc="upper right")
 
 
 def plot_optical_error(ax, reps: list[ReplicateData]) -> None:
@@ -262,7 +262,7 @@ def plot_optical_error(ax, reps: list[ReplicateData]) -> None:
     )
     ax.axhline(0.0, color="#555555", lw=0.7, alpha=0.8)
     _style_time_axis(ax, "Optical error $\\varepsilon$ (550 nm)")
-    ax.legend(loc="upper right", ncols=2)
+    ax.legend(loc="upper right")
 
 
 
