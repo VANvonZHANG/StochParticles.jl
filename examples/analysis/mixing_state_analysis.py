@@ -70,3 +70,37 @@ def final_bc_fraction(reps: list[ReplicateData]) -> list[np.ndarray]:
         row = values[-1, :] if values.ndim == 2 else values
         arrays.append(_clean_fraction_row(row))
     return arrays
+
+
+SPECIES_DENSITIES = (1770.0, 1800.0)  # (SO4, BC) kg/m³ — mirrors StochParticles.AS/BC presets
+SPECIES_KAPPA = (0.61, 0.0)  # Petters & Kreidenweis (2007) — mirrors StochParticles.AS/BC
+
+
+def particle_species_volumes(
+    diameters: np.ndarray,
+    bc_fractions: np.ndarray,
+    densities: tuple[float, float] = SPECIES_DENSITIES,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Per-particle (SO4, BC) dry volumes [m³] from dry diameter and BC mass fraction.
+
+    Volume-additive inversion: m_tot = V_dry / Σ_s f_s/ρ_s, v_s = m_tot·f_s/ρ_s.
+    """
+
+    rho_so4, rho_bc = densities
+    f_bc = np.asarray(bc_fractions, dtype=float)
+    f_so4 = 1.0 - f_bc
+    v_dry = np.pi * np.asarray(diameters, dtype=float) ** 3 / 6.0
+    m_tot = v_dry / (f_so4 / rho_so4 + f_bc / rho_bc)
+    return m_tot * f_so4 / rho_so4, m_tot * f_bc / rho_bc
+
+
+def particle_kappas(
+    diameters: np.ndarray,
+    bc_fractions: np.ndarray,
+    kappa: tuple[float, float] = SPECIES_KAPPA,
+    densities: tuple[float, float] = SPECIES_DENSITIES,
+) -> np.ndarray:
+    """Volume-weighted hygroscopicity per particle (mirrors StochParticles.water_activity)."""
+
+    v_so4, v_bc = particle_species_volumes(diameters, bc_fractions, densities)
+    return (kappa[0] * v_so4 + kappa[1] * v_bc) / (v_so4 + v_bc)
