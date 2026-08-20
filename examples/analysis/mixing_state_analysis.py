@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+import PyMieScatt
 
 from .stochparticles_io import (
     ReplicateData,
@@ -234,5 +235,82 @@ def ccn_error_series(
                     n_actual > 0,
                     (n_internal - n_actual) / n_actual,
                     np.nan,
+                )
+    return _series_on_common_time(reps, errors)
+
+
+OPTICAL_WAVELENGTH = 550e-9  # m
+REFRACTIVE_INDICES = {
+    "so4": 1.53 + 0j,           # ammonium sulfate
+    "bc": 1.95 + 0.79j,         # Bond & Bergstrom (2006)
+}
+
+
+def _particle_cross_sections(
+    diameters: np.ndarray, core_volumes: np.ndarray, shell_volumes: np.ndarray,
+    wavelength: float = OPTICAL_WAVELENGTH,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Per-particle (C_abs, C_sca) [m²] for a BC core / SO4 shell sphere.
+
+    Pure particles (zero core or zero shell volume) use the homogeneous-sphere
+    MieQ; mixed particles use MieQCoreShell. All calls are per-particle scalars.
+    """
+
+    diameters = np.asarray(diameters, dtype=float)
+    total = np.asarray(core_volumes, dtype=float) + np.asarray(shell_volumes, dtype=float)
+    c_abs = np.zeros(diameters.size)
+    c_sca = np.zeros(diameters.size)
+    for i in range(diameters.size):
+        d_total = diameters[i]
+        area = np.pi * (0.5 * d_total) ** 2
+        if core_volumes[i] <= 0.0:
+            q = PyMieScatt.MieQ(REFRACTIVE_INDICES["so4"], wavelength, d_total, asDict=True)
+        elif shell_volumes[i] <= 0.0:
+            q = PyMieScatt.MieQ(REFRACTIVE_INDICES["bc"], wavelength, d_total, asDict=True)
+        else:
+            d_core = d_total * (core_volumes[i] / total[i]) ** (1.0 / 3.0)
+            q = PyMieScatt.MieQCoreShell(
+                REFRACTIVE_INDICES["bc"], REFRACTIVE_INDICES["so4"],
+                wavelength, d_core, d_total, asDict=True,
+            )
+        c_abs[i] = q["Qabs"] * area
+        c_sca[i] = q["Qsca"] * area
+    return c_abs, c_sca
+
+
+def optical_error_series(
+    reps: list[ReplicateData],
+    wavelength: float = OPTICAL_WAVELENGTH,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Optical mixing-state error: relative error in bulk absorption/scattering
+    when every particle is assumed to carry the bulk BC volume fraction as a
+    BC core / SO4 shell (actual sizes kept).
+
+    Returns (time, errors) with errors shaped (n_reps, 2, n_time):
+    row 0 = ε_abs, row 1 = ε_sca; NaN where the actual coefficient is zero.
+    """
+
+    errors = np.full((len(reps), 2, _n_times(reps)), np.nan)
+    for rep_idx, rep in enumerate(reps):
+        n_time = np.asarray(rep.arrays["time"], dtype=float).size
+        for t_idx in range(n_time):
+            diameters, fractions = _active_samples(rep, t_idx)
+            if diameters.size == 0:
+                continue
+            v_so4, v_bc = particle_species_volumes(diameters, fractions)
+            v_total = v_so4 + v_bc
+            c_abs_a, c_sca_a = _particle_cross_sections(diameters, v_bc, v_so4, wavelength)
+            bc_bulk = v_bc.sum() / v_total.sum()
+            c_abs_i, c_sca_i = _particle_cross_sections(
+                diameters, bc_bulk * v_total, (1.0 - bc_bulk) * v_total, wavelength
+            )
+            with np.errstate(divide="ignore", invalid="ignore"):
+                errors[rep_idx, 0, t_idx] = (
+                    (c_abs_i.sum() - c_abs_a.sum()) / c_abs_a.sum()
+                    if c_abs_a.sum() > 0 else np.nan
+                )
+                errors[rep_idx, 1, t_idx] = (
+                    (c_sca_i.sum() - c_sca_a.sum()) / c_sca_a.sum()
+                    if c_sca_a.sum() > 0 else np.nan
                 )
     return _series_on_common_time(reps, errors)
