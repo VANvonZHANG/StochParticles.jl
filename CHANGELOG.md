@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### Mixing-state impact metrics (`examples/`)
+- `ccn_error_series` in `examples/analysis/mixing_state_analysis.py`: ε-type CCN mixing-state metric (Riemer et al. 2019) — relative error in CCN number under a fully-internal-mixture assumption, using a vectorized numpy port of the exact κ-Köhler `critical_supersaturation` maximization.
+- `optical_error_series` in `examples/analysis/mixing_state_analysis.py`: relative error in bulk absorption/scattering at 550 nm under the same assumption, computed with PyMieScatt core-shell Mie (BC core / sulfate shell; new analysis dependency).
+- Mixing-state figure: mass-conservation and composition-PDF panels replaced by ε_CCN (S = 0.1/0.3/1.0%) and ε_optical (ε_abs, ε_sca) panels.
+
 ## [0.6.0] - 2026-08-18
 
 ### Added
