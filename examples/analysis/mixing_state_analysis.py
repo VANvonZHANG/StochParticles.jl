@@ -104,3 +104,54 @@ def particle_kappas(
 
     v_so4, v_bc = particle_species_volumes(diameters, bc_fractions, densities)
     return (kappa[0] * v_so4 + kappa[1] * v_bc) / (v_so4 + v_bc)
+
+
+KOEHLER_PARAMS = {"sigma": 0.072, "rho_w": 1000.0, "R_v": 461.5}  # mirrors ThermodynamicsParams
+TEMPERATURE = 298.0
+
+
+def _kohler_supersaturation(radius, v_dry, kappa_mix, temperature):
+    v_w = (4.0 / 3.0) * np.pi * radius**3 - v_dry
+    with np.errstate(divide="ignore", invalid="ignore"):
+        a_w = v_w / (v_w + kappa_mix * v_dry)
+        kelvin = np.exp(
+            2.0 * KOEHLER_PARAMS["sigma"]
+            / (KOEHLER_PARAMS["R_v"] * temperature * KOEHLER_PARAMS["rho_w"] * radius)
+        )
+        return np.where(v_w > 0.0, a_w * kelvin - 1.0, -1.0)
+
+
+def critical_supersaturations(
+    dry_diameters: np.ndarray,
+    kappas: np.ndarray,
+    temperature: float = TEMPERATURE,
+) -> np.ndarray:
+    """Vectorized port of StochParticles.critical_supersaturation.
+
+    Golden-section maximization of the exact Koehler curve over all particles
+    at once; same bracket and iteration budget as the Julia implementation.
+    """
+
+    dry_diameters = np.asarray(dry_diameters, dtype=float)
+    kappas = np.asarray(kappas, dtype=float)
+    v_dry = np.pi * dry_diameters**3 / 6.0
+    r_dry = np.cbrt(3.0 * v_dry / (4.0 * np.pi))
+    a_kelvin = (
+        2.0 * KOEHLER_PARAMS["sigma"]
+        / (KOEHLER_PARAMS["R_v"] * temperature * KOEHLER_PARAMS["rho_w"])
+    )
+    r_c_approx = np.sqrt(3.0 * kappas * v_dry / a_kelvin)
+
+    a = r_dry * 1.001
+    b = np.maximum(r_c_approx * 10.0, r_dry * 100.0)
+    phi = (np.sqrt(5.0) - 1.0) / 2.0
+    for _ in range(100):
+        c = b - phi * (b - a)
+        d = a + phi * (b - a)
+        s_c = _kohler_supersaturation(c, v_dry, kappas, temperature)
+        s_d = _kohler_supersaturation(d, v_dry, kappas, temperature)
+        take_right = s_c < s_d
+        a = np.where(take_right, c, a)
+        b = np.where(take_right, b, d)
+    r_opt = 0.5 * (a + b)
+    return np.maximum(_kohler_supersaturation(r_opt, v_dry, kappas, temperature), 0.0)
