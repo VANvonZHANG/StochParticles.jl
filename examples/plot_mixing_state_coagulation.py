@@ -13,7 +13,7 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.colors import LogNorm, Normalize
+from matplotlib.colors import Normalize
 
 from analysis.coagulation_analysis import normalized_number
 from analysis.figure_style import (
@@ -30,6 +30,11 @@ from analysis.mixing_state_analysis import (
     mixing_index,
     normalized_species_mass,
 )
+from analysis.smoothing import (
+    dense_log_grid,
+    linear_edges_from_centers,
+    log_edges_from_centers,
+)
 from analysis.stochparticles_io import DATA_DIR, FIG_DIR, ReplicateData, read_scene
 
 
@@ -43,11 +48,16 @@ PANEL_PATHS = {
     "b": PANEL_DIR / "b_number_decay.png",
     "c": PANEL_DIR / "c_species_mass_conservation.png",
     "d": PANEL_DIR / "d_composition_distribution.png",
-    "e": PANEL_DIR / "e_size_composition_map.png",
+    "e": PANEL_DIR / "e_size_composition_map_initial.png",
+    "f": PANEL_DIR / "f_size_composition_map_final.png",
 }
 
 FRACTION_BINS = np.linspace(0.0, 1.0, 41)
-FRACTION_HEATMAP_BINS = np.linspace(0.0, 1.0, 101)
+FRACTION_KDE_GRID = np.linspace(0.0, 1.0, 101)
+FRACTION_KDE_BANDWIDTH = 0.025
+DIAMETER_GRID_POINTS = 240
+DIAMETER_GRID_PAD_DEX = 0.05
+KDE_MAX_BANDWIDTH_DEX = 0.06
 
 
 def _time_minutes(time: np.ndarray) -> np.ndarray:
@@ -128,14 +138,25 @@ def _fraction_histogram_rows(
     return centers, np.vstack(rows) if rows else np.empty((0, centers.size))
 
 
-def _final_size_fraction_pairs(reps: list[ReplicateData]) -> tuple[np.ndarray, np.ndarray]:
-    diameters = []
-    fractions = []
+def _volume_at_row(rep: ReplicateData, row_index: int) -> float:
+    time = np.asarray(rep.arrays["time"], dtype=float)
+    values = np.asarray(
+        rep.arrays.get("volume", rep.attrs.get("volume", 1.0)), dtype=float
+    )
+    if values.ndim == 1 and values.size == time.size:
+        return float(values[row_index])
+    return float(values.ravel()[0])
+
+
+def _size_fraction_rows(reps: list[ReplicateData], row_index: int) -> list[tuple]:
+    """Per-replicate (diameters, BC fractions, volume) samples at one time row."""
+
+    rows = []
     for rep in reps:
         diameter_values = np.asarray(rep.arrays["diameter_samples"], dtype=float)
         fraction_values = np.asarray(rep.arrays["bc_mass_fraction_samples"], dtype=float)
-        diameter_row = diameter_values[-1, :] if diameter_values.ndim == 2 else diameter_values
-        fraction_row = fraction_values[-1, :] if fraction_values.ndim == 2 else fraction_values
+        diameter_row = diameter_values[row_index, :] if diameter_values.ndim == 2 else diameter_values
+        fraction_row = fraction_values[row_index, :] if fraction_values.ndim == 2 else fraction_values
         n = min(diameter_row.size, fraction_row.size)
         diameter_row = np.ravel(diameter_row)[:n]
         fraction_row = np.ravel(fraction_row)[:n]
@@ -147,82 +168,82 @@ def _final_size_fraction_pairs(reps: list[ReplicateData]) -> tuple[np.ndarray, n
             & (fraction_row <= 1.0)
         )
         if np.any(mask):
-            diameters.append(diameter_row[mask])
-            fractions.append(fraction_row[mask])
-    if not diameters:
-        raise ValueError("no valid final diameter/BC-fraction samples found")
-    return np.concatenate(diameters), np.concatenate(fractions)
+            rows.append(
+                (diameter_row[mask], fraction_row[mask], _volume_at_row(rep, row_index))
+            )
+    if not rows:
+        raise ValueError(f"no valid diameter/BC-fraction samples found at time row {row_index}")
+    return rows
 
 
-def _log_edges(values: np.ndarray, n: int = 100) -> np.ndarray:
-    positive = np.asarray(values, dtype=float)
-    positive = positive[np.isfinite(positive) & (positive > 0.0)]
-    if positive.size == 0:
-        raise ValueError("cannot build log bin edges without positive values")
-    lo, hi = np.percentile(positive, [0.5, 99.5])
-    lo = min(float(lo), float(np.min(positive)))
-    hi = max(float(hi), float(np.max(positive)))
-    if not np.isfinite(lo) or not np.isfinite(hi) or hi <= lo:
-        lo = float(np.min(positive)) * 0.9
-        hi = float(np.max(positive)) * 1.1
-    return np.geomspace(lo, hi, n)
+def _diameter_kde_grid(rows_per_time: list[list[tuple]]) -> np.ndarray:
+    pooled = np.concatenate([diameters for rows in rows_per_time for diameters, _, _ in rows])
+    lo, hi = float(np.min(pooled)), float(np.max(pooled))
+    return dense_log_grid(
+        10.0 ** (np.log10(lo) - DIAMETER_GRID_PAD_DEX),
+        10.0 ** (np.log10(hi) + DIAMETER_GRID_PAD_DEX),
+        n=DIAMETER_GRID_POINTS,
+    )
 
 
-def _diameter_edges_from_replicates(
-    reps: list[ReplicateData], fallback_values: np.ndarray
+def _size_fraction_kde(
+    rows: list[tuple], diameter_grid: np.ndarray, fraction_grid: np.ndarray
 ) -> np.ndarray:
-    for rep in reps:
-        edges = np.asarray(rep.arrays.get("bin_edges", []), dtype=float)
-        edges = edges[np.isfinite(edges) & (edges > 0.0)]
-        if edges.size >= 2 and edges[-1] > edges[0]:
-            return edges
-    return _log_edges(fallback_values)
+    """Gaussian KDE of pooled (log10 diameter, BC fraction) samples.
+
+    The log-diameter bandwidth follows Silverman's rule capped at
+    KDE_MAX_BANDWIDTH_DEX, mirroring the single-component spectrum heatmaps,
+    while the fraction bandwidth is fixed. Values are number densities in
+    m^-3 dex^-1 (the fraction axis is dimensionless).
+    """
+
+    log_grid = np.log10(diameter_grid)
+    density = np.zeros((diameter_grid.size, fraction_grid.size), dtype=float)
+    for diameters, fractions, volume in rows:
+        log_samples = np.log10(diameters)
+        bandwidth = 1.06 * np.std(log_samples, ddof=1) * log_samples.size ** (-1.0 / 5.0)
+        if log_samples.size == 1 or not np.isfinite(bandwidth) or bandwidth <= 0.0:
+            bandwidth = 0.05
+        bandwidth = min(bandwidth * 1.1, KDE_MAX_BANDWIDTH_DEX)
+
+        z_d = (log_grid[:, None] - log_samples[None, :]) / bandwidth
+        kernel_d = np.exp(-0.5 * z_d * z_d) / (np.sqrt(2.0 * np.pi) * bandwidth)
+        z_f = (fraction_grid[None, :] - fractions[:, None]) / FRACTION_KDE_BANDWIDTH
+        kernel_f = np.exp(-0.5 * z_f * z_f) / (np.sqrt(2.0 * np.pi) * FRACTION_KDE_BANDWIDTH)
+        density += (kernel_d / volume) @ kernel_f
+    return density
 
 
-def _count_norm(counts: np.ndarray) -> LogNorm | Normalize:
-    positive = counts[np.isfinite(counts) & (counts > 0.0)]
-    if positive.size == 0:
-        return Normalize(vmin=0.0, vmax=1.0)
-    vmax = float(np.max(positive))
-    if vmax > 1.0:
-        vmin = max(float(np.percentile(positive, 2.0)), np.finfo(float).tiny)
-        return LogNorm(vmin=vmin, vmax=vmax)
-    return Normalize(vmin=0.0, vmax=1.0)
+def _density_norm(density: np.ndarray) -> Normalize:
+    positive = density[np.isfinite(density) & (density > 0.0)]
+    vmax = float(np.percentile(positive, 99.5)) if positive.size else 1.0
+    if not np.isfinite(vmax) or vmax <= 0.0:
+        vmax = 1.0
+    return Normalize(vmin=0.0, vmax=vmax)
 
 
-def _gaussian_kernel1d(sigma: float) -> np.ndarray:
-    sigma = float(sigma)
-    if sigma <= 0.0:
-        return np.array([1.0], dtype=float)
-    radius = max(1, int(np.ceil(3.0 * sigma)))
-    offsets = np.arange(-radius, radius + 1, dtype=float)
-    kernel = np.exp(-0.5 * (offsets / sigma) ** 2)
-    return kernel / np.sum(kernel)
+def _size_composition_map_data(reps: list[ReplicateData]):
+    """Initial and final size-composition KDE maps on a shared grid, each with its own scale."""
+
+    initial_rows = _size_fraction_rows(reps, 0)
+    final_rows = _size_fraction_rows(reps, -1)
+    diameter_grid = _diameter_kde_grid([initial_rows, final_rows])
+    fraction_grid = FRACTION_KDE_GRID
+    initial_density = _size_fraction_kde(initial_rows, diameter_grid, fraction_grid)
+    final_density = _size_fraction_kde(final_rows, diameter_grid, fraction_grid)
+    return (
+        diameter_grid,
+        fraction_grid,
+        initial_density,
+        _density_norm(initial_density),
+        final_density,
+        _density_norm(final_density),
+    )
 
 
-def _smooth_2d_counts(
-    counts: np.ndarray, sigma_x: float = 1.1, sigma_y: float = 0.75
-) -> np.ndarray:
-    values = np.asarray(counts, dtype=float)
-    kernel_x = _gaussian_kernel1d(sigma_x)
-    kernel_y = _gaussian_kernel1d(sigma_y)
-    radius_x = kernel_x.size // 2
-    radius_y = kernel_y.size // 2
-
-    padded_x = np.pad(values, ((radius_x, radius_x), (0, 0)), mode="edge")
-    smoothed_x = np.empty_like(values, dtype=float)
-    for i in range(values.shape[0]):
-        smoothed_x[i, :] = np.sum(
-            padded_x[i : i + kernel_x.size, :] * kernel_x[:, None], axis=0
-        )
-
-    padded_y = np.pad(smoothed_x, ((0, 0), (radius_y, radius_y)), mode="edge")
-    smoothed = np.empty_like(values, dtype=float)
-    for j in range(values.shape[1]):
-        smoothed[:, j] = np.sum(
-            padded_y[:, j : j + kernel_y.size] * kernel_y[None, :], axis=1
-        )
-    return smoothed
+def _row_time_hours(reps: list[ReplicateData], row_index: int) -> float:
+    time = np.asarray(reps[0].arrays["time"], dtype=float)
+    return float(time[row_index]) / 3600.0
 
 
 def load_replicates() -> list[ReplicateData]:
@@ -311,34 +332,34 @@ def plot_composition_distribution(ax, reps: list[ReplicateData]) -> None:
     ax.legend(loc="best")
 
 
-def plot_size_composition_map(ax, fig, reps: list[ReplicateData], *, colorbar: bool = True):
-    diameters, fractions = _final_size_fraction_pairs(reps)
-    diameter_edges = _diameter_edges_from_replicates(reps, diameters)
-    counts, x_edges, y_edges = np.histogram2d(
-        diameters * 1e6,
-        fractions,
-        bins=[diameter_edges * 1e6, FRACTION_HEATMAP_BINS],
-    )
-    smoothed_counts = _smooth_2d_counts(counts)
-    smoothed_counts[smoothed_counts < 0.05] = np.nan
-    cmap = plt.get_cmap("cividis").copy()
-    cmap.set_bad(color="white")
+def plot_size_composition_map(
+    ax,
+    fig,
+    density: np.ndarray,
+    diameter_grid: np.ndarray,
+    fraction_grid: np.ndarray,
+    *,
+    title: str,
+    norm: Normalize,
+    colorbar: bool = True,
+):
     mesh = ax.pcolormesh(
-        x_edges,
-        y_edges,
-        np.ma.masked_invalid(smoothed_counts.T),
-        cmap=cmap,
-        norm=_count_norm(smoothed_counts),
+        log_edges_from_centers(diameter_grid * 1e6),
+        linear_edges_from_centers(fraction_grid),
+        np.ma.masked_invalid(density.T),
         shading="flat",
+        cmap=plt.get_cmap("cividis"),
+        norm=norm,
     )
     ax.set_xscale("log")
     ax.set_ylim(0.0, 1.0)
-    ax.set_xlabel("Final diameter (um)")
+    ax.set_xlabel("Diameter (um)")
     ax.set_ylabel("BC mass fraction")
+    ax.set_title(title, pad=4)
     ax.grid(False)
     if colorbar:
         cbar = fig.colorbar(mesh, ax=ax, pad=0.02, fraction=0.046)
-        cbar.set_label("Smoothed particle count")
+        cbar.set_label("KDE number density (m$^{-3}$ dex$^{-1}$)")
     return mesh
 
 
@@ -348,12 +369,42 @@ def _finish_standalone(fig, ax, label: str, path) -> None:
 
 
 def save_standalone_panels(reps: list[ReplicateData]) -> None:
+    diameter_grid, fraction_grid, initial_density, initial_norm, final_density, final_norm = (
+        _size_composition_map_data(reps)
+    )
+    initial_title = f"Initial (t = {_row_time_hours(reps, 0):g} h)"
+    final_title = f"Final (t = {_row_time_hours(reps, -1):g} h)"
     panel_specs = [
         ("a", lambda ax, fig: plot_mixing_state_index(ax, reps), (3.45, 2.45)),
         ("b", lambda ax, fig: plot_number_decay(ax, reps), (3.45, 2.45)),
         ("c", lambda ax, fig: plot_species_mass_conservation(ax, reps), (3.45, 2.45)),
         ("d", lambda ax, fig: plot_composition_distribution(ax, reps), (3.45, 2.45)),
-        ("e", lambda ax, fig: plot_size_composition_map(ax, fig, reps), (3.75, 2.65)),
+        (
+            "e",
+            lambda ax, fig: plot_size_composition_map(
+                ax,
+                fig,
+                initial_density,
+                diameter_grid,
+                fraction_grid,
+                title=initial_title,
+                norm=initial_norm,
+            ),
+            (3.75, 2.65),
+        ),
+        (
+            "f",
+            lambda ax, fig: plot_size_composition_map(
+                ax,
+                fig,
+                final_density,
+                diameter_grid,
+                fraction_grid,
+                title=final_title,
+                norm=final_norm,
+            ),
+            (3.75, 2.65),
+        ),
     ]
 
     for label, plotter, figsize in panel_specs:
@@ -364,21 +415,43 @@ def save_standalone_panels(reps: list[ReplicateData]) -> None:
 
 def save_composite(reps: list[ReplicateData]) -> None:
     fig = plt.figure(figsize=(7.3, 8.2), constrained_layout=True)
-    gs = fig.add_gridspec(3, 2, height_ratios=[1.0, 1.0, 1.2])
+    gs = fig.add_gridspec(3, 2, height_ratios=[1.0, 1.0, 1.15])
 
     axes = {
         "a": fig.add_subplot(gs[0, 0]),
         "b": fig.add_subplot(gs[0, 1]),
         "c": fig.add_subplot(gs[1, 0]),
         "d": fig.add_subplot(gs[1, 1]),
-        "e": fig.add_subplot(gs[2, :]),
+        "e": fig.add_subplot(gs[2, 0]),
+        "f": fig.add_subplot(gs[2, 1]),
     }
 
     plot_mixing_state_index(axes["a"], reps)
     plot_number_decay(axes["b"], reps)
     plot_species_mass_conservation(axes["c"], reps)
     plot_composition_distribution(axes["d"], reps)
-    plot_size_composition_map(axes["e"], fig, reps, colorbar=True)
+
+    diameter_grid, fraction_grid, initial_density, initial_norm, final_density, final_norm = (
+        _size_composition_map_data(reps)
+    )
+    plot_size_composition_map(
+        axes["e"],
+        fig,
+        initial_density,
+        diameter_grid,
+        fraction_grid,
+        title=f"Initial (t = {_row_time_hours(reps, 0):g} h)",
+        norm=initial_norm,
+    )
+    plot_size_composition_map(
+        axes["f"],
+        fig,
+        final_density,
+        diameter_grid,
+        fraction_grid,
+        title=f"Final (t = {_row_time_hours(reps, -1):g} h)",
+        norm=final_norm,
+    )
 
     for label, ax in axes.items():
         add_panel_label(ax, label)
