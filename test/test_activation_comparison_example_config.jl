@@ -35,3 +35,18 @@ include("../examples/simulate_activation_coagulation_comparison.jl")
     @test sc_accum < cfg.supersaturation
     @test cfg.supersaturation < sc_aitken
 end
+
+@testset "Mode classification and per-mode counts" begin
+    cfg = ActivationComparisonConfig()
+    @test mode_id_from_dry_diameter(2.0e-8, cfg) == 1
+    @test mode_id_from_dry_diameter(5.9e-8, cfg) == 1
+    @test mode_id_from_dry_diameter(6.0e-8, cfg) == 2
+    @test mode_id_from_dry_diameter(2.0e-7, cfg) == 2
+
+    ids = [1, 1, 2, 2, 2]
+    flags = [1.0, 0.0, 1.0, 1.0, 0.0]
+    n_aitken, n_droplet, act_aitken, act_droplet = per_mode_counts(ids, flags)
+    @test (n_aitken, n_droplet) == (2, 3)
+    @test (act_aitken, act_droplet) == (1, 2)
+    @test per_mode_counts(Int[], Float64[]) == (0, 0, 0, 0)
+end

@@ -188,6 +188,40 @@ function activation_flags_from_state(u, sys, cfg::ActivationComparisonConfig)
     return flags
 end
 
+function mode_id_from_dry_diameter(dry_diameter::Real, cfg::ActivationComparisonConfig)
+    return dry_diameter >= cfg.mode_dry_diameter_threshold ? 2 : 1
+end
+
+function mode_ids_from_state(u, sys, cfg::ActivationComparisonConfig)
+    ids = Vector{Int}(undef, sys.n_active)
+    for i in 1:sys.n_active
+        particle = get_particle(u, i, Val(A))
+        dry_diameter = dry_diameter_from_so4_mass(particle[1], cfg.densities[1])
+        ids[i] = mode_id_from_dry_diameter(dry_diameter, cfg)
+    end
+    return ids
+end
+
+function per_mode_counts(ids, flags)
+    n_aitken = count(==(1), ids)
+    n_droplet = count(==(2), ids)
+    activated_aitken = count(i -> ids[i] == 1 && flags[i] == 1.0, eachindex(ids))
+    activated_droplet = count(i -> ids[i] == 2 && flags[i] == 1.0, eachindex(ids))
+    return (n_aitken, n_droplet, activated_aitken, activated_droplet)
+end
+
+function per_mode_record(u, sys, cfg::ActivationComparisonConfig)
+    ids = mode_ids_from_state(u, sys, cfg)
+    flags = activation_flags_from_state(u, sys, cfg)
+    n_aitken, n_droplet, act_aitken, act_droplet = per_mode_counts(ids, flags)
+    return (
+        number_concentration_aitken = n_aitken / sys.volume,
+        number_concentration_droplet = n_droplet / sys.volume,
+        activation_fraction_aitken = n_aitken == 0 ? 0.0 : act_aitken / n_aitken,
+        activation_fraction_droplet = n_droplet == 0 ? 0.0 : act_droplet / n_droplet
+    )
+end
+
 function kernel_fraction_triplet(u, sys, parts)
     sys.n_active < 2 && return EQUAL_KERNEL_FRACTIONS
 
@@ -213,25 +247,28 @@ function kernel_fraction_triplet(u, sys, parts)
 end
 
 function record_extras(u, sys, cfg::ActivationComparisonConfig)
-    return (
-        activation_fraction = activation_fraction(
-            u,
-            sys,
-            Val(A);
-            mode = :radius_threshold,
-            threshold = cfg.activation_radius,
-            densities = cfg.densities
+    return merge(
+        (
+            activation_fraction = activation_fraction(
+                u,
+                sys,
+                Val(A);
+                mode = :radius_threshold,
+                threshold = cfg.activation_radius,
+                densities = cfg.densities
+            ),
+            cloud_droplet_concentration = cloud_droplet_concentration(
+                u,
+                sys,
+                Val(A);
+                mode = :radius_threshold,
+                threshold = cfg.activation_radius,
+                densities = cfg.densities
+            ),
+            dry_diameter_samples = dry_diameters_from_state(u, sys, cfg),
+            activation_flag_samples = activation_flags_from_state(u, sys, cfg)
         ),
-        cloud_droplet_concentration = cloud_droplet_concentration(
-            u,
-            sys,
-            Val(A);
-            mode = :radius_threshold,
-            threshold = cfg.activation_radius,
-            densities = cfg.densities
-        ),
-        dry_diameter_samples = dry_diameters_from_state(u, sys, cfg),
-        activation_flag_samples = activation_flags_from_state(u, sys, cfg)
+        per_mode_record(u, sys, cfg)
     )
 end
 
