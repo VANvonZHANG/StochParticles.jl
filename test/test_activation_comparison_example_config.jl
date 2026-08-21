@@ -77,3 +77,28 @@ end
           mixed.kernel_fraction_cross_gravitational +
           mixed.kernel_fraction_cross_turbulent ≈ 1.0 atol = 1e-12
 end
+
+@testset "Activation comparison integration (short)" begin
+    cfg = ActivationComparisonConfig(tspan = (0.0, 30.0), saveat = 10.0)
+    particles, _, _ = initial_activation_particles(cfg, cfg.initial_seed)
+
+    sol_only, rec_only = solve_activation_scenario(cfg, particles, :activation_only)
+    @test sol_only.retcode == ReturnCode.Success
+    last = rec_only[end]
+    # At t = 30 s activated droplets have wet radius well below the 1 um flag
+    # threshold (r ~ sqrt(t)), so only the Aitken-zero side of the separation
+    # and number conservation are asserted here; the droplet == 1.0 check runs
+    # on the 600 s smoke run.
+    @test last.activation_fraction_aitken == 0.0
+    @test last.number_concentration_aitken ≈ rec_only[1].number_concentration_aitken
+    @test last.number_concentration_droplet ≈ rec_only[1].number_concentration_droplet
+
+    cfg_coag = ActivationComparisonConfig(tspan = (0.0, 30.0), saveat = 10.0)
+    sol_coag, rec_coag = solve_activation_scenario(
+        cfg_coag, deepcopy(particles), :activation_with_coagulation)
+    @test sol_coag.retcode == ReturnCode.Success
+    @test rec_coag[end].number_concentration_aitken <
+          rec_coag[1].number_concentration_aitken
+    @test rec_coag[end].volume == rec_coag[1].volume
+    @test rec_coag[end].active_particles < rec_coag[1].active_particles
+end
