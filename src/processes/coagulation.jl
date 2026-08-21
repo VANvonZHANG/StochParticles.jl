@@ -558,6 +558,38 @@ function compute_majorant(
 end
 
 """
+    LocalMajorant() <: CoagulationSampling
+
+Per-particle exact local majorant sampling for frozen-state sub-steps
+(operator splitting). Bounds `K_i^max = max_{j != i} K(i, j)` are rebuilt
+exactly at each sub-step and maintained incrementally per accepted event.
+Use via `step_coagulation!` / `solve_split`.
+"""
+struct LocalMajorant <: CoagulationSampling end
+
+"""
+    local_majorant_bounds(kernel, u, sys) -> Vector{Float64}
+
+Per-particle exact kernel maxima `K_i^max = max_{j != i} K(mu_i, mu_j) >= 0`
+over the currently active particles. O(N^2) kernel evaluations, exploiting
+kernel symmetry.
+"""
+function local_majorant_bounds(kernel, u::Vector{Float64}, sys::ParticleSystem{A}) where {A}
+    n = sys.n_active
+    A_val = Val(A)
+    particles = [get_particle(u, i, A_val) for i in 1:n]
+    bounds = zeros(n)
+    for i in 1:(n - 1)
+        for j in (i + 1):n
+            K = max(kernel(particles[i], particles[j]), 0.0)
+            K > bounds[i] && (bounds[i] = K)
+            K > bounds[j] && (bounds[j] = K)
+        end
+    end
+    return bounds
+end
+
+"""
     majorant_rate(sampling, kernel, u, sys) -> Float64
 
 Compute the total coagulation event rate using the majorant method:

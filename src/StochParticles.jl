@@ -19,7 +19,7 @@ export ParticleSystem, ParticleProblem, species_val
 export get_particle, set_particle!, make_u0, total_mass
 export PhysicsProcess, provides_drift
 export CoagulationKernel, CoagulationSampling
-export BrownianKernel, GlobalMajorant, CompositeKernel, GravitationalKernel,
+export BrownianKernel, GlobalMajorant, LocalMajorant, CompositeKernel, GravitationalKernel,
        AyalaTurbulentKernel, AtmosphericParameters, make_kernel
 export CoagulationProcess, NonCNMCCoagulationProcess,
        CondensationProcess, SpeciesDependentCondensation,
