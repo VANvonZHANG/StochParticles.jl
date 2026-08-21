@@ -142,3 +142,67 @@ function set_parcel!(
     u[offset + 4] = parcel.S
     nothing
 end
+
+"""
+    solve_split(particles, volume, gas_phase_fn, processes, solver;
+                tspan, n_sim, dt_split, saveat, record_func) -> (sol, records)
+
+Lie-Trotter operator-splitting driver: per sub-step of length `dt_split`,
+solve the drift-only ODE on the interval, then advance the frozen-state
+coagulation SSA by the same interval (`step_coagulation!`). Requires
+`saveat` to be an integer multiple of `dt_split`; supports drift processes
+plus at most one coagulation process (`CoagulationProcess` /
+`NonCNMCCoagulationProcess`); Emission/Dilution processes are rejected.
+Records are taken at `tspan[1]` and at every `tspan[1] + k*saveat` boundary,
+after that sub-step's jump phase. Returns the final ODE solution and the
+records vector built from `record_func(t, u, sys)`.
+"""
+function solve_split(particles::Vector{SVector{A, Float64}},
+        volume::Float64, gas_phase_fn, processes::Tuple{Vararg{PhysicsProcess}},
+        solver;
+        tspan = (0.0, 3600.0), n_sim = length(particles),
+        dt_split::Real, saveat::Real, record_func) where {A}
+    dt_split > 0.0 || throw(ArgumentError("dt_split must be positive, got $dt_split"))
+    saveat > 0.0 || throw(ArgumentError("saveat must be positive, got $saveat"))
+    isapprox(rem(saveat, dt_split), 0.0; atol = 1.0e-9 * dt_split) ||
+        throw(ArgumentError("saveat ($saveat) must be an integer multiple of dt_split ($dt_split)"))
+    drift_processes = Tuple(p for p in processes if provides_drift(p))
+    coag = nothing
+    for p in processes
+        if p isa CoagulationProcess || p isa NonCNMCCoagulationProcess
+            coag === nothing ||
+                throw(ArgumentError("solve_split supports at most one coagulation process"))
+            coag = p
+        elseif !(provides_drift(p))
+            throw(ArgumentError("solve_split does not support process $(typeof(p))"))
+        end
+    end
+    sys = ParticleSystem(Val(A), n_sim, volume, gas_phase_fn)
+    u = make_u0(particles)
+    if length(u) < n_sim * A
+        u_extended = zeros(Float64, n_sim * A)
+        u_extended[1:length(u)] .= u
+        u = u_extended
+    end
+    ode_func! = make_ode_func(drift_processes)
+    records = Any[record_func(tspan[1], u, sys)]
+    t0, t_end = tspan
+    n_steps = ceil(Int, (t_end - t0) / dt_split - 1.0e-12)
+    sol = nothing
+    t_prev = t0
+    for k in 1:n_steps
+        t_next = min(t0 + k * dt_split, t_end)
+        oprob = ODEProblem(ode_func!, u, (t_prev, t_next), sys)
+        sol = solve(oprob, solver)
+        u = copy(sol.u[end])
+        if coag !== nothing
+            step_coagulation!(u, sys, coag, t_next - t_prev)
+        end
+        if isapprox(rem(t_next - t0, saveat), 0.0; atol = 1.0e-9 * saveat) ||
+           t_next >= t_end - 1.0e-12
+            push!(records, record_func(t_next, u, sys))
+        end
+        t_prev = t_next
+    end
+    return sol, records
+end

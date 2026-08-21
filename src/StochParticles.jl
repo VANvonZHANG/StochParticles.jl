@@ -25,7 +25,7 @@ export CoagulationProcess, NonCNMCCoagulationProcess, step_coagulation!,
        CondensationProcess, SpeciesDependentCondensation,
        H2OCondensationFlux,
        H2OCondensationProcess, pre_equilibrate!, EmissionProcess, DilutionProcess
-export apply_drift, make_ode_func
+export apply_drift, make_ode_func, solve_split
 export compute_majorant, majorant_rate
 export cnmc_merge!, cnmc_clone!, cnmc_volume_rescale!, cnmc_coagulate!
 export make_coagulation_jump, make_non_cnmc_coagulation_jump, make_emission_jump
