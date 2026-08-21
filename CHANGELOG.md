@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `LocalMajorant` sampling with exact per-particle bounds, `step_coagulation!`
+  frozen-state SSA advancer, and `solve_split` Lie-Trotter operator-splitting
+  driver — makes n_sim=1000 coagulation tractable (O(N^2) bound rebuild once
+  per split sub-step instead of once per virtual event).
+
 ## [0.6.0] - 2026-08-18
 
 ### Added
