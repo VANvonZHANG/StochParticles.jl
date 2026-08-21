@@ -57,6 +57,7 @@ Base.@kwdef struct ActivationComparisonConfig
     volume::Float64 = 1000.0 / (8.4e11 + 2.1e11)
     tspan::Tuple{Float64, Float64} = (0.0, 600.0)
     saveat::Float64 = 10.0
+    dt_split::Float64 = 10.0
     densities::SVector{2, Float64} = SVector(1770.0, 1000.0)
     h2o_idx::Int = 2
     T::Float64 = 293.15
@@ -288,20 +289,11 @@ function solve_activation_scenario(cfg::ActivationComparisonConfig, particles, s
         (condensation,)
     elseif scenario == :activation_with_coagulation
         parts = activation_kernel_parts(cfg)
-        coagulation = CoagulationProcess(parts.total, GlobalMajorant())
+        coagulation = NonCNMCCoagulationProcess(parts.total, LocalMajorant())
         (condensation, coagulation)
     else
         throw(ArgumentError("unknown activation scenario '$scenario'"))
     end
-
-    prob = ParticleProblem(
-        deepcopy(particles),
-        cfg.volume,
-        gas_fn(cfg),
-        processes;
-        tspan = cfg.tspan,
-        n_sim = cfg.n_sim
-    )
 
     parts = scenario == :activation_with_coagulation ? activation_kernel_parts(cfg) :
             nothing
@@ -314,7 +306,18 @@ function solve_activation_scenario(cfg::ActivationComparisonConfig, particles, s
 
         return merge_record(base, merge(extras, kernel_attribution_by_class(u, sys, parts, cfg)))end
 
-    return solve_with_records(prob, Tsit5(); saveat = cfg.saveat, record_func = record_func)
+    return solve_split(
+        deepcopy(particles),
+        cfg.volume,
+        gas_fn(cfg),
+        processes,
+        Tsit5();
+        tspan = cfg.tspan,
+        n_sim = cfg.n_sim,
+        dt_split = cfg.dt_split,
+        saveat = cfg.saveat,
+        record_func = record_func
+    )
 end
 
 function case_attributes(cfg::ActivationComparisonConfig, scenario)
@@ -328,6 +331,15 @@ function case_attributes(cfg::ActivationComparisonConfig, scenario)
         "t_start" => Float64(cfg.tspan[1]),
         "t_end" => Float64(cfg.tspan[2]),
         "saveat" => cfg.saveat,
+        "dt_split" => cfg.dt_split,
+        "aitken_dg" => cfg.aitken_dg,
+        "aitken_sigma_g" => cfg.aitken_sigma_g,
+        "aitken_concentration" => cfg.aitken_concentration,
+        "accumulation_dg" => cfg.accumulation_dg,
+        "accumulation_sigma_g" => cfg.accumulation_sigma_g,
+        "accumulation_concentration" => cfg.accumulation_concentration,
+        "mode_dry_diameter_threshold" => cfg.mode_dry_diameter_threshold,
+        "coagulation_process" => "NonCNMCCoagulationProcess+LocalMajorant+solve_split",
         "supersaturation" => cfg.supersaturation,
         "activation_radius" => cfg.activation_radius,
         "notes" => notes
