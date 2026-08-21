@@ -50,3 +50,30 @@ end
     @test (act_aitken, act_droplet) == (1, 2)
     @test per_mode_counts(Int[], Float64[]) == (0, 0, 0, 0)
 end
+
+@testset "Kernel attribution by pair class" begin
+    cfg = ActivationComparisonConfig()
+    parts = activation_kernel_parts(cfg)
+    aitken_pair = [SVector{2, Float64}(1.0e-19, 0.0), SVector{2, Float64}(2.0e-19, 0.0)]
+    droplet_pair = [SVector{2, Float64}(1.0e-15, 0.0), SVector{2, Float64}(2.0e-15, 0.0)]
+
+    only_aitken = kernel_attribution_from_particles(aitken_pair, [1, 1], parts)
+    @test only_aitken.kernel_fraction_aitken_brownian +
+          only_aitken.kernel_fraction_aitken_gravitational +
+          only_aitken.kernel_fraction_aitken_turbulent ≈ 1.0 atol = 1e-12
+    @test only_aitken.kernel_fraction_aitken_brownian > 0.9
+    @test only_aitken.kernel_fraction_droplet_brownian == 0.0
+    @test only_aitken.kernel_fraction_cross_turbulent == 0.0
+
+    mixed = kernel_attribution_from_particles(
+        vcat(aitken_pair, droplet_pair), [1, 1, 2, 2], parts)
+    @test mixed.kernel_fraction_aitken_brownian +
+          mixed.kernel_fraction_aitken_gravitational +
+          mixed.kernel_fraction_aitken_turbulent ≈ 1.0 atol = 1e-12
+    @test mixed.kernel_fraction_droplet_brownian +
+          mixed.kernel_fraction_droplet_gravitational +
+          mixed.kernel_fraction_droplet_turbulent ≈ 1.0 atol = 1e-12
+    @test mixed.kernel_fraction_cross_brownian +
+          mixed.kernel_fraction_cross_gravitational +
+          mixed.kernel_fraction_cross_turbulent ≈ 1.0 atol = 1e-12
+end

@@ -8,7 +8,6 @@ include("simulation_io.jl")
 
 const ACTIVATION_BASENAME = "activation_coagulation_comparison"
 const A = 2
-const EQUAL_KERNEL_FRACTIONS = (1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0)
 const TIME_MAJOR_COMPAT_DATASETS = Set([
     "activation_flag_samples",
     "diameter_samples",
@@ -222,28 +221,36 @@ function per_mode_record(u, sys, cfg::ActivationComparisonConfig)
     )
 end
 
-function kernel_fraction_triplet(u, sys, parts)
-    sys.n_active < 2 && return EQUAL_KERNEL_FRACTIONS
-
-    brownian_sum = 0.0
-    gravitational_sum = 0.0
-    turbulent_sum = 0.0
-    for i in 1:(sys.n_active - 1)
-        particle_i = get_particle(u, i, Val(A))
-        for j in (i + 1):sys.n_active
-            particle_j = get_particle(u, j, Val(A))
-            brownian_sum += max(parts.brownian(particle_i, particle_j), 0.0)
-            gravitational_sum += max(parts.gravitational(particle_i, particle_j), 0.0)
-            turbulent_sum += max(parts.turbulent(particle_i, particle_j), 0.0)
+function kernel_attribution_from_particles(particles, ids, parts)
+    sums = zeros(3, 3)  # rows: (A,A)=1, (D,D)=2, (A,D)/mixed=3; cols: B, G, T
+    n = length(particles)
+    for i in 1:(n - 1)
+        for j in (i + 1):n
+            cls = ids[i] == ids[j] ? ids[i] : 3
+            sums[cls, 1] += max(parts.brownian(particles[i], particles[j]), 0.0)
+            sums[cls, 2] += max(parts.gravitational(particles[i], particles[j]), 0.0)
+            sums[cls, 3] += max(parts.turbulent(particles[i], particles[j]), 0.0)
         end
     end
+    fraction(cls, comp) =
+        sums[cls, comp] / (sum(sums[cls, :]) > 0.0 ? sum(sums[cls, :]) : 1.0)
+    return (
+        kernel_fraction_aitken_brownian = fraction(1, 1),
+        kernel_fraction_aitken_gravitational = fraction(1, 2),
+        kernel_fraction_aitken_turbulent = fraction(1, 3),
+        kernel_fraction_droplet_brownian = fraction(2, 1),
+        kernel_fraction_droplet_gravitational = fraction(2, 2),
+        kernel_fraction_droplet_turbulent = fraction(2, 3),
+        kernel_fraction_cross_brownian = fraction(3, 1),
+        kernel_fraction_cross_gravitational = fraction(3, 2),
+        kernel_fraction_cross_turbulent = fraction(3, 3)
+    )
+end
 
-    total = brownian_sum + gravitational_sum + turbulent_sum
-    if !isfinite(total) || total <= 0.0
-        return EQUAL_KERNEL_FRACTIONS
-    end
-
-    return (brownian_sum / total, gravitational_sum / total, turbulent_sum / total)
+function kernel_attribution_by_class(u, sys, parts, cfg::ActivationComparisonConfig)
+    particles = [get_particle(u, i, Val(A)) for i in 1:sys.n_active]
+    ids = mode_ids_from_state(u, sys, cfg)
+    return kernel_attribution_from_particles(particles, ids, parts)
 end
 
 function record_extras(u, sys, cfg::ActivationComparisonConfig)
@@ -305,19 +312,7 @@ function solve_activation_scenario(cfg::ActivationComparisonConfig, particles, s
             return merge_record(base, extras)
         end
 
-        brownian_frac, gravitational_frac, turbulent_frac = kernel_fraction_triplet(u, sys, parts)
-        return merge_record(
-            base,
-            merge(
-                extras,
-                (
-                    kernel_fraction_brownian = brownian_frac,
-                    kernel_fraction_gravitational = gravitational_frac,
-                    kernel_fraction_turbulent = turbulent_frac
-                )
-            )
-        )
-    end
+        return merge_record(base, merge(extras, kernel_attribution_by_class(u, sys, parts, cfg)))end
 
     return solve_with_records(prob, Tsit5(); saveat = cfg.saveat, record_func = record_func)
 end
