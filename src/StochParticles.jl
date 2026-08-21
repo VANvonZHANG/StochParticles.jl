@@ -21,7 +21,7 @@ export PhysicsProcess, provides_drift
 export CoagulationKernel, CoagulationSampling
 export BrownianKernel, GlobalMajorant, LocalMajorant, CompositeKernel, GravitationalKernel,
        AyalaTurbulentKernel, AtmosphericParameters, make_kernel
-export CoagulationProcess, NonCNMCCoagulationProcess,
+export CoagulationProcess, NonCNMCCoagulationProcess, step_coagulation!,
        CondensationProcess, SpeciesDependentCondensation,
        H2OCondensationFlux,
        H2OCondensationProcess, pre_equilibrate!, EmissionProcess, DilutionProcess
