@@ -48,16 +48,23 @@ end
 
 Base.@kwdef struct ActivationComparisonConfig
     species_names::Vector{String} = ["SO4", "H2O"]
-    n_sim::Int = 240
-    volume::Float64 = 1.0e-6
+    n_sim::Int = 1000
+    aitken_dg::Float64 = 2.0e-8
+    aitken_sigma_g::Float64 = 1.25
+    aitken_concentration::Float64 = 8.4e11
+    accumulation_dg::Float64 = 2.0e-7
+    accumulation_sigma_g::Float64 = 1.4
+    accumulation_concentration::Float64 = 2.1e11
+    volume::Float64 = 1000.0 / (8.4e11 + 2.1e11)
     tspan::Tuple{Float64, Float64} = (0.0, 600.0)
     saveat::Float64 = 10.0
     densities::SVector{2, Float64} = SVector(1770.0, 1000.0)
     h2o_idx::Int = 2
     T::Float64 = 293.15
     p::Float64 = 1.01325e5
-    supersaturation::Float64 = 0.003
+    supersaturation::Float64 = 0.005
     activation_radius::Float64 = 1.0e-6
+    mode_dry_diameter_threshold::Float64 = 6.0e-8
     rho_f::Float64 = 1.06
     mu_f::Float64 = 1.75e-5
     nu::Float64 = 1.65e-5
@@ -68,6 +75,12 @@ Base.@kwdef struct ActivationComparisonConfig
     bin_edges::Vector{Float64} = collect(10.0 .^ range(-8.3, -4.5; length = 96))
     initial_seed::Int = 2026072200
     seed_base::Int = 2026072200
+end
+
+function mode_particle_counts(cfg::ActivationComparisonConfig)
+    total = cfg.aitken_concentration + cfg.accumulation_concentration
+    n_aitken = round(Int, cfg.n_sim * cfg.aitken_concentration / total)
+    return n_aitken, cfg.n_sim - n_aitken
 end
 
 function average_thermo(_cfg::ActivationComparisonConfig)
@@ -95,18 +108,16 @@ end
 
 function initial_activation_particles(cfg::ActivationComparisonConfig, seed)
     Random.seed!(seed)
-
-    n_aitken = div(cfg.n_sim, 2)
-    n_accum = cfg.n_sim - n_aitken
-
-    particles_aitken = lognormal_masses(n_aitken, 3.0e-8, 1.6, cfg.densities)
-    particles_accum = lognormal_masses(n_accum, 1.2e-7, 1.8, cfg.densities)
+    n_aitken, n_accum = mode_particle_counts(cfg)
+    particles_aitken = lognormal_masses(
+        n_aitken, cfg.aitken_dg, cfg.aitken_sigma_g, cfg.densities)
+    particles_accum = lognormal_masses(
+        n_accum, cfg.accumulation_dg, cfg.accumulation_sigma_g, cfg.densities)
     dry_particles = [SVector{2, Float64}(m[1], 0.0)
                      for m in vcat(particles_aitken, particles_accum)]
     dry_diams = [dry_diameter_from_so4_mass(p[1], cfg.densities[1])
                  for p in dry_particles]
-    thermo_labels = vcat(fill(0.30, n_aitken), fill(0.61, n_accum))
-
+    thermo_labels = fill(0.455, cfg.n_sim)
     particles = deepcopy(dry_particles)
     pre_equilibrate!(
         particles,
@@ -116,7 +127,6 @@ function initial_activation_particles(cfg::ActivationComparisonConfig, seed)
         vapor_pressure(cfg);
         h2o_idx = cfg.h2o_idx
     )
-
     return (particles, dry_diams, thermo_labels)
 end
 
