@@ -486,7 +486,16 @@ def save_composite(data) -> None:
     plot_size_resolved_activation(axes["i"], data)
     for label, ax in axes.items():
         add_panel_label(ax, label)
-    finish_panel(fig, COMPOSITE_PATH)
+    save_png(fig, COMPOSITE_PATH)
+    plt.close(fig)
+
+
+def main() -> None:
+    apply_publication_style()
+    data = prepare_scene()
+    save_full_outputs(data)
+    print(f"Saved composite PNG: {COMPOSITE_PATH}")
+    print(f"Saved {len(PANEL_PATHS)} panel PNGs: {PANEL_DIR}")
 
 if __name__ == "__main__":
     main()
