@@ -380,21 +380,6 @@ def plot_activation_with_coagulation_heatmap(ax, fig, data, *, colorbar: bool = 
     return mesh
 
 
-def plot_final_distribution_overlay(ax, data) -> None:
-    grid = data["wet_grid"]
-    diameter_um = grid * 1e6
-    for case in ("activation_only", "activation_with_coagulation"):
-        rows = final_distribution(data[case], grid)
-        _draw_replicates(
-            ax,
-            diameter_um,
-            rows,
-            CASE_COLORS[case],
-            CASE_LABELS[case],
-        )
-    _apply_log_x_distribution_style(ax, f"Final {KDE_DENSITY_LABEL}")
-    ax.legend(loc="best")
-
 
 def plot_size_resolved_activation(ax, data) -> None:
     for case in ("activation_only", "activation_with_coagulation"):
