@@ -51,15 +51,14 @@ COMPOSITE_PATH = FIG_DIR / f"{SCENE_NAME}.png"
 PANEL_DIR = FIG_DIR / SCENE_NAME
 
 PANEL_PATHS = {
-    "a": PANEL_DIR / "a_mode_activation_fraction.png",
-    "b": PANEL_DIR / "b_mode_number.png",
+    "a": PANEL_DIR / "a_mode_number.png",
+    "b": PANEL_DIR / "b_mean_wet_diameter.png",
     "c": PANEL_DIR / "c_kernel_attribution_aitken.png",
     "d": PANEL_DIR / "d_kernel_attribution_droplet.png",
-    "e": PANEL_DIR / "e_activation_only_heatmap.png",
-    "f": PANEL_DIR / "f_activation_with_coagulation_heatmap.png",
-    "g": PANEL_DIR / "g_final_distribution_overlay.png",
-    "h": PANEL_DIR / "h_final_distribution_difference.png",
-    "i": PANEL_DIR / "i_size_resolved_activation.png",
+    "e": PANEL_DIR / "e_kernel_attribution_cross.png",
+    "f": PANEL_DIR / "f_size_resolved_activation.png",
+    "g": PANEL_DIR / "g_with_coagulation_heatmap.png",
+    "h": PANEL_DIR / "h_final_distribution_overlay.png",
 }
 
 CASE_LABELS = {
@@ -72,7 +71,7 @@ CASE_COLORS = {
     "activation_with_coagulation": PALETTE["activation_with_coagulation"],
 }
 
-MODE_LABELS = {"aitken": "Aitken (20 nm)", "droplet": "Droplet (200 nm)"}
+MODE_LABELS = {"aitken": "Aitken (20 nm)", "droplet": "Droplet (200 nm)", "cross": "Aitken-droplet"}
 MODE_COLORS = {"aitken": PALETTE["aerosol"], "droplet": PALETTE["cloud"]}
 MODE_SERIES = {
     "aitken": "number_concentration_aitken",
@@ -221,9 +220,7 @@ def prepare_scene():
         raise KeyError(f"required case missing from {DATA_PATH}; available cases: {available}") from exc
 
     wet_samples = _all_positive_samples((only_reps, coag_reps), "diameter_samples")
-    wet_grid = _log_grid_from_bin_edges_or_samples(
-        only_reps + coag_reps, wet_samples, n=280
-    )
+    wet_grid = _log_grid_from_samples(wet_samples, n=280)
     dry_samples = _all_positive_samples(
         (only_reps, coag_reps), "dry_diameter_samples", final_only=True
     )
@@ -277,23 +274,6 @@ def _mode_case_legend(ax) -> None:
     ax.legend(handles=handles, fontsize=6, ncols=2, loc="best", framealpha=0.85)
 
 
-def plot_mode_activation_fraction(ax, data) -> None:
-    for mode, series in MODE_ACTIVATION.items():
-        for case in ("activation_only", "activation_with_coagulation"):
-            time, rows = dataset_series(data[case], series)
-            linestyle = "-" if case == "activation_with_coagulation" else "--"
-            _draw_replicates(
-                ax,
-                _time_minutes(time),
-                rows,
-                MODE_COLORS[mode],
-                None,
-                linestyle=linestyle,
-            )
-    _style_time_axis(ax, "Activated fraction", ylim=(-0.02, 1.02))
-    _mode_case_legend(ax)
-
-
 def plot_mode_number(ax, data) -> None:
     for mode, series in MODE_SERIES.items():
         for case in ("activation_only", "activation_with_coagulation"):
@@ -313,6 +293,21 @@ def plot_mode_number(ax, data) -> None:
     _mode_case_legend(ax)
 
 
+def plot_mean_wet_diameter(ax, data) -> None:
+    for case in ("activation_only", "activation_with_coagulation"):
+        time, rows = dataset_series(data[case], "mean_diameter")
+        _draw_replicates(
+            ax,
+            _time_minutes(time),
+            rows * 1e6,
+            CASE_COLORS[case],
+            CASE_LABELS[case],
+            lw_mean=1.75,
+        )
+    ax.set_yscale("log")
+    _style_time_axis(ax, "Mean wet diameter ($\mu$m)")
+
+
 def plot_kernel_attribution(ax, data, mode_class: str) -> None:
     case = "activation_with_coagulation"
     time, _ = dataset_series(data[case], f"kernel_fraction_{mode_class}_brownian")
@@ -330,20 +325,18 @@ def plot_kernel_attribution(ax, data, mode_class: str) -> None:
         labels=[label for _, label in ATTRIBUTION_COMPONENTS],
         alpha=0.85,
     )
+    total = np.vstack([
+        np.asarray(rep.arrays["number_concentration_aitken"], dtype=float) +
+        np.asarray(rep.arrays["number_concentration_droplet"], dtype=float)
+        for rep in data[case]
+    ])
+    active = np.nanmean(total / total[:, :1], axis=0) >= 0.05
+    t_max = float(time[np.max(np.nonzero(active)[0])]) if active.any() else float(time[-1])
     _style_time_axis(
         ax, f"Kernel share ({MODE_LABELS[mode_class]} pairs)", ylim=(0.0, 1.0)
     )
+    ax.set_xlim(0.0, t_max / 60.0)
     ax.legend(loc="center right", fontsize=6)
-
-
-def plot_activation_only_heatmap(ax, fig, data, *, colorbar: bool = True):
-    time, grid, heatmap = data["heatmaps"]["activation_only"]
-    mesh = _plot_heatmap(ax, time, grid, heatmap, data["heatmap_norm"])
-    ax.set_title("Activation only", pad=4)
-    if colorbar:
-        cbar = fig.colorbar(mesh, ax=ax, pad=0.02, fraction=0.046)
-        cbar.set_label(KDE_DENSITY_LABEL)
-    return mesh
 
 
 def plot_activation_with_coagulation_heatmap(ax, fig, data, *, colorbar: bool = True):
@@ -369,47 +362,6 @@ def plot_final_distribution_overlay(ax, data) -> None:
             CASE_LABELS[case],
         )
     _apply_log_x_distribution_style(ax, f"Final {KDE_DENSITY_LABEL}")
-    ax.legend(loc="best")
-
-
-def plot_final_distribution_difference(ax, data) -> None:
-    grid = data["wet_grid"]
-    only_rows = final_distribution(data["activation_only"], grid)
-    coag_rows = final_distribution(data["activation_with_coagulation"], grid)
-    n_pair = min(only_rows.shape[0], coag_rows.shape[0])
-    diameter_um = grid * 1e6
-
-    if n_pair:
-        pair_differences = coag_rows[:n_pair] - only_rows[:n_pair]
-        for row in pair_differences:
-            ax.plot(diameter_um, row, color=PALETTE["neutral"], lw=0.7, alpha=0.25)
-        difference = np.nanmean(pair_differences, axis=0)
-    else:
-        difference = np.nanmean(coag_rows, axis=0) - np.nanmean(only_rows, axis=0)
-
-    ax.axhline(0.0, color="#555555", lw=0.7)
-    ax.plot(diameter_um, difference, color="#252525", lw=1.8, label="Mean difference")
-    ax.fill_between(
-        diameter_um,
-        0.0,
-        difference,
-        where=difference >= 0.0,
-        color=PALETTE["positive"],
-        alpha=0.18,
-        interpolate=True,
-    )
-    ax.fill_between(
-        diameter_um,
-        0.0,
-        difference,
-        where=difference < 0.0,
-        color=PALETTE["negative"],
-        alpha=0.18,
-        interpolate=True,
-    )
-    _apply_log_x_distribution_style(
-        ax, "With coag. - activation only\n(m$^{-3}$ dex$^{-1}$)"
-    )
     ax.legend(loc="best")
 
 
@@ -443,20 +395,19 @@ def _finish_standalone(fig, ax, label: str, path) -> None:
 
 def save_standalone_panels(data) -> None:
     panel_specs = [
-        ("a", lambda ax, fig: plot_mode_activation_fraction(ax, data)),
-        ("b", lambda ax, fig: plot_mode_number(ax, data)),
+        ("a", lambda ax, fig: plot_mode_number(ax, data)),
+        ("b", lambda ax, fig: plot_mean_wet_diameter(ax, data)),
         ("c", lambda ax, fig: plot_kernel_attribution(ax, data, "aitken")),
         ("d", lambda ax, fig: plot_kernel_attribution(ax, data, "droplet")),
-        ("e", lambda ax, fig: plot_activation_only_heatmap(ax, fig, data, colorbar=True)),
+        ("e", lambda ax, fig: plot_kernel_attribution(ax, data, "cross")),
+        ("f", lambda ax, fig: plot_size_resolved_activation(ax, data)),
         (
-            "f",
+            "g",
             lambda ax, fig: plot_activation_with_coagulation_heatmap(
                 ax, fig, data, colorbar=True
             ),
         ),
-        ("g", lambda ax, fig: plot_final_distribution_overlay(ax, data)),
-        ("h", lambda ax, fig: plot_final_distribution_difference(ax, data)),
-        ("i", lambda ax, fig: plot_size_resolved_activation(ax, data)),
+        ("h", lambda ax, fig: plot_final_distribution_overlay(ax, data)),
     ]
 
     for label, plotter in panel_specs:
@@ -471,8 +422,8 @@ def save_full_outputs(data) -> None:
 
 
 def save_composite(data) -> None:
-    fig = plt.figure(figsize=(10.0, 14.0), constrained_layout=True)
-    gs = fig.add_gridspec(5, 2, height_ratios=[1.0, 1.0, 1.1, 1.0, 0.95])
+    fig = plt.figure(figsize=(10.0, 11.5), constrained_layout=True)
+    gs = fig.add_gridspec(4, 2, height_ratios=[1.0, 1.0, 1.0, 1.15])
     axes = {
         "a": fig.add_subplot(gs[0, 0]),
         "b": fig.add_subplot(gs[0, 1]),
@@ -482,24 +433,21 @@ def save_composite(data) -> None:
         "f": fig.add_subplot(gs[2, 1]),
         "g": fig.add_subplot(gs[3, 0]),
         "h": fig.add_subplot(gs[3, 1]),
-        "i": fig.add_subplot(gs[4, :]),
     }
-    plot_mode_activation_fraction(axes["a"], data)
-    plot_mode_number(axes["b"], data)
+    plot_mode_number(axes["a"], data)
+    plot_mean_wet_diameter(axes["b"], data)
     plot_kernel_attribution(axes["c"], data, "aitken")
     plot_kernel_attribution(axes["d"], data, "droplet")
-    mesh = plot_activation_only_heatmap(axes["e"], fig, data, colorbar=False)
-    plot_activation_with_coagulation_heatmap(axes["f"], fig, data, colorbar=False)
-    cbar = fig.colorbar(mesh, ax=[axes["e"], axes["f"]], pad=0.015, fraction=0.035)
+    plot_kernel_attribution(axes["e"], data, "cross")
+    plot_size_resolved_activation(axes["f"], data)
+    mesh = plot_activation_with_coagulation_heatmap(axes["g"], fig, data, colorbar=False)
+    cbar = fig.colorbar(mesh, ax=axes["g"], pad=0.02, fraction=0.046)
     cbar.set_label(KDE_DENSITY_LABEL)
-    plot_final_distribution_overlay(axes["g"], data)
-    plot_final_distribution_difference(axes["h"], data)
-    plot_size_resolved_activation(axes["i"], data)
+    plot_final_distribution_overlay(axes["h"], data)
     for label, ax in axes.items():
         add_panel_label(ax, label)
     save_png(fig, COMPOSITE_PATH)
     plt.close(fig)
-
 
 def main() -> None:
     apply_publication_style()
