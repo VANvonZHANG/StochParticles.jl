@@ -14,6 +14,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import Normalize
+from matplotlib.lines import Line2D
 
 from analysis.activation_analysis import (
     activation_fraction,
@@ -266,6 +267,16 @@ def prepare_scene():
     }
 
 
+def _mode_case_legend(ax) -> None:
+    handles = [
+        Line2D([0], [0], color=MODE_COLORS["aitken"], lw=1.8, label="Aitken (20 nm)"),
+        Line2D([0], [0], color=MODE_COLORS["droplet"], lw=1.8, label="Droplet (200 nm)"),
+        Line2D([0], [0], color="0.25", lw=1.8, ls="-", label="With coagulation"),
+        Line2D([0], [0], color="0.25", lw=1.8, ls="--", label="Activation only"),
+    ]
+    ax.legend(handles=handles, fontsize=6, ncols=2, loc="best", framealpha=0.85)
+
+
 def plot_mode_activation_fraction(ax, data) -> None:
     for mode, series in MODE_ACTIVATION.items():
         for case in ("activation_only", "activation_with_coagulation"):
@@ -276,11 +287,11 @@ def plot_mode_activation_fraction(ax, data) -> None:
                 _time_minutes(time),
                 rows,
                 MODE_COLORS[mode],
-                f"{MODE_LABELS[mode]} ({CASE_LABELS[case]})",
+                None,
                 linestyle=linestyle,
             )
     _style_time_axis(ax, "Activated fraction", ylim=(-0.02, 1.02))
-    ax.legend(loc="best", fontsize=6, ncols=2)
+    _mode_case_legend(ax)
 
 
 def plot_mode_number(ax, data) -> None:
@@ -294,12 +305,12 @@ def plot_mode_number(ax, data) -> None:
                 _time_minutes(time),
                 normalized,
                 MODE_COLORS[mode],
-                f"{MODE_LABELS[mode]} ({CASE_LABELS[case]})",
+                None,
                 linestyle=linestyle,
                 lw_mean=1.75,
             )
     _style_time_axis(ax, "N / N$_0$", ylim=(0.0, 1.08))
-    ax.legend(loc="best", fontsize=6, ncols=2)
+    _mode_case_legend(ax)
 
 
 def plot_kernel_attribution(ax, data, mode_class: str) -> None:
@@ -460,7 +471,7 @@ def save_full_outputs(data) -> None:
 
 
 def save_composite(data) -> None:
-    fig = plt.figure(figsize=(7.4, 14.6), constrained_layout=True)
+    fig = plt.figure(figsize=(10.0, 14.0), constrained_layout=True)
     gs = fig.add_gridspec(5, 2, height_ratios=[1.0, 1.0, 1.1, 1.0, 0.95])
     axes = {
         "a": fig.add_subplot(gs[0, 0]),
