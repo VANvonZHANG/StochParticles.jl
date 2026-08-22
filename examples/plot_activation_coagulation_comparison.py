@@ -58,7 +58,7 @@ PANEL_PATHS = {
     "e": PANEL_DIR / "e_kernel_attribution_cross.png",
     "f": PANEL_DIR / "f_size_resolved_activation.png",
     "g": PANEL_DIR / "g_with_coagulation_heatmap.png",
-    "h": PANEL_DIR / "h_final_distribution_overlay.png",
+    "h": PANEL_DIR / "h_activation_only_heatmap.png",
 }
 
 CASE_LABELS = {
@@ -306,6 +306,7 @@ def plot_mean_wet_diameter(ax, data) -> None:
         )
     ax.set_yscale("log")
     _style_time_axis(ax, "Mean wet diameter ($\mu$m)")
+    ax.legend(loc="best", fontsize=6)
 
 
 def plot_kernel_attribution(ax, data, mode_class: str) -> None:
@@ -335,8 +336,38 @@ def plot_kernel_attribution(ax, data, mode_class: str) -> None:
     _style_time_axis(
         ax, f"Kernel share ({MODE_LABELS[mode_class]} pairs)", ylim=(0.0, 1.0)
     )
-    ax.set_xlim(0.0, t_max / 60.0)
+    ax.set_xlim(0.0, max(t_max / 60.0, 5.0))
     ax.legend(loc="center right", fontsize=6)
+
+
+def plot_activation_only_heatmap(ax, fig, data, *, colorbar: bool = True):
+    time, grid, heatmap = data["heatmaps"]["activation_only"]
+    mesh = _plot_heatmap(ax, time, grid, heatmap, data["heatmap_norm"])
+    ax.set_title("Activation only", pad=4)
+    if colorbar:
+        cbar = fig.colorbar(mesh, ax=ax, pad=0.02, fraction=0.046)
+        cbar.set_label(KDE_DENSITY_LABEL)
+    return mesh
+
+
+def plot_activation_with_coagulation_heatmap(ax, fig, data, *, colorbar: bool = True):
+    time, grid, heatmap = data["heatmaps"]["activation_with_coagulation"]
+    mesh = _plot_heatmap(ax, time, grid, heatmap, data["heatmap_norm"])
+    ax.set_title("With coagulation", pad=4)
+    if colorbar:
+        cbar = fig.colorbar(mesh, ax=ax, pad=0.02, fraction=0.046)
+        cbar.set_label(KDE_DENSITY_LABEL)
+    return mesh
+
+
+def plot_activation_only_heatmap(ax, fig, data, *, colorbar: bool = True):
+    time, grid, heatmap = data["heatmaps"]["activation_only"]
+    mesh = _plot_heatmap(ax, time, grid, heatmap, data["heatmap_norm"])
+    ax.set_title("Activation only", pad=4)
+    if colorbar:
+        cbar = fig.colorbar(mesh, ax=ax, pad=0.02, fraction=0.046)
+        cbar.set_label(KDE_DENSITY_LABEL)
+    return mesh
 
 
 def plot_activation_with_coagulation_heatmap(ax, fig, data, *, colorbar: bool = True):
@@ -407,7 +438,7 @@ def save_standalone_panels(data) -> None:
                 ax, fig, data, colorbar=True
             ),
         ),
-        ("h", lambda ax, fig: plot_final_distribution_overlay(ax, data)),
+        ("h", lambda ax, fig: plot_activation_only_heatmap(ax, fig, data, colorbar=True)),
     ]
 
     for label, plotter in panel_specs:
@@ -441,9 +472,9 @@ def save_composite(data) -> None:
     plot_kernel_attribution(axes["e"], data, "cross")
     plot_size_resolved_activation(axes["f"], data)
     mesh = plot_activation_with_coagulation_heatmap(axes["g"], fig, data, colorbar=False)
-    cbar = fig.colorbar(mesh, ax=axes["g"], pad=0.02, fraction=0.046)
+    plot_activation_only_heatmap(axes["h"], fig, data, colorbar=False)
+    cbar = fig.colorbar(mesh, ax=[axes["g"], axes["h"]], pad=0.015, fraction=0.035)
     cbar.set_label(KDE_DENSITY_LABEL)
-    plot_final_distribution_overlay(axes["h"], data)
     for label, ax in axes.items():
         add_panel_label(ax, label)
     save_png(fig, COMPOSITE_PATH)
