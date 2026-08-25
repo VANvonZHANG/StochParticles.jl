@@ -10,11 +10,13 @@ include("../examples/simulate_activation_coagulation_comparison.jl")
     @test n_accum == 200
     @test n_aitken + n_accum == cfg.n_sim
     @test cfg.n_sim == 1000
-    @test cfg.volume * (cfg.aitken_concentration + cfg.accumulation_concentration) ≈ cfg.n_sim
+    @test cfg.volume * (cfg.aitken_concentration + cfg.accumulation_concentration) ≈
+          cfg.n_sim
     @test cfg.supersaturation == 0.005
     @test cfg.mode_dry_diameter_threshold == 6.0e-8
 
-    particles, dry_diams, thermo_labels = initial_activation_particles(cfg, cfg.initial_seed)
+    particles, dry_diams,
+    thermo_labels = initial_activation_particles(cfg, cfg.initial_seed)
     @test length(particles) == cfg.n_sim
     @test length(dry_diams) == cfg.n_sim
     @test length(thermo_labels) == cfg.n_sim
@@ -27,11 +29,11 @@ include("../examples/simulate_activation_coagulation_comparison.jl")
 
     thermo = average_thermo(cfg)
     sc_aitken = minimum(critical_supersaturation(
-        SVector{2, Float64}(m[1], 0.0), thermo, cfg.densities, cfg.T)
-        for m in particles[1:n_aitken])
+                            SVector{2, Float64}(m[1], 0.0), thermo, cfg.densities, cfg.T)
+    for m in particles[1:n_aitken])
     sc_accum = maximum(critical_supersaturation(
-        SVector{2, Float64}(m[1], 0.0), thermo, cfg.densities, cfg.T)
-        for m in particles[(n_aitken + 1):end])
+                           SVector{2, Float64}(m[1], 0.0), thermo, cfg.densities, cfg.T)
+    for m in particles[(n_aitken + 1):end])
     @test sc_accum < cfg.supersaturation
     @test cfg.supersaturation < sc_aitken
 end
@@ -94,7 +96,8 @@ end
     @test last.number_concentration_droplet ≈ rec_only[1].number_concentration_droplet
 
     cfg_coag = ActivationComparisonConfig(tspan = (0.0, 30.0), saveat = 10.0)
-    sol_coag, rec_coag = solve_activation_scenario(
+    sol_coag,
+    rec_coag = solve_activation_scenario(
         cfg_coag, deepcopy(particles), :activation_with_coagulation)
     @test sol_coag.retcode == ReturnCode.Success
     @test rec_coag[end].number_concentration_aitken <
