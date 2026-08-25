@@ -591,7 +591,6 @@ function local_majorant_bounds(kernel, u::Vector{Float64}, sys::ParticleSystem{A
     return bounds
 end
 
-
 """
     refresh_local_bounds!(kernel, u, sys, bounds, process, i, j)
 
@@ -826,7 +825,8 @@ function make_non_cnmc_coagulation_jump(kernel, sampling)
     return ConstantRateJump(rate, affect!)
 end
 
-function apply_coagulation_merge!(u, sys, ::Val{A}, process::CoagulationProcess, i, j) where {A}
+function apply_coagulation_merge!(
+        u, sys, ::Val{A}, process::CoagulationProcess, i, j) where {A}
     cnmc_coagulate!(u, sys, Val(A), i, j)
     return nothing
 end
