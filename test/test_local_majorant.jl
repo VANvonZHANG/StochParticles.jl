@@ -14,13 +14,14 @@ using OrdinaryDiffEq
     bounds = StochParticles.local_majorant_bounds(kernel, u0, sys)
     @test length(bounds) == 4
     for i in 1:4, j in 1:4
+
         i == j && continue
         K_ij = kernel(get_particle(u0, i, Val(1)), get_particle(u0, j, Val(1)))
         @test bounds[i] >= K_ij
     end
     # exactness: the extreme particle's bound equals its true row max
     row_max = maximum(kernel(get_particle(u0, 4, Val(1)), get_particle(u0, j, Val(1)))
-                      for j in 1:3)
+    for j in 1:3)
     @test bounds[4] == row_max
     # LocalMajorant is a CoagulationSampling usable in process constructors
     proc = NonCNMCCoagulationProcess(kernel, LocalMajorant())
@@ -40,7 +41,7 @@ end
     fresh = StochParticles.local_majorant_bounds(kernel, u, sys)
     @test sys.n_active == 5
     @test StochParticles.total_mass(u, Val(1), sys.n_active) ≈ m_before
-    for k in 1:sys.n_active
+    for k in 1:(sys.n_active)
         @test bounds[k] >= fresh[k] - 1.0e-15 * max(1.0, fresh[k])
     end
 end
@@ -52,6 +53,7 @@ end
     volume = 1.0e-6
     Λ = 0.0
     for i in 1:19, j in (i + 1):20
+
         Λ += kernel(particles[i], particles[j])
     end
     Λ /= volume
@@ -80,6 +82,7 @@ end
             pairs = Tuple{Int, Int, Float64}[]
             tot = 0.0
             for i in 1:(n - 1), j in (i + 1):n
+
                 K = kernel(get_particle(u, i, Val(1)), get_particle(u, j, Val(1)))
                 if K > 0.0
                     push!(pairs, (i, j, K))
@@ -125,10 +128,11 @@ struct ConstKernel <: StochParticles.CoagulationKernel{1} end
 @testset "solve_split degenerate ODE path" begin
     particles = [SVector(1.0e-18), SVector(2.0e-18), SVector(3.0e-18)]
     records = solve_split(particles, 1.0e-6, t -> SVector(0.0), (ConstDrift(),),
-                          Tsit5(); tspan = (0.0, 100.0), dt_split = 10.0,
-                          saveat = 10.0,
-                          record_func = (t, u, sys) -> (t = t,
-                                                        mass = StochParticles.total_mass(u, Val(1), sys.n_active)))[2]
+        Tsit5(); tspan = (0.0, 100.0), dt_split = 10.0,
+        saveat = 10.0,
+        record_func = (t, u,
+            sys) -> (t = t,
+            mass = StochParticles.total_mass(u, Val(1), sys.n_active)))[2]
     @test length(records) == 11                      # t = 0, 10, ..., 100
     @test records[1].t == 0.0
     @test records[end].t == 100.0
@@ -142,19 +146,19 @@ end
     proc = NonCNMCCoagulationProcess(kernel, LocalMajorant())
     # saveat not an integer multiple of dt_split
     @test_throws ArgumentError solve_split(particles, 1.0e-6, t -> SVector(0.0),
-                                           (ConstDrift(),), Tsit5();
-                                           tspan = (0.0, 10.0), dt_split = 3.0,
-                                           saveat = 10.0, record_func = (t, u, sys) -> t)
+        (ConstDrift(),), Tsit5();
+        tspan = (0.0, 10.0), dt_split = 3.0,
+        saveat = 10.0, record_func = (t, u, sys) -> t)
     # two coagulation processes
     @test_throws ArgumentError solve_split(particles, 1.0e-6, t -> SVector(0.0),
-                                           (proc, proc), Tsit5();
-                                           tspan = (0.0, 10.0), dt_split = 5.0,
-                                           saveat = 10.0, record_func = (t, u, sys) -> t)
+        (proc, proc), Tsit5();
+        tspan = (0.0, 10.0), dt_split = 5.0,
+        saveat = 10.0, record_func = (t, u, sys) -> t)
     # unsupported process kind (Emission; sampler never invoked, type is what matters)
     @test_throws ArgumentError solve_split(particles, 1.0e-6, t -> SVector(0.0),
-                                           (EmissionProcess(1.0, (args...) -> SVector(0.0)),), Tsit5();
-                                           tspan = (0.0, 10.0), dt_split = 5.0,
-                                           saveat = 10.0, record_func = (t, u, sys) -> t)
+        (EmissionProcess(1.0, (args...) -> SVector(0.0)),), Tsit5();
+        tspan = (0.0, 10.0), dt_split = 5.0,
+        saveat = 10.0, record_func = (t, u, sys) -> t)
 end
 
 @testset "solve_split Smoluchowski analytic (constant kernel)" begin
@@ -166,9 +170,10 @@ end
     finals = Float64[]
     for rep in 1:20
         Random.seed!(777000 + rep)
-        _, recs = solve_split(particles, volume, t -> SVector(0.0), (proc,), Tsit5();
-                              tspan = (0.0, 0.01), dt_split = 0.002, saveat = 0.01,
-                              record_func = (t, u, sys) -> sys.n_active)
+        _,
+        recs = solve_split(particles, volume, t -> SVector(0.0), (proc,), Tsit5();
+            tspan = (0.0, 0.01), dt_split = 0.002, saveat = 0.01,
+            record_func = (t, u, sys) -> sys.n_active)
         push!(finals, recs[end] / n0)
     end
     # analytic N/N0 = 1/(1 + K0*N0*t/2) = 0.5; 20 reps -> 10% band
