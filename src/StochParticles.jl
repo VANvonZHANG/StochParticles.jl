@@ -19,13 +19,13 @@ export ParticleSystem, ParticleProblem, species_val
 export get_particle, set_particle!, make_u0, total_mass
 export PhysicsProcess, provides_drift
 export CoagulationKernel, CoagulationSampling
-export BrownianKernel, GlobalMajorant, CompositeKernel, GravitationalKernel,
+export BrownianKernel, GlobalMajorant, LocalMajorant, CompositeKernel, GravitationalKernel,
        AyalaTurbulentKernel, AtmosphericParameters, make_kernel
-export CoagulationProcess, NonCNMCCoagulationProcess,
+export CoagulationProcess, NonCNMCCoagulationProcess, step_coagulation!,
        CondensationProcess, SpeciesDependentCondensation,
        H2OCondensationFlux,
        H2OCondensationProcess, pre_equilibrate!, EmissionProcess, DilutionProcess
-export apply_drift, make_ode_func
+export apply_drift, make_ode_func, solve_split
 export compute_majorant, majorant_rate
 export cnmc_merge!, cnmc_clone!, cnmc_volume_rescale!, cnmc_coagulate!
 export make_coagulation_jump, make_non_cnmc_coagulation_jump, make_emission_jump

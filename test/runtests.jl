@@ -20,6 +20,7 @@ end
     include("test_preset_species.jl")
     include("test_condensation.jl")
     include("test_coagulation.jl")
+    include("test_local_majorant.jl")
     include("test_cnmc.jl")
     include("test_emission.jl")
     include("test_dilution.jl")

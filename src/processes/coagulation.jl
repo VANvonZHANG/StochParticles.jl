@@ -2,6 +2,8 @@
 
 # ---- Kernel implementations ----
 
+using Random: randexp
+
 """
     compute_air_properties(T, p) -> NamedTuple
 
@@ -558,6 +560,123 @@ function compute_majorant(
 end
 
 """
+    LocalMajorant() <: CoagulationSampling
+
+Per-particle exact local majorant sampling for frozen-state sub-steps
+(operator splitting). Bounds `K_i^max = max_{j != i} K(i, j)` are rebuilt
+exactly at each sub-step and maintained incrementally per accepted event.
+Use via `step_coagulation!` / `solve_split`.
+"""
+struct LocalMajorant <: CoagulationSampling end
+
+"""
+    local_majorant_bounds(kernel, u, sys) -> Vector{Float64}
+
+Per-particle exact kernel maxima `K_i^max = max_{j != i} K(mu_i, mu_j) >= 0`
+over the currently active particles. O(N^2) kernel evaluations, exploiting
+kernel symmetry.
+"""
+function local_majorant_bounds(kernel, u::Vector{Float64}, sys::ParticleSystem{A}) where {A}
+    n = sys.n_active
+    A_val = Val(A)
+    particles = [get_particle(u, i, A_val) for i in 1:n]
+    bounds = zeros(n)
+    for i in 1:(n - 1)
+        for j in (i + 1):n
+            K = max(kernel(particles[i], particles[j]), 0.0)
+            K > bounds[i] && (bounds[i] = K)
+            K > bounds[j] && (bounds[j] = K)
+        end
+    end
+    return bounds
+end
+
+"""
+    refresh_local_bounds!(kernel, u, sys, bounds, process, i, j)
+
+Restore the invariant `bounds[k] >= max_j K(k, j)` after a merge of `i` and
+`j` (call AFTER the merge was applied). Only the merged particle's row, the
+merged particle's column, and the slot reshuffled by the swap/clone can
+change; bounds are raised, never lowered.
+"""
+function refresh_local_bounds!(
+        kernel, u, sys::ParticleSystem{A}, bounds, process, i, j) where {A}
+    n = sys.n_active
+    A_val = Val(A)
+    μ_i = get_particle(u, i, A_val)
+    b_i = 0.0
+    for k in 1:n
+        k == i && continue
+        b_i = max(b_i, kernel(μ_i, get_particle(u, k, A_val)))
+    end
+    bounds[i] = max(bounds[i], b_i)
+    for k in 1:n
+        k == i && continue
+        K_ki = kernel(get_particle(u, k, A_val), μ_i)
+        K_ki > bounds[k] && (bounds[k] = K_ki)
+    end
+    if process isa CoagulationProcess
+        # CNMC cloned a particle into the vacated slot: recompute its row exactly.
+        if j <= n
+            μ_j = get_particle(u, j, A_val)
+            b_j = 0.0
+            for k in 1:n
+                k == j && continue
+                b_j = max(b_j, kernel(μ_j, get_particle(u, k, A_val)))
+            end
+            bounds[j] = max(bounds[j], b_j)
+        end
+    elseif j <= n
+        # NonCNMC swap-delete: the last active particle moved into slot j.
+        bounds[j] = max(bounds[j], bounds[n + 1])
+    end
+    return nothing
+end
+
+"""
+    step_coagulation!(u, sys, process, dt) -> Int
+
+Advance the frozen-state coagulation SSA for `process` by `dt` simulated
+seconds, treating all particle states as constant between events (operator
+splitting). Per-particle bounds `K_i^max = max_{j != i} K(i, j)` are rebuilt
+exactly at entry and maintained incrementally per accepted event
+(`refresh_local_bounds!`). The inflated total rate is
+`sum_i K_i^max * (n - 1) / (2V)`; `i` is drawn proportional to `K_i^max`,
+`j` uniformly among the other active particles, and the proposal is accepted
+with probability `K_ij / K_i^max`, giving an effective unordered-pair rate of
+exactly `K_ij / V`. Mutates `u` and `sys` (`n_active`, and `volume` under the
+CNMC merge policy); returns the number of accepted events.
+"""
+function step_coagulation!(u::Vector{Float64}, sys::ParticleSystem{A},
+        process, dt::Real) where {A}
+    sys.n_active < 2 && return 0
+    kernel = process.kernel
+    bounds = local_majorant_bounds(kernel, u, sys)
+    A_val = Val(A)
+    t = 0.0
+    events = 0
+    while sys.n_active >= 2
+        n = sys.n_active
+        B = sum(bounds[1:n])
+        Λ = B * (n - 1) / (2 * sys.volume)
+        Λ <= 0.0 && break
+        t += randexp() / Λ
+        t >= dt && break
+        c = cumsum(bounds[1:n])
+        i = searchsortedfirst(c, rand() * B)
+        j = rand(1:(n - 1))
+        j >= i && (j += 1)
+        K_ij = kernel(get_particle(u, i, A_val), get_particle(u, j, A_val))
+        if K_ij > 0.0 && rand() * bounds[i] <= K_ij
+            apply_coagulation_merge!(u, sys, A_val, process, i, j)
+            refresh_local_bounds!(kernel, u, sys, bounds, process, i, j)
+            events += 1
+        end
+    end
+    return events
+end
+
+"""
     majorant_rate(sampling, kernel, u, sys) -> Float64
 
 Compute the total coagulation event rate using the majorant method:
@@ -704,4 +823,16 @@ function make_non_cnmc_coagulation_jump(kernel, sampling)
     end
 
     return ConstantRateJump(rate, affect!)
+end
+
+function apply_coagulation_merge!(
+        u, sys, ::Val{A}, process::CoagulationProcess, i, j) where {A}
+    cnmc_coagulate!(u, sys, Val(A), i, j)
+    return nothing
+end
+
+function apply_coagulation_merge!(
+        u, sys, ::Val{A}, process::NonCNMCCoagulationProcess, i, j) where {A}
+    non_cnmc_coagulate!(u, sys, Val(A), i, j)
+    return nothing
 end
