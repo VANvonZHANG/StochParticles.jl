@@ -22,6 +22,7 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 [compat]
 Aqua = "0.8"
 Dates = "1.10"
+DiffEqCallbacks = "4"
 HDF5 = "0.17"
 Interpolations = "0.15, 0.16"
 JLD2 = "0.6"
@@ -39,7 +40,8 @@ julia = "1.10"
 
 [extras]
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+DiffEqCallbacks = "459566f4-90b8-5000-8ac3-15dfb0a30def"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Aqua", "Test"]
+test = ["Aqua", "DiffEqCallbacks", "Test"]

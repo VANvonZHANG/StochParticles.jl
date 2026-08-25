@@ -274,7 +274,7 @@ def plot_distribution_shift(ax, reps: list[ReplicateData]):
             ha="left",
             va="top",
             color="#333333",
-            fontsize=6.5,
+            fontsize=6,
         )
     ax.set_xlabel("Diameter (um)")
     ax.set_ylabel("KDE number density (m$^{-3}$ dex$^{-1}$)")
@@ -445,7 +445,7 @@ def save_standalone_panels(aerosol_reps: list[ReplicateData], cloud_reps: list[R
     ]
 
     for label, plotter in panel_specs:
-        fig, ax = plt.subplots(figsize=(3.35, 2.45))
+        fig, ax = plt.subplots(figsize=(3.5, 2.45))
         plotter(ax, fig)
         _finish_standalone(fig, ax, label, PANEL_PATHS[label])
 

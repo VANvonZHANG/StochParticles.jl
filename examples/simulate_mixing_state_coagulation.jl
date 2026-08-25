@@ -309,7 +309,8 @@ function direct_mixing_state_coagulation_records(cfg, initial_particles)
             next_time > save_time && break
 
             current_time = next_time
-            i, j = sample_pair_from_cache(
+            i,
+            j = sample_pair_from_cache(
                 kernel_cache, row_sums, active_particles, total_kernel_sum)
             active_particles = update_after_coagulation!(
                 kernel_cache, row_sums, particles, active_particles, kernel, i, j)

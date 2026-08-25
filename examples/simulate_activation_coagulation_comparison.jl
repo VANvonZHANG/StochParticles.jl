@@ -8,7 +8,6 @@ include("simulation_io.jl")
 
 const ACTIVATION_BASENAME = "activation_coagulation_comparison"
 const A = 2
-const EQUAL_KERNEL_FRACTIONS = (1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0)
 const TIME_MAJOR_COMPAT_DATASETS = Set([
     "activation_flag_samples",
     "diameter_samples",
@@ -48,16 +47,24 @@ end
 
 Base.@kwdef struct ActivationComparisonConfig
     species_names::Vector{String} = ["SO4", "H2O"]
-    n_sim::Int = 240
-    volume::Float64 = 1.0e-6
+    n_sim::Int = 1000
+    aitken_dg::Float64 = 2.0e-8
+    aitken_sigma_g::Float64 = 1.25
+    aitken_concentration::Float64 = 8.4e11
+    accumulation_dg::Float64 = 2.0e-7
+    accumulation_sigma_g::Float64 = 1.4
+    accumulation_concentration::Float64 = 2.1e11
+    volume::Float64 = 1000.0 / (8.4e11 + 2.1e11)
     tspan::Tuple{Float64, Float64} = (0.0, 600.0)
     saveat::Float64 = 10.0
+    dt_split::Float64 = 10.0
     densities::SVector{2, Float64} = SVector(1770.0, 1000.0)
     h2o_idx::Int = 2
     T::Float64 = 293.15
     p::Float64 = 1.01325e5
-    supersaturation::Float64 = 0.003
+    supersaturation::Float64 = 0.005
     activation_radius::Float64 = 1.0e-6
+    mode_dry_diameter_threshold::Float64 = 6.0e-8
     rho_f::Float64 = 1.06
     mu_f::Float64 = 1.75e-5
     nu::Float64 = 1.65e-5
@@ -68,6 +75,12 @@ Base.@kwdef struct ActivationComparisonConfig
     bin_edges::Vector{Float64} = collect(10.0 .^ range(-8.3, -4.5; length = 96))
     initial_seed::Int = 2026072200
     seed_base::Int = 2026072200
+end
+
+function mode_particle_counts(cfg::ActivationComparisonConfig)
+    total = cfg.aitken_concentration + cfg.accumulation_concentration
+    n_aitken = round(Int, cfg.n_sim * cfg.aitken_concentration / total)
+    return n_aitken, cfg.n_sim - n_aitken
 end
 
 function average_thermo(_cfg::ActivationComparisonConfig)
@@ -95,18 +108,16 @@ end
 
 function initial_activation_particles(cfg::ActivationComparisonConfig, seed)
     Random.seed!(seed)
-
-    n_aitken = div(cfg.n_sim, 2)
-    n_accum = cfg.n_sim - n_aitken
-
-    particles_aitken = lognormal_masses(n_aitken, 3.0e-8, 1.6, cfg.densities)
-    particles_accum = lognormal_masses(n_accum, 1.2e-7, 1.8, cfg.densities)
+    n_aitken, n_accum = mode_particle_counts(cfg)
+    particles_aitken = lognormal_masses(
+        n_aitken, cfg.aitken_dg, cfg.aitken_sigma_g, cfg.densities)
+    particles_accum = lognormal_masses(
+        n_accum, cfg.accumulation_dg, cfg.accumulation_sigma_g, cfg.densities)
     dry_particles = [SVector{2, Float64}(m[1], 0.0)
                      for m in vcat(particles_aitken, particles_accum)]
     dry_diams = [dry_diameter_from_so4_mass(p[1], cfg.densities[1])
                  for p in dry_particles]
-    thermo_labels = vcat(fill(0.30, n_aitken), fill(0.61, n_accum))
-
+    thermo_labels = fill(0.455, cfg.n_sim)
     particles = deepcopy(dry_particles)
     pre_equilibrate!(
         particles,
@@ -116,7 +127,6 @@ function initial_activation_particles(cfg::ActivationComparisonConfig, seed)
         vapor_pressure(cfg);
         h2o_idx = cfg.h2o_idx
     )
-
     return (particles, dry_diams, thermo_labels)
 end
 
@@ -157,7 +167,7 @@ end
 
 function dry_diameters_from_state(u, sys, cfg::ActivationComparisonConfig)
     diameters = Vector{Float64}(undef, sys.n_active)
-    for i in 1:sys.n_active
+    for i in 1:(sys.n_active)
         particle = get_particle(u, i, Val(A))
         diameters[i] = dry_diameter_from_so4_mass(particle[1], cfg.densities[1])
     end
@@ -166,7 +176,7 @@ end
 
 function activation_flags_from_state(u, sys, cfg::ActivationComparisonConfig)
     flags = Vector{Float64}(undef, sys.n_active)
-    for i in 1:sys.n_active
+    for i in 1:(sys.n_active)
         particle = get_particle(u, i, Val(A))
         wet_volume = 0.0
         for k in 1:A
@@ -178,50 +188,95 @@ function activation_flags_from_state(u, sys, cfg::ActivationComparisonConfig)
     return flags
 end
 
-function kernel_fraction_triplet(u, sys, parts)
-    sys.n_active < 2 && return EQUAL_KERNEL_FRACTIONS
+function mode_id_from_dry_diameter(dry_diameter::Real, cfg::ActivationComparisonConfig)
+    return dry_diameter >= cfg.mode_dry_diameter_threshold ? 2 : 1
+end
 
-    brownian_sum = 0.0
-    gravitational_sum = 0.0
-    turbulent_sum = 0.0
-    for i in 1:(sys.n_active - 1)
-        particle_i = get_particle(u, i, Val(A))
-        for j in (i + 1):sys.n_active
-            particle_j = get_particle(u, j, Val(A))
-            brownian_sum += max(parts.brownian(particle_i, particle_j), 0.0)
-            gravitational_sum += max(parts.gravitational(particle_i, particle_j), 0.0)
-            turbulent_sum += max(parts.turbulent(particle_i, particle_j), 0.0)
+function mode_ids_from_state(u, sys, cfg::ActivationComparisonConfig)
+    ids = Vector{Int}(undef, sys.n_active)
+    for i in 1:(sys.n_active)
+        particle = get_particle(u, i, Val(A))
+        dry_diameter = dry_diameter_from_so4_mass(particle[1], cfg.densities[1])
+        ids[i] = mode_id_from_dry_diameter(dry_diameter, cfg)
+    end
+    return ids
+end
+
+function per_mode_counts(ids, flags)
+    n_aitken = count(==(1), ids)
+    n_droplet = count(==(2), ids)
+    activated_aitken = count(i -> ids[i] == 1 && flags[i] == 1.0, eachindex(ids))
+    activated_droplet = count(i -> ids[i] == 2 && flags[i] == 1.0, eachindex(ids))
+    return (n_aitken, n_droplet, activated_aitken, activated_droplet)
+end
+
+function per_mode_record(u, sys, cfg::ActivationComparisonConfig)
+    ids = mode_ids_from_state(u, sys, cfg)
+    flags = activation_flags_from_state(u, sys, cfg)
+    n_aitken, n_droplet, act_aitken, act_droplet = per_mode_counts(ids, flags)
+    return (
+        number_concentration_aitken = n_aitken / sys.volume,
+        number_concentration_droplet = n_droplet / sys.volume,
+        activation_fraction_aitken = n_aitken == 0 ? 0.0 : act_aitken / n_aitken,
+        activation_fraction_droplet = n_droplet == 0 ? 0.0 : act_droplet / n_droplet
+    )
+end
+
+function kernel_attribution_from_particles(particles, ids, parts)
+    sums = zeros(3, 3)  # rows: (A,A)=1, (D,D)=2, (A,D)/mixed=3; cols: B, G, T
+    n = length(particles)
+    for i in 1:(n - 1)
+        for j in (i + 1):n
+            cls = ids[i] == ids[j] ? ids[i] : 3
+            sums[cls, 1] += max(parts.brownian(particles[i], particles[j]), 0.0)
+            sums[cls, 2] += max(parts.gravitational(particles[i], particles[j]), 0.0)
+            sums[cls, 3] += max(parts.turbulent(particles[i], particles[j]), 0.0)
         end
     end
+    fraction(cls, comp) = sums[cls, comp] /
+                          (sum(sums[cls, :]) > 0.0 ? sum(sums[cls, :]) : 1.0)
+    return (
+        kernel_fraction_aitken_brownian = fraction(1, 1),
+        kernel_fraction_aitken_gravitational = fraction(1, 2),
+        kernel_fraction_aitken_turbulent = fraction(1, 3),
+        kernel_fraction_droplet_brownian = fraction(2, 1),
+        kernel_fraction_droplet_gravitational = fraction(2, 2),
+        kernel_fraction_droplet_turbulent = fraction(2, 3),
+        kernel_fraction_cross_brownian = fraction(3, 1),
+        kernel_fraction_cross_gravitational = fraction(3, 2),
+        kernel_fraction_cross_turbulent = fraction(3, 3)
+    )
+end
 
-    total = brownian_sum + gravitational_sum + turbulent_sum
-    if !isfinite(total) || total <= 0.0
-        return EQUAL_KERNEL_FRACTIONS
-    end
-
-    return (brownian_sum / total, gravitational_sum / total, turbulent_sum / total)
+function kernel_attribution_by_class(u, sys, parts, cfg::ActivationComparisonConfig)
+    particles = [get_particle(u, i, Val(A)) for i in 1:(sys.n_active)]
+    ids = mode_ids_from_state(u, sys, cfg)
+    return kernel_attribution_from_particles(particles, ids, parts)
 end
 
 function record_extras(u, sys, cfg::ActivationComparisonConfig)
-    return (
-        activation_fraction = activation_fraction(
-            u,
-            sys,
-            Val(A);
-            mode = :radius_threshold,
-            threshold = cfg.activation_radius,
-            densities = cfg.densities
+    return merge(
+        (
+            activation_fraction = activation_fraction(
+                u,
+                sys,
+                Val(A);
+                mode = :radius_threshold,
+                threshold = cfg.activation_radius,
+                densities = cfg.densities
+            ),
+            cloud_droplet_concentration = cloud_droplet_concentration(
+                u,
+                sys,
+                Val(A);
+                mode = :radius_threshold,
+                threshold = cfg.activation_radius,
+                densities = cfg.densities
+            ),
+            dry_diameter_samples = dry_diameters_from_state(u, sys, cfg),
+            activation_flag_samples = activation_flags_from_state(u, sys, cfg)
         ),
-        cloud_droplet_concentration = cloud_droplet_concentration(
-            u,
-            sys,
-            Val(A);
-            mode = :radius_threshold,
-            threshold = cfg.activation_radius,
-            densities = cfg.densities
-        ),
-        dry_diameter_samples = dry_diameters_from_state(u, sys, cfg),
-        activation_flag_samples = activation_flags_from_state(u, sys, cfg)
+        per_mode_record(u, sys, cfg)
     )
 end
 
@@ -234,45 +289,38 @@ function solve_activation_scenario(cfg::ActivationComparisonConfig, particles, s
         (condensation,)
     elseif scenario == :activation_with_coagulation
         parts = activation_kernel_parts(cfg)
-        coagulation = CoagulationProcess(parts.total, GlobalMajorant())
+        coagulation = NonCNMCCoagulationProcess(parts.total, LocalMajorant())
         (condensation, coagulation)
     else
         throw(ArgumentError("unknown activation scenario '$scenario'"))
     end
 
-    prob = ParticleProblem(
-        deepcopy(particles),
-        cfg.volume,
-        gas_fn(cfg),
-        processes;
-        tspan = cfg.tspan,
-        n_sim = cfg.n_sim
-    )
-
     parts = scenario == :activation_with_coagulation ? activation_kernel_parts(cfg) :
             nothing
-    record_func = (t, u, sys) -> begin
+    record_func = (t,
+        u,
+        sys) -> begin
         base = base_diagnostic_record(t, u, sys, Val(A), cfg.densities, cfg.bin_edges)
         extras = record_extras(u, sys, cfg)
         if parts === nothing
             return merge_record(base, extras)
         end
 
-        brownian_frac, gravitational_frac, turbulent_frac = kernel_fraction_triplet(u, sys, parts)
-        return merge_record(
-            base,
-            merge(
-                extras,
-                (
-                    kernel_fraction_brownian = brownian_frac,
-                    kernel_fraction_gravitational = gravitational_frac,
-                    kernel_fraction_turbulent = turbulent_frac
-                )
-            )
-        )
+        return merge_record(base, merge(extras, kernel_attribution_by_class(u, sys, parts, cfg)))
     end
 
-    return solve_with_records(prob, Tsit5(); saveat = cfg.saveat, record_func = record_func)
+    return solve_split(
+        deepcopy(particles),
+        cfg.volume,
+        gas_fn(cfg),
+        processes,
+        Tsit5();
+        tspan = cfg.tspan,
+        n_sim = cfg.n_sim,
+        dt_split = cfg.dt_split,
+        saveat = cfg.saveat,
+        record_func = record_func
+    )
 end
 
 function case_attributes(cfg::ActivationComparisonConfig, scenario)
@@ -286,6 +334,15 @@ function case_attributes(cfg::ActivationComparisonConfig, scenario)
         "t_start" => Float64(cfg.tspan[1]),
         "t_end" => Float64(cfg.tspan[2]),
         "saveat" => cfg.saveat,
+        "dt_split" => cfg.dt_split,
+        "aitken_dg" => cfg.aitken_dg,
+        "aitken_sigma_g" => cfg.aitken_sigma_g,
+        "aitken_concentration" => cfg.aitken_concentration,
+        "accumulation_dg" => cfg.accumulation_dg,
+        "accumulation_sigma_g" => cfg.accumulation_sigma_g,
+        "accumulation_concentration" => cfg.accumulation_concentration,
+        "mode_dry_diameter_threshold" => cfg.mode_dry_diameter_threshold,
+        "coagulation_process" => "NonCNMCCoagulationProcess+LocalMajorant+solve_split",
         "supersaturation" => cfg.supersaturation,
         "activation_radius" => cfg.activation_radius,
         "notes" => notes
@@ -330,7 +387,8 @@ end
 
 function run_replicate!(case_groups, cfg::ActivationComparisonConfig, replicate_idx)
     process_seed = cfg.seed_base + replicate_idx
-    particles, dry_diameter_initial, thermo_labels = initial_activation_particles(cfg, cfg.initial_seed)
+    particles, dry_diameter_initial,
+    thermo_labels = initial_activation_particles(cfg, cfg.initial_seed)
 
     write_scenario_replicate!(
         case_groups.activation_only,

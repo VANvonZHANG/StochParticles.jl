@@ -74,3 +74,9 @@ def effective_number_loss_rate(reps: list[ReplicateData]) -> np.ndarray:
             continue
         rates.append(-np.log(n1 / n0) / duration)
     return np.asarray(rates, dtype=float)
+
+def dataset_series(reps: list[ReplicateData], key: str) -> tuple[np.ndarray, np.ndarray]:
+    """Stack one scalar time-series dataset across replicates: rows = replicates."""
+    time = reps[0].arrays["time"]
+    rows = np.vstack([np.asarray(rep.arrays[key], dtype=float) for rep in reps])
+    return time, rows
