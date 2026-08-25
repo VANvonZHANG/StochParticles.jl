@@ -1,8 +1,5 @@
 name: TagBot
 on:
-  push:
-    branches:
-    - main
   issue_comment:
     types:
       - created
@@ -14,7 +11,7 @@ on:
     - cron: 0 0 * * *
 jobs:
   TagBot:
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.actor == 'JuliaTagBot'
+    if: github.event_name == 'workflow_dispatch' || github.actor == 'JuliaTagBot'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
