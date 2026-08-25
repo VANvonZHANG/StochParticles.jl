@@ -1,4 +1,10 @@
-"""Matplotlib styling helpers for StochParticles example figures."""
+"""Matplotlib styling helpers for StochParticles example figures.
+
+Shared Nature-style geometry standard (89 mm single column / 183 mm double
+column): standalone panels 3.5 x 2.45 in (heatmaps may extend height to
+2.65 in), composite width 7.2 in, legend fontsize 6, colorbar pad 0.02 /
+fraction 0.046 (paired: 0.015 / 0.035), title pad 4.
+"""
 
 from __future__ import annotations
 
@@ -64,6 +70,7 @@ def save_png(fig, path: str | Path, dpi: int = 650) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=dpi, bbox_inches="tight")
+    fig.savefig(path.with_suffix(".pdf"), bbox_inches="tight")
 
 
 def finish_panel(fig, path: str | Path) -> None:

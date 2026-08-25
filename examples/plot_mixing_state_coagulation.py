@@ -349,11 +349,11 @@ def _finish_standalone(fig, ax, label: str, path) -> None:
 
 def save_standalone_panels(reps: list[ReplicateData]) -> None:
     panel_specs = [
-        ("a", lambda ax, fig: plot_mixing_state_index(ax, reps), (3.45, 2.45)),
-        ("b", lambda ax, fig: plot_number_decay(ax, reps), (3.45, 2.45)),
-        ("c", lambda ax, fig: plot_species_mass_conservation(ax, reps), (3.45, 2.45)),
-        ("d", lambda ax, fig: plot_composition_distribution(ax, reps), (3.45, 2.45)),
-        ("e", lambda ax, fig: plot_size_composition_map(ax, fig, reps), (3.75, 2.65)),
+        ("a", lambda ax, fig: plot_mixing_state_index(ax, reps), (3.5, 2.45)),
+        ("b", lambda ax, fig: plot_number_decay(ax, reps), (3.5, 2.45)),
+        ("c", lambda ax, fig: plot_species_mass_conservation(ax, reps), (3.5, 2.45)),
+        ("d", lambda ax, fig: plot_composition_distribution(ax, reps), (3.5, 2.45)),
+        ("e", lambda ax, fig: plot_size_composition_map(ax, fig, reps), (3.5, 2.65)),
     ]
 
     for label, plotter, figsize in panel_specs:
@@ -363,7 +363,7 @@ def save_standalone_panels(reps: list[ReplicateData]) -> None:
 
 
 def save_composite(reps: list[ReplicateData]) -> None:
-    fig = plt.figure(figsize=(7.3, 8.2), constrained_layout=True)
+    fig = plt.figure(figsize=(7.2, 8.2), constrained_layout=True)
     gs = fig.add_gridspec(3, 2, height_ratios=[1.0, 1.0, 1.2])
 
     axes = {

@@ -427,7 +427,7 @@ def save_standalone_panels(data) -> None:
     ]
 
     for label, plotter in panel_specs:
-        fig, ax = plt.subplots(figsize=(3.45, 2.45))
+        fig, ax = plt.subplots(figsize=(3.5, 2.45))
         plotter(ax, fig)
         _finish_standalone(fig, ax, label, PANEL_PATHS[label])
 
@@ -438,7 +438,7 @@ def save_full_outputs(data) -> None:
 
 
 def save_composite(data) -> None:
-    fig = plt.figure(figsize=(10.0, 11.5), constrained_layout=True)
+    fig = plt.figure(figsize=(7.2, 10.8), constrained_layout=True)
     gs = fig.add_gridspec(4, 2, height_ratios=[1.0, 1.0, 1.0, 1.15])
     axes = {
         "a": fig.add_subplot(gs[0, 0]),
