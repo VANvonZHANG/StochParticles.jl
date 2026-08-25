@@ -7,18 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.7.0] - 2026-08-25
+## [0.8.0] - 2026-08-25
+### Added
 
+#### Activation-coagulation example redesign (`examples/`)
+- Two lognormal modes allocated by number concentration (Aitken 20 nm x 800 / accumulation 200 nm x 200 at n_sim = 1000, V = 1000/1.05e12 m^3) with supersaturation S = 0.005 chosen from the measured Köhler activation window of the realized population.
+- Coagulation runs `NonCNMCCoagulationProcess` + `LocalMajorant` through `solve_split` (dt_split = 10 s); per-mode number/activation records and 9-series Brownian/gravitational/turbulent kernel attribution per pair class (A-A, D-D, A-D).
+- The configured concentrations drive a coalescence-sweep cascade (droplet number collapses, merged droplets grow to ~39 um and sweep the interstitial mode); full 20-replicate run ~2 h.
+- Composite figure redesigned to 8 panels (per-mode N/N0, mean wet diameter, attribution triptych, size-resolved activation, dual KDE heatmaps); all three example figures unified to the Nature 89/183-mm geometry standard with PNG-only export.
+
+#### Mixing-state impact metrics (`examples/`)
+- `ccn_error_series` in `examples/analysis/mixing_state_analysis.py`: ε-type CCN mixing-state metric (Riemer et al. 2019) — relative error in CCN number under a fully-internal-mixture assumption, using a vectorized numpy port of the exact κ-Köhler `critical_supersaturation` maximization.
+- `optical_error_series` in `examples/analysis/mixing_state_analysis.py`: relative error in bulk absorption/scattering at 550 nm under the same assumption, computed with PyMieScatt core-shell Mie (BC core / sulfate shell; new analysis dependency).
+- Mixing-state figure: mass-conservation and composition-PDF panels replaced by ε_CCN (S = 0.1/0.3/1.0%) and ε_optical (ε_abs, ε_sca) panels.
+
+## [0.7.0] - 2026-08-25
 ### Added
 
 - `LocalMajorant` sampling with exact per-particle bounds, `step_coagulation!`
   frozen-state SSA advancer, and `solve_split` Lie-Trotter operator-splitting
   driver — makes n_sim=1000 coagulation tractable (O(N^2) bound rebuild once
   per split sub-step instead of once per virtual event).
-#### Mixing-state impact metrics (`examples/`)
-- `ccn_error_series` in `examples/analysis/mixing_state_analysis.py`: ε-type CCN mixing-state metric (Riemer et al. 2019) — relative error in CCN number under a fully-internal-mixture assumption, using a vectorized numpy port of the exact κ-Köhler `critical_supersaturation` maximization.
-- `optical_error_series` in `examples/analysis/mixing_state_analysis.py`: relative error in bulk absorption/scattering at 550 nm under the same assumption, computed with PyMieScatt core-shell Mie (BC core / sulfate shell; new analysis dependency).
-- Mixing-state figure: mass-conservation and composition-PDF panels replaced by ε_CCN (S = 0.1/0.3/1.0%) and ε_optical (ε_abs, ε_sca) panels.
 
 ## [0.6.0] - 2026-08-18
 
