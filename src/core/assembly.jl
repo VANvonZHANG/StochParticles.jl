@@ -145,7 +145,8 @@ end
 
 """
     solve_split(particles, volume, gas_phase_fn, processes, solver;
-                tspan, n_sim, dt_split, saveat, record_func) -> (sol, records)
+                tspan, n_sim, dt_split, saveat, record_func,
+                abstol = nothing, reltol = nothing) -> (sol, records)
 
 Lie-Trotter operator-splitting driver: per sub-step of length `dt_split`,
 solve the drift-only ODE on the interval, then advance the frozen-state
@@ -156,12 +157,16 @@ plus at most one coagulation process (`CoagulationProcess` /
 Records are taken at `tspan[1]` and at every `tspan[1] + k*saveat` boundary,
 after that sub-step's jump phase. Returns the final ODE solution and the
 records vector built from `record_func(t, u, sys)`.
+Optional `abstol`/`reltol` are forwarded to each internal `solve` call. Set
+them explicitly for kilogram-scale particle states, where the solver defaults
+(abstol = 1e-6) exceed the state magnitudes by many orders of magnitude.
 """
 function solve_split(particles::Vector{SVector{A, Float64}},
         volume::Float64, gas_phase_fn, processes::Tuple{Vararg{PhysicsProcess}},
         solver;
         tspan = (0.0, 3600.0), n_sim = length(particles),
-        dt_split::Real, saveat::Real, record_func) where {A}
+        dt_split::Real, saveat::Real, record_func,
+        abstol = nothing, reltol = nothing) where {A}
     dt_split > 0.0 || throw(ArgumentError("dt_split must be positive, got $dt_split"))
     saveat > 0.0 || throw(ArgumentError("saveat must be positive, got $saveat"))
     isapprox(rem(saveat, dt_split), 0.0; atol = 1.0e-9 * dt_split) ||
@@ -188,12 +193,15 @@ function solve_split(particles::Vector{SVector{A, Float64}},
     records = Any[record_func(tspan[1], u, sys)]
     t0, t_end = tspan
     n_steps = ceil(Int, (t_end - t0) / dt_split - 1.0e-12)
+    solver_opts = Pair{Symbol, Any}[]
+    abstol === nothing || push!(solver_opts, :abstol => abstol)
+    reltol === nothing || push!(solver_opts, :reltol => reltol)
     sol = nothing
     t_prev = t0
     for k in 1:n_steps
         t_next = min(t0 + k * dt_split, t_end)
         oprob = ODEProblem(ode_func!, u, (t_prev, t_next), sys)
-        sol = solve(oprob, solver)
+        sol = solve(oprob, solver; solver_opts...)
         u = copy(sol.u[end])
         if coag !== nothing
             step_coagulation!(u, sys, coag, t_next - t_prev)
