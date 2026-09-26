@@ -65,6 +65,15 @@ This document tracks completed features and planned improvements for StochPartic
 - [x] TagBot for automatic release tagging
 - [x] CompatHelper for dependency updates
 
+## Completed (as of 2026-09-25)
+
+### GCVI Closure M0+M1 (v0.9.0)
+- [x] Dry-composition mixing-state χ (`species` keyword)
+- [x] `PrescribedProfile` open-loop environment source
+- [x] Virtual GCVI: response curve, CR/CI classification, virtual SMPS/ACSM
+- [x] `dNdlogD_from_diameters` promoted to library binning
+- [x] M0 closure driver + twin experiment v0 + J(χ) cost-curve analysis
+
 ---
 
 ## Planned Improvements

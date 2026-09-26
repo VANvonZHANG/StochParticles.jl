@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-25
+### Added
+
+#### Virtual-GCVI closure toolkit (M0+M1 of the GCVI closure blueprint)
+- `mixing_state_index(...; species)` — dry-composition χ over a species mask (water/tracers excluded); water-addition invariance under test.
+- `PrescribedProfile` — open-loop environment source (linear S(t)/T(t) interpolation, flat extrapolation); `p_v` derived via `saturation_vapor_pressure` single-source invariant.
+- `GCVIResponse` / `transmission` / `classify_cr_ci` — virtual GCVI ideal-classifier semantics (logistic response on endpoint wet diameter, Bernoulli CR/CI assignment).
+- `virtual_smps` / `virtual_acsm` — CR/CI subpopulation aggregation to instrument dimensions, reusing `dNdlogD_from_diameters` (promoted from examples to `src/utils/binning.jl`).
+- `examples/simulate_gcvi_closure.jl` — M0 walking-skeleton driver: ν scan × replicates under open-loop S(t) ramp, endpoint virtual instrument, twin-observation export (`synthetic-obs-v1` schema).
+- `examples/analysis/gcvi_closure.py` + `plot_gcvi_closure.py` — KLD/MSE cost curve J(χ) and twin-recovery figure.
+
+### Changed
+
+- `mixing_state_index` default path (no `species` keyword): particles with zero total mass are now skipped (zero mass weight, no entropy contribution) instead of contributing uniform-fraction entropy; single-species systems still return 1.0.
+- `solve_split` now forwards optional `abstol`/`reltol` to the inner ODE solve (defaults unchanged); the activation driver passes mass-scaled tolerances because the OrdinaryDiffEq default `abstol` is ~9 orders above particle masses.
+
 ## [0.8.0] - 2026-08-25
 ### Added
 
