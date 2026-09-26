@@ -44,6 +44,7 @@ export particle_diameters, compute_size_distribution
 export kde_log_diameter, smooth_histogram_diameter
 export bin_size_distribution, dNdlogD_from_diameters
 export standard_aerosol_atmosphere, standard_cloud_atmosphere
+export AbstractEnvSource, PrescribedProfile
 export Species, species_vectors
 export AS, AN, BC, OA, H2O
 export lognormal_masses, diameters_from_masses
@@ -84,6 +85,7 @@ include("plotting/recipes.jl")
 
 # ---- Utils ----
 include("utils/binning.jl")
+include("utils/env_source.jl")
 include("utils/parameters.jl")
 include("utils/initial_conditions.jl")
 include("utils/preset_species.jl")
