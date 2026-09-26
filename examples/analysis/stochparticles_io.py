@@ -21,6 +21,11 @@ TIME_MAJOR_2D_DATASETS = {
     "bc_mass_fraction_samples",
     "dry_diameter_samples",
     "activation_flag_samples",
+    "gcvi_cr_flags",
+    "cr_spectrum",
+    "ci_spectrum",
+    "cr_chemistry",
+    "ci_chemistry",
 }
 
 
