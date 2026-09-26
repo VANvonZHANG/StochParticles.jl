@@ -39,6 +39,7 @@ export number_concentration, mass_concentration, species_mass_concentration,
        mixing_state_index, particle_mixing_entropy, shannon_entropy
 export reconstruct_volumes, extract_concentrations
 export activation_fraction, cloud_droplet_concentration
+export GCVIResponse, transmission, classify_cr_ci
 export check_mass_conservation
 export particle_diameters, compute_size_distribution
 export kde_log_diameter, smooth_histogram_diameter
@@ -78,6 +79,7 @@ include("diagnostics/kde.jl")
 include("diagnostics/smooth_histogram.jl")
 include("diagnostics/validation.jl")
 include("diagnostics/activation.jl")
+include("diagnostics/gcvi.jl")
 
 # ---- Plotting ----
 include("plotting/core.jl")

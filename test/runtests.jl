@@ -29,6 +29,7 @@ end
     include("test_io.jl")
     include("test_mixing_state.jl")
     include("test_env_source.jl")
+    include("test_gcvi.jl")
     include("test_activation_comparison_example_config.jl")
     include("test_plotting.jl")
     include("test_brownian_precision.jl")
