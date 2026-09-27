@@ -31,7 +31,7 @@ edges [m] (strictly increasing), and computational volume [m³].
 function dNdlogD_from_diameters(diameters, bin_edges, volume::Real)
     volume > 0.0 || throw(ArgumentError("volume must be positive"))
     counts = Float64.(bin_size_distribution(
-                          Float64.(collect(diameters)), Float64.(collect(bin_edges))))
+        Float64.(collect(diameters)), Float64.(collect(bin_edges))))
     dlogD = diff(log10.(Float64.(collect(bin_edges))))
     return counts ./ dlogD ./ volume
 end
