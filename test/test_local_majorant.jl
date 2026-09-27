@@ -140,6 +140,26 @@ struct ConstKernel <: StochParticles.CoagulationKernel{1} end
     @test records[end].mass / records[1].mass ≈ exp(1.0) rtol = 1.0e-3
 end
 
+@testset "solve_split tolerance passthrough" begin
+    particles = [SVector(1.0e-18), SVector(2.0e-18), SVector(3.0e-18)]
+    rec_mass = (t, u, sys) -> (t = t,
+        mass = StochParticles.total_mass(u, Val(1), sys.n_active))
+    sol_default, recs_default = solve_split(particles, 1.0e-6, t -> SVector(0.0),
+        (ConstDrift(),), Tsit5(); tspan = (0.0, 400.0), dt_split = 10.0,
+        saveat = 50.0, record_func = rec_mass)
+    sol_strict, recs_strict = solve_split(particles, 1.0e-6, t -> SVector(0.0),
+        (ConstDrift(),), Tsit5(); tspan = (0.0, 400.0), dt_split = 10.0,
+        saveat = 50.0, record_func = rec_mass, abstol = 1.0e-24, reltol = 1.0e-10)
+    @test sol_default.retcode == ReturnCode.Success
+    @test sol_strict.retcode == ReturnCode.Success
+    # stricter tolerances must force more accepted ODE steps across split windows
+    # (guards the kwarg splat in solve_split; dropped passthrough -> equal step counts)
+    @test sol_strict.stats.naccept > sol_default.stats.naccept
+    # tolerance changes solver behavior, not physics: same growth, loose agreement
+    @test isapprox(recs_strict[end].mass, recs_default[end].mass; rtol = 1.0e-2)
+    @test recs_strict[end].mass / recs_strict[1].mass ≈ exp(4.0) rtol = 1.0e-3
+end
+
 @testset "solve_split contract errors" begin
     particles = [SVector(1.0e-18), SVector(2.0e-18)]
     kernel = BrownianKernel(293.15, 101325.0, SVector(1000.0))

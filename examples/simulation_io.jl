@@ -137,14 +137,6 @@ function diameter_summary(diameters)
     )
 end
 
-function dNdlogD_from_diameters(diameters, bin_edges, volume)
-    volume > 0.0 || throw(ArgumentError("volume must be positive, got $volume"))
-    edges = Float64.(collect(bin_edges))
-    counts = bin_size_distribution(Float64.(collect(diameters)), edges)
-    dlogD = diff(log10.(edges))
-    return Float64.(counts) ./ dlogD ./ volume
-end
-
 function _density_vector(::Val{A}, densities::SVector{A, Float64}) where {A}
     return densities
 end

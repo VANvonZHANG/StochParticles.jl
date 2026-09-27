@@ -39,11 +39,13 @@ export number_concentration, mass_concentration, species_mass_concentration,
        mixing_state_index, particle_mixing_entropy, shannon_entropy
 export reconstruct_volumes, extract_concentrations
 export activation_fraction, cloud_droplet_concentration
+export GCVIResponse, transmission, classify_cr_ci, virtual_smps, virtual_acsm
 export check_mass_conservation
 export particle_diameters, compute_size_distribution
 export kde_log_diameter, smooth_histogram_diameter
-export bin_size_distribution
+export bin_size_distribution, dNdlogD_from_diameters
 export standard_aerosol_atmosphere, standard_cloud_atmosphere
+export AbstractEnvSource, PrescribedProfile
 export Species, species_vectors
 export AS, AN, BC, OA, H2O
 export lognormal_masses, diameters_from_masses
@@ -77,6 +79,7 @@ include("diagnostics/kde.jl")
 include("diagnostics/smooth_histogram.jl")
 include("diagnostics/validation.jl")
 include("diagnostics/activation.jl")
+include("diagnostics/gcvi.jl")
 
 # ---- Plotting ----
 include("plotting/core.jl")
@@ -84,6 +87,7 @@ include("plotting/recipes.jl")
 
 # ---- Utils ----
 include("utils/binning.jl")
+include("utils/env_source.jl")
 include("utils/parameters.jl")
 include("utils/initial_conditions.jl")
 include("utils/preset_species.jl")

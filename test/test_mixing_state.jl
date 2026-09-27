@@ -228,3 +228,40 @@ using StaticArrays
         end
     end
 end
+
+@testset "mixing_state_index species mask (dry chi)" begin
+    gas_fn5 = t -> SVector(0.0, 0.0, 0.0, 0.0, 0.0)
+
+    function build_u(particles)
+        sys = ParticleSystem(Val(5), length(particles), 1.0, gas_fn5)
+        return make_u0(particles), sys
+    end
+
+    # 干闭合物种 (AS,AN,OA) 完全内混、BC 变化 → dry-χ = 1 而默认 χ < 1
+    n = 100
+    particles = [SVector{5, Float64}(0.3, 0.2, 0.5, 0.25 * (i % 4), 0.0) for i in 1:n]
+    u_int, sys_int = build_u(particles)
+    @test mixing_state_index(u_int, sys_int; species = [1, 2, 3]) ≈ 1.0 atol = 1e-9
+    @test 0.0 < mixing_state_index(u_int, sys_int) < 1.0
+
+    # 加水不变性：随机吸水后 dry-χ 逐位不变
+    u_wet = copy(u_int)
+    for i in 1:(sys_int.n_active)
+        μ = get_particle(u_wet, i, Val(5))
+        set_particle!(u_wet, i, Val(5), setindex(μ, 0.37 * i, 5))
+    end
+    @test mixing_state_index(u_wet, sys_int; species = [1, 2, 3]) ==
+          mixing_state_index(u_int, sys_int; species = [1, 2, 3])
+
+    # 纯 AS / 纯 AN 各半 → dry-χ = 0
+    particles_ext = vcat(
+        [SVector{5, Float64}(1.0, 0.0, 0.0, 0.0, 0.0) for _ in 1:50],
+        [SVector{5, Float64}(0.0, 1.0, 0.0, 0.0, 0.0) for _ in 1:50])
+    u_ext, sys_ext = build_u(particles_ext)
+    @test mixing_state_index(u_ext, sys_ext; species = [1, 2, 3]) ≈ 0.0 atol = 1e-12
+
+    # 非法 mask
+    @test_throws ArgumentError mixing_state_index(u_ext, sys_ext; species = [0])
+    @test_throws ArgumentError mixing_state_index(u_ext, sys_ext; species = [1, 1])
+    @test_throws ArgumentError mixing_state_index(u_ext, sys_ext; species = [1, 6])
+end
