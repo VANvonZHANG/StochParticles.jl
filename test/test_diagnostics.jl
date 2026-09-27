@@ -97,3 +97,17 @@ using StaticArrays
         @test rel_error < 1e-3
     end
 end
+
+@testset "dNdlogD_from_diameters" begin
+    # 5 particles of 100 nm in 1 m^-3 → 单 bin 内 dN/dlogD = 5/dlogD
+    edges = [1.0e-10, 1.0e-9, 1.0e-8, 1.0e-7, 1.0e-6]
+    spec = dNdlogD_from_diameters(fill(1.0e-8, 5), edges, 1.0)
+    @test length(spec) == 4
+    @test spec[3] ≈ 5.0 / log10(1.0e-7 / 1.0e-8)
+    @test spec[1] ≈ 0.0 atol = 1e-30
+    @test spec[4] ≈ 0.0 atol = 1e-30
+    # volume 缩放
+    spec_half = dNdlogD_from_diameters(fill(1.0e-8, 5), edges, 2.0)
+    @test spec_half[3] ≈ spec[3] / 2
+    @test_throws ArgumentError dNdlogD_from_diameters([1.0e-8], edges, 0.0)
+end
