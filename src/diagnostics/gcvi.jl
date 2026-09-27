@@ -63,11 +63,11 @@ function virtual_smps(
         bin_edges, volume::Real)
     length(cr_flags) == length(dry_diameters) ||
         throw(DimensionMismatch(
-                  "cr_flags has $(length(cr_flags)) entries, dry_diameters has $(length(dry_diameters))"))
+            "cr_flags has $(length(cr_flags)) entries, dry_diameters has $(length(dry_diameters))"))
     cr_d = Float64[dry_diameters[i] for i in eachindex(cr_flags) if cr_flags[i]]
     ci_d = Float64[dry_diameters[i] for i in eachindex(cr_flags) if !cr_flags[i]]
     return (cr = dNdlogD_from_diameters(cr_d, bin_edges, volume),
-            ci = dNdlogD_from_diameters(ci_d, bin_edges, volume))
+        ci = dNdlogD_from_diameters(ci_d, bin_edges, volume))
 end
 
 """
