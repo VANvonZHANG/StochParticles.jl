@@ -50,3 +50,50 @@ function classify_cr_ci(
     diams = particle_diameters(u, sys, densities)
     return [rand(rng) <= transmission(resp, D) for D in diams]
 end
+
+"""
+    virtual_smps(cr_flags, dry_diameters, bin_edges, volume) -> NamedTuple(cr, ci)
+
+Virtual-SMPS output: dN/dlog₁₀D spectra of the CR and CI subpopulations on
+`bin_edges`, computed from **dry** diameters (residual convention: the
+instrument downstream of the GCVI sees dried residuals).
+"""
+function virtual_smps(
+        cr_flags::AbstractVector{Bool}, dry_diameters::AbstractVector{<:Real},
+        bin_edges, volume::Real)
+    length(cr_flags) == length(dry_diameters) ||
+        throw(DimensionMismatch(
+                  "cr_flags has $(length(cr_flags)) entries, dry_diameters has $(length(dry_diameters))"))
+    cr_d = Float64[dry_diameters[i] for i in eachindex(cr_flags) if cr_flags[i]]
+    ci_d = Float64[dry_diameters[i] for i in eachindex(cr_flags) if !cr_flags[i]]
+    return (cr = dNdlogD_from_diameters(cr_d, bin_edges, volume),
+            ci = dNdlogD_from_diameters(ci_d, bin_edges, volume))
+end
+
+"""
+    virtual_acsm(u, sys, ::Val{A}, cr_flags; species = 1:(A - 1)) -> NamedTuple(cr, ci)
+
+Virtual-ACSM output: dry mass fractions of the selected `species` within the
+CR and CI subpopulations. Water must be excluded from `species` (dry
+convention). Returns NaN fractions for an empty group.
+"""
+function virtual_acsm(
+        u::Vector{Float64}, sys::ParticleSystem{A}, ::Val{A},
+        cr_flags::AbstractVector{Bool};
+        species::AbstractVector{Int} = collect(1:(A - 1))) where {A}
+    n = sys.n_active
+    length(cr_flags) == n ||
+        throw(DimensionMismatch("cr_flags has $(length(cr_flags)) entries, n_active is $n"))
+    K = length(species)
+    m_cr = zeros(Float64, K)
+    m_ci = zeros(Float64, K)
+    for i in 1:n
+        μ = get_particle(u, i, Val(A))
+        target = cr_flags[i] ? m_cr : m_ci
+        for (j, k) in enumerate(species)
+            target[j] += μ[k]
+        end
+    end
+    _fractions(m) = sum(m) > 0 ? m ./ sum(m) : fill(NaN, K)
+    return (cr = _fractions(m_cr), ci = _fractions(m_ci))
+end
