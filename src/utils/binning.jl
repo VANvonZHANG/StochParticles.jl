@@ -25,7 +25,7 @@ end
 """
     dNdlogD_from_diameters(diameters, bin_edges, volume) -> Vector{Float64}
 
-dN/dlog₁₀D spectrum [m⁻⁴] from per-particle diameters [m], log-spaced bin
+dN/dlog₁₀D spectrum [m⁻³] from per-particle diameters [m], log-spaced bin
 edges [m] (strictly increasing), and computational volume [m³].
 """
 function dNdlogD_from_diameters(diameters, bin_edges, volume::Real)
