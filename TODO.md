@@ -65,7 +65,7 @@ This document tracks completed features and planned improvements for StochPartic
 - [x] TagBot for automatic release tagging
 - [x] CompatHelper for dependency updates
 
-## Completed (as of 2026-09-25)
+## Completed (as of 2026-09-27)
 
 ### GCVI Closure M0+M1 (v0.9.0)
 - [x] Dry-composition mixing-state χ (`species` keyword)

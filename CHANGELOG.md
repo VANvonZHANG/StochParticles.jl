@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.9.0] - 2026-09-25
+## [0.9.0] - 2026-09-27
 ### Added
 
 #### Virtual-GCVI closure toolkit (M0+M1 of the GCVI closure blueprint)
