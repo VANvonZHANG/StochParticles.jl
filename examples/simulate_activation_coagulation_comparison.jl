@@ -8,6 +8,7 @@ include("simulation_io.jl")
 
 const ACTIVATION_BASENAME = "activation_coagulation_comparison"
 const A = 2
+const SO4_KAPPA = 0.61  # ammonium sulfate, Petters & Kreidenweis (2007)
 const TIME_MAJOR_COMPAT_DATASETS = Set([
     "activation_flag_samples",
     "diameter_samples",
@@ -85,7 +86,7 @@ end
 
 function average_thermo(_cfg::ActivationComparisonConfig)
     return ThermodynamicsParams(
-        SVector(0.455, 0.0),
+        SVector(SO4_KAPPA, 0.0),
         0.072,
         1000.0,
         18.015e-3,
@@ -117,7 +118,7 @@ function initial_activation_particles(cfg::ActivationComparisonConfig, seed)
                      for m in vcat(particles_aitken, particles_accum)]
     dry_diams = [dry_diameter_from_so4_mass(p[1], cfg.densities[1])
                  for p in dry_particles]
-    thermo_labels = fill(0.455, cfg.n_sim)
+    thermo_labels = fill(SO4_KAPPA, cfg.n_sim)
     particles = deepcopy(dry_particles)
     pre_equilibrate!(
         particles,

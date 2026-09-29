@@ -20,7 +20,7 @@ include("../examples/simulate_activation_coagulation_comparison.jl")
     @test length(particles) == cfg.n_sim
     @test length(dry_diams) == cfg.n_sim
     @test length(thermo_labels) == cfg.n_sim
-    @test all(thermo_labels .== 0.455)
+    @test all(thermo_labels .== 0.61)
 
     aitken_diams = dry_diams[1:n_aitken]
     accum_diams = dry_diams[(n_aitken + 1):end]
