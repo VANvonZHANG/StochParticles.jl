@@ -21,40 +21,47 @@ jobs:
           ssh: ${{ secrets.DOCUMENTER_KEY }}
       - name: Prepend CHANGELOG to release notes
         run: |
-          sleep 15
-          TAG=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1 --json tagName -q '.[0].tagName')
-          if [ -z "$TAG" ]; then
-            git fetch --tags --prune-tags --force
-            TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
-          fi
-          if [ -z "$TAG" ]; then
-            echo "Could not determine tag name, skipping CHANGELOG prepend"
+          # Target the version in the checked-out Project.toml (the version just released),
+          # NOT "whatever release is latest" — immune to release-list API lag and no-op runs.
+          VERSION=$(grep -m1 '^version' Project.toml | cut -d'"' -f2)
+          if [ -z "$VERSION" ]; then
+            echo "Could not read version from Project.toml, skipping CHANGELOG prepend"
             exit 0
           fi
-          VERSION="${TAG#v}"
+          TAG="v$VERSION"
+          # Wait for the release object to become visible (TagBot action created it moments ago)
+          EXISTING=""
+          for _ in 1 2 3 4 5 6; do
+            EXISTING=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body -q '.body' 2>/dev/null || true)
+            [ -n "$EXISTING" ] && break
+            sleep 10
+          done
           NOTES=$(awk "/^## \\[$VERSION\\]/{flag=1;next}/^## \\[/{flag=0}flag" CHANGELOG.md | sed '/./,$!d' | sed -n ':a;N;$!ba;s/\n*$//;p')
-          if [ -n "$NOTES" ]; then
-            EXISTING=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body -q '.body' 2>/dev/null || echo "")
-            # Idempotency guard: skip if this CHANGELOG section is already in the notes
-            FIRST_HEADING=$(printf '%s\n' "$NOTES" | grep -m1 '^#\+ ' || true)
-            if [ -n "$FIRST_HEADING" ] && printf '%s\n' "$EXISTING" | grep -qF -- "$FIRST_HEADING"; then
-              echo "CHANGELOG section already present in $TAG notes, skipping prepend"
-              exit 0
+          if [ -z "$NOTES" ]; then
+            echo "No CHANGELOG section for $VERSION, skipping prepend"
+            exit 0
+          fi
+          # Idempotency guard: skip if this CHANGELOG section is already in the notes
+          FIRST_HEADING=$(printf '%s\n' "$NOTES" | grep -m1 '^#\+ ' || true)
+          if [ -n "$FIRST_HEADING" ] && printf '%s\n' "$EXISTING" | grep -qF -- "$FIRST_HEADING"; then
+            echo "CHANGELOG section already present in $TAG notes, skipping prepend"
+            exit 0
+          fi
+          if [ -n "$EXISTING" ]; then
+            # Extract title (first non-empty line, e.g. "StochParticles v0.4.0")
+            TITLE=$(printf '%s\n' "$EXISTING" | awk 'NF{print; exit}')
+            # Extract body: everything after the first non-empty line
+            BODY=$(printf '%s\n' "$EXISTING" | awk 'found{print; next} NF{found=1}')
+            # Strip registrator release-notes summary from body
+            CLEANED=$(printf '%s\n' "$BODY" | sed '/^[[:space:]]*See CHANGELOG/d; /^[[:space:]]*Release notes:/d' | sed '/./,$!d')
+            if [ -n "$CLEANED" ]; then
+              COMBINED="${TITLE}"$'\n\n'"${NOTES}"$'\n\n---\n\n'"${CLEANED}"
+            else
+              COMBINED="${TITLE}"$'\n\n'"${NOTES}"
             fi
-            if [ -n "$EXISTING" ]; then
-              # Extract title (first non-empty line, e.g. "StochParticles v0.4.0")
-              TITLE=$(printf '%s\n' "$EXISTING" | awk 'NF{print; exit}')
-              # Extract body: everything after the first non-empty line
-              BODY=$(printf '%s\n' "$EXISTING" | awk 'found{print; next} NF{found=1}')
-              # Strip registrator release-notes summary from body
-              CLEANED=$(printf '%s\n' "$BODY" | sed '/^[[:space:]]*See CHANGELOG/d; /^[[:space:]]*Release notes:/d' | sed '/./,$!d')
-              if [ -n "$CLEANED" ]; then
-                COMBINED="${TITLE}"$'\n\n'"${NOTES}"$'\n\n---\n\n'"${CLEANED}"
-              else
-                COMBINED="${TITLE}"$'\n\n'"${NOTES}"
-              fi
-              gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes "${COMBINED}"
-            fi
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes "${COMBINED}"
+          else
+            echo "Release $TAG not visible after retries, skipping prepend"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
