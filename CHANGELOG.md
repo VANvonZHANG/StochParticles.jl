@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-09-29
+
+### Fixed
+
+- Activation-comparison example unified to sulfate κ = 0.61 (Petters & Kreidenweis, 2007) across config, tests, and setup notes (#23).
+
+### Changed
+
+- CHANGELOG now carries Keep-a-Changelog version links for 0.7.0–0.9.1 (they stopped at 0.6.0); TagBot release-notes prepend step made idempotent.
+
 ## [0.9.0] - 2026-09-27
 ### Added
 
@@ -257,3 +267,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.4.0]: https://github.com/VANvonZHANG/StochParticles.jl/releases/tag/v0.4.0
 [0.5.0]: https://github.com/VANvonZHANG/StochParticles.jl/releases/tag/v0.5.0
 [0.6.0]: https://github.com/VANvonZHANG/StochParticles.jl/releases/tag/v0.6.0
+[0.7.0]: https://github.com/VANvonZHANG/StochParticles.jl/releases/tag/v0.7.0
+[0.8.0]: https://github.com/VANvonZHANG/StochParticles.jl/releases/tag/v0.8.0
+[0.9.0]: https://github.com/VANvonZHANG/StochParticles.jl/releases/tag/v0.9.0
+[0.9.1]: https://github.com/VANvonZHANG/StochParticles.jl/releases/tag/v0.9.1
+[unreleased]: https://github.com/VANvonZHANG/StochParticles.jl/compare/v0.9.1...HEAD

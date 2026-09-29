@@ -35,6 +35,12 @@ jobs:
           NOTES=$(awk "/^## \\[$VERSION\\]/{flag=1;next}/^## \\[/{flag=0}flag" CHANGELOG.md | sed '/./,$!d' | sed -n ':a;N;$!ba;s/\n*$//;p')
           if [ -n "$NOTES" ]; then
             EXISTING=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body -q '.body' 2>/dev/null || echo "")
+            # Idempotency guard: skip if this CHANGELOG section is already in the notes
+            FIRST_HEADING=$(printf '%s\n' "$NOTES" | grep -m1 '^#\+ ' || true)
+            if [ -n "$FIRST_HEADING" ] && printf '%s\n' "$EXISTING" | grep -qF -- "$FIRST_HEADING"; then
+              echo "CHANGELOG section already present in $TAG notes, skipping prepend"
+              exit 0
+            fi
             if [ -n "$EXISTING" ]; then
               # Extract title (first non-empty line, e.g. "StochParticles v0.4.0")
               TITLE=$(printf '%s\n' "$EXISTING" | awk 'NF{print; exit}')
