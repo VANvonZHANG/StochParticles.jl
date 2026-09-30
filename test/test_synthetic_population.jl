@@ -88,3 +88,47 @@ const SPEC = lognormal_table(6.0e-8, 1.45, 8.0e11, EDGES) +
         @test abs(counts[b] - expected) <= 5.0 * sqrt(n * probs[b] * (1 - probs[b]))
     end
 end
+
+const ANCHORS = [(3.0e-8, SVector(0.18, 0.15, 0.57, 0.10)),
+    (3.0e-7, SVector(0.35, 0.20, 0.30, 0.15))]
+const FBAR = SizeResolvedComposition(SPEC; anchors = ANCHORS)
+
+@testset "SizeResolvedComposition construction" begin
+    bad = zeros(4, length(EDGES) - 1)
+    bad[:, 1] .= 0.25
+    @test_throws ArgumentError SizeResolvedComposition(EDGES, bad)          # column not summing to 1
+    bad2 = fill(0.25, 4, length(EDGES) - 1)
+    bad2[1, 1] = -0.25
+    @test_throws ArgumentError SizeResolvedComposition(EDGES, bad2)         # negative entry
+
+    const_fb = constant_fbar(SVector(0.25, 0.15, 0.50, 0.10), SPEC)
+    @test const_fb.bin_edges == SPEC.bin_edges
+    @test all(const_fb.fractions[:, b] == [0.25, 0.15, 0.50, 0.10]
+    for b in 1:(length(EDGES) - 1))
+end
+
+@testset "anchor interpolation" begin
+    centers = [sqrt(EDGES[b] * EDGES[b + 1]) for b in 1:(length(EDGES) - 1)]
+    f1 = SVector(0.2, 0.2, 0.4, 0.2)
+    f2 = SVector(0.5, 0.2, 0.2, 0.1)
+    fb = SizeResolvedComposition(SPEC; anchors = [(centers[10], f1), (centers[90], f2)])
+    @test fb.fractions[:, 10] ≈ collect(f1) atol = 1e-12
+    @test fb.fractions[:, 90] ≈ collect(f2) atol = 1e-12
+    @test all(isapprox.(sum(fb.fractions; dims = 1), 1.0; atol = 1e-12))
+    # species 1 (AS) rises and species 3 (OA) falls between the anchors
+    @test all(diff(fb.fractions[1, 10:90]) .>= -1e-12)
+    @test all(diff(fb.fractions[3, 10:90]) .<= 1e-12)
+
+    # anchor coverage / ordering validation
+    @test_throws ArgumentError SizeResolvedComposition(
+        SPEC; anchors = [(1.0e-7, f1), (3.0e-7, f2)])              # first anchor inside grid
+    @test_throws ArgumentError SizeResolvedComposition(
+        SPEC; anchors = [(centers[90], f2), (centers[10], f1)])    # unsorted
+    @test_throws ArgumentError SizeResolvedComposition(SPEC; anchors = [(centers[10], f1)])
+end
+
+@testset "driver anchors" begin
+    @test FBAR.bin_edges == SPEC.bin_edges
+    @test all(isapprox.(sum(FBAR.fractions; dims = 1), 1.0; atol = 1e-12))
+    @test all(>=(0.0), FBAR.fractions)
+end

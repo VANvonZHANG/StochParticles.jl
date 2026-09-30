@@ -122,3 +122,100 @@ function _sample_dry_diameters(rng::AbstractRNG, s::TabulatedSpectrum, n::Int)
     end
     return diameters, bins
 end
+
+"""
+    SizeResolvedComposition(bin_edges, fractions)
+
+Size-resolved mean dry composition: `fractions[:, b]` is the mean dry mass
+fraction vector (K species) of bin `b`; piecewise-constant within a bin
+(same discretization as `TabulatedSpectrum`).
+"""
+struct SizeResolvedComposition
+    bin_edges::Vector{Float64}
+    fractions::Matrix{Float64}
+    function SizeResolvedComposition(bin_edges::Vector{Float64},
+            fractions::Matrix{Float64})
+        size(fractions, 2) == length(bin_edges) - 1 ||
+            throw(ArgumentError("fractions must have one column per bin " *
+                                "(got $(size(fractions, 2)) columns for $(length(bin_edges) - 1) bins)"))
+        size(fractions, 1) >= 1 ||
+            throw(ArgumentError("at least one species required"))
+        all(i -> bin_edges[i] < bin_edges[i + 1], 1:(length(bin_edges) - 1)) ||
+            throw(ArgumentError("bin_edges must be strictly increasing"))
+        all(>=(0.0), fractions) ||
+            throw(ArgumentError("fractions must be non-negative"))
+        for b in axes(fractions, 2)
+            colsum = sum(fractions[:, b])
+            abs(colsum - 1.0) <= 1e-10 ||
+                throw(ArgumentError("fraction columns must sum to 1 (column $b sums to $colsum)"))
+        end
+        return new(bin_edges, fractions)
+    end
+end
+
+"""
+    constant_fbar(fbar, spectrum) -> SizeResolvedComposition
+
+Size-independent mean composition (M0 compatibility).
+"""
+function constant_fbar(fbar::SVector{K, Float64},
+        spectrum::TabulatedSpectrum) where {K}
+    nbins = length(spectrum.bin_edges) - 1
+    mat = Matrix{Float64}(undef, K, nbins)
+    for b in 1:nbins
+        mat[:, b] .= fbar
+    end
+    return SizeResolvedComposition(spectrum.bin_edges, mat)
+end
+
+function _anchor_interp(ln_d::Float64, ln_anchors::Vector{Float64},
+        values::Vector{Float64})
+    # linear in log-D with flat extrapolation (anchors bracket the median, so
+    # flat extrapolation covers the far tails of the grid)
+    ln_d <= ln_anchors[1] && return values[1]
+    ln_d >= ln_anchors[end] && return values[end]
+    j = findfirst(i -> ln_anchors[i + 1] >= ln_d, 1:(length(ln_anchors) - 1))
+    t = (ln_d - ln_anchors[j]) / (ln_anchors[j + 1] - ln_anchors[j])
+    return values[j] + t * (values[j + 1] - values[j])
+end
+
+"""
+    SizeResolvedComposition(spectrum; anchors) -> SizeResolvedComposition
+
+Build from anchor points `[(D, f̄), …]` (sorted by D, at least two, bracketing
+the spectrum's number-median diameter): each species is interpolated linearly
+in log-D at the bin geometric centers, then each column is renormalized to
+sum to 1.
+"""
+function SizeResolvedComposition(spectrum::TabulatedSpectrum;
+        anchors::Vector{Tuple{Float64, SVector{K, Float64}}}) where {K}
+    length(anchors) >= 2 ||
+        throw(ArgumentError("at least two anchors required, got $(length(anchors))"))
+    ds = [a[1] for a in anchors]
+    all(>=(0.0), ds) ||
+        throw(ArgumentError("anchor diameters must be positive"))
+    issorted(ds) ||
+        throw(ArgumentError("anchors must be sorted by diameter"))
+    edges = spectrum.bin_edges
+    cum = cumsum(_spectrum_bin_probs(spectrum))
+    med = findfirst(c -> c >= 0.5, cum)
+    d_med = sqrt(edges[med] * edges[med + 1])
+    ds[1] <= d_med ||
+        throw(ArgumentError("first anchor ($(ds[1]) m) must lie at or below the " *
+                            "number-median diameter ($(d_med) m)"))
+    ds[end] >= d_med ||
+        throw(ArgumentError("last anchor ($(ds[end]) m) must lie at or above the " *
+                            "number-median diameter ($(d_med) m)"))
+    all(a -> length(a[2]) == K, anchors) ||
+        throw(ArgumentError("all anchor fraction vectors must have length $K"))
+    ln_anchors = log.(ds)
+    nbins = length(edges) - 1
+    mat = Matrix{Float64}(undef, K, nbins)
+    for b in 1:nbins
+        ln_center = 0.5 * (log(edges[b]) + log(edges[b + 1]))
+        col = [_anchor_interp(ln_center, ln_anchors, [a[2][k] for a in anchors])
+               for k in 1:K]
+        mat[:, b] .= col ./ sum(col)
+    end
+    return SizeResolvedComposition(edges, mat)
+end
