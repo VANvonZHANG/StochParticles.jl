@@ -105,6 +105,10 @@ def chem_mse(sim, obs) -> float:
     return float(np.mean((np.asarray(sim, dtype=float) - np.asarray(obs, dtype=float)) ** 2))
 
 
+# closure-bin coarsening stride shared by _case_J_values and pool_observation
+CLOSURE_STRIDE = 3
+
+
 def _case_J_values(scene: dict, case_name: str, obs: dict,
                    w_size: float = 1.0, w_chem: float = 1.0) -> list:
     """Per-replicate total J of one case against the observations.
@@ -118,8 +122,8 @@ def _case_J_values(scene: dict, case_name: str, obs: dict,
     values = []
     for rep in scene[case_name]:
         vi = final_virtual_instrument(rep)
-        cr = rebin_spectrum(obs["bin_edges"], vi["cr"])[1]
-        ci = rebin_spectrum(obs["bin_edges"], vi["ci"])[1]
+        cr = rebin_spectrum(obs["bin_edges"], vi["cr"], CLOSURE_STRIDE)[1]
+        ci = rebin_spectrum(obs["bin_edges"], vi["ci"], CLOSURE_STRIDE)[1]
         j_size = 0.5 * (kld(cr, obs["cr_dNdlogD_rebinned"]) +
                         kld(ci, obs["ci_dNdlogD_rebinned"]))
         j_chem = 0.5 * (chem_mse(vi["cr_chemistry"], obs["cr_chemistry"]) +
@@ -152,7 +156,7 @@ def truth_case_name(scene: dict) -> str:
     return truths[0]
 
 
-def pool_observation(scene: dict, obs: dict, stride: int = 3) -> dict:
+def pool_observation(scene: dict, obs: dict, stride: int = CLOSURE_STRIDE) -> dict:
     """Pooled observation: truth-case replicate-mean instrument output.
 
     Real SMPS/ACSM observations average over a sampling window, so the twin
@@ -177,6 +181,16 @@ def pool_observation(scene: dict, obs: dict, stride: int = 3) -> dict:
                                                    pooled["cr_dNdlogD"], stride)[1]
     pooled["ci_dNdlogD_rebinned"] = rebin_spectrum(obs["bin_edges"],
                                                    pooled["ci_dNdlogD"], stride)[1]
+    # cross-check against a synthetic-obs-v2 file (n_replicates_pooled attr):
+    # the file and the recomputed pool are two implementations of the same
+    # statistic (Julia driver / Python analysis); drift must fail loudly
+    if obs.get("n_replicates_pooled") not in (None, len(reps)):
+        raise ValueError(f"obs file pooled over {obs['n_replicates_pooled']} "
+                         f"replicates but scene truth case has {len(reps)}")
+    if obs.get("n_replicates_pooled") is not None and not np.isclose(
+            obs["chi_true"], pooled["chi_true"], atol=1e-9):
+        raise ValueError(f"obs file chi_true {obs['chi_true']:.6f} disagrees "
+                         f"with pooled scene mean {pooled['chi_true']:.6f}")
     return pooled
 
 
