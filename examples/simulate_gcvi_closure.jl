@@ -175,7 +175,6 @@ function main()
                 meta = synthesize_population(
                     population_spec(cfg, chi);
                     seed = initial_seed, thermo = thermo(cfg))
-                @assert abs(meta.chi_realized - chi) < 0.02
                 case_nu === nothing && (case_nu = meta.nu)
                 push!(get!(chis_realized, case_idx, Float64[]), meta.chi_realized)
                 attrs_dict = Dict{String, Any}(
@@ -199,6 +198,13 @@ function main()
                         "nu=$(round(meta.nu, digits = 2))")
             end
             attrs(case_group)["nu"] = case_nu
+            # case-level chi gate (user-adjudicated 2026-09-30): the per-replicate
+            # hard assert was infeasible — realized-chi has sd ~0.011 at n_sim = 1000
+            # in the sparse-mixing regime (measured 5/64 seeds beyond 0.02), and
+            # single-replicate excursions ARE the resampling noise this experiment
+            # must quantify (sigma_J). Gate the calibration accuracy at case level.
+            mean_dev = abs(mean(chis_realized[case_idx]) - chi)
+            @assert mean_dev < 0.02 "case-level chi deviation $mean_dev >= 0.02 for chi=$chi"
             sigma_chi = std(chis_realized[case_idx])
             @assert sigma_chi <= 0.02 "sigma_chi = $sigma_chi exceeds 0.02 for chi=$chi"
             println("case chi=$chi DONE: nu=$(round(case_nu, digits = 2)), " *
