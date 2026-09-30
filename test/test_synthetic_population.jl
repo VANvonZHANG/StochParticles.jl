@@ -44,3 +44,47 @@ end
     @test number_concentration(tbl) ≈ 1.12e12 rtol = 1e-9
     @test_throws ArgumentError lognormal_table(6.0e-8, 0.5, 100.0, EDGES)
 end
+
+function ks_statistic(samples::Vector{Float64}, cdf::Function)
+    n = length(samples)
+    d = 0.0
+    for (i, x) in enumerate(sort(samples))
+        f = cdf(x)
+        d = max(d, abs(f - i / n), abs(f - (i - 1) / n))
+    end
+    return d
+end
+
+lognormal_cdf(x, dg, sg) = 0.5 * (1.0 + erf((log(x) - log(dg)) / (log(sg) * sqrt(2.0))))
+
+const SPEC = lognormal_table(6.0e-8, 1.45, 8.0e11, EDGES) +
+             lognormal_table(1.6e-7, 1.55, 3.2e11, EDGES)
+
+@testset "inverse-CDF sampling" begin
+    empty = TabulatedSpectrum([1.0, 2.0, 3.0], [0.0, 0.0])
+    @test_throws ArgumentError StochParticles._spectrum_bin_probs(empty)
+
+    rng = MersenneTwister(20260930)
+    n = 20_000
+    diameters, bins = StochParticles._sample_dry_diameters(rng, SPEC, n)
+    @test length(diameters) == n == length(bins)
+    @test all(1 .<= bins .<= length(EDGES) - 1)
+    # every diameter lies inside its reported bin
+    for i in 1:n
+        @test EDGES[bins[i]] <= diameters[i] <= EDGES[bins[i] + 1]
+    end
+    # KS against the bimodal analytic CDF (alpha = 0.01 critical value 1.63)
+    w1 = 8.0e11 / 1.12e12
+    mix_cdf = x -> w1 * lognormal_cdf(x, 6.0e-8, 1.45) +
+                   (1 - w1) * lognormal_cdf(x, 1.6e-7, 1.55)
+    dstat = ks_statistic(diameters, mix_cdf)
+    @test dstat * sqrt(n) < 1.63
+    # bin counts within 5 sigma of the analytic per-bin probabilities
+    probs = StochParticles._spectrum_bin_probs(SPEC)
+    counts = [sum(bins .== b) for b in 1:(length(EDGES) - 1)]
+    for b in eachindex(probs)
+        expected = n * probs[b]
+        expected >= 5 || continue
+        @test abs(counts[b] - expected) <= 5.0 * sqrt(n * probs[b] * (1 - probs[b]))
+    end
+end

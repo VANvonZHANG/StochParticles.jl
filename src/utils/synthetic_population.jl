@@ -81,3 +81,44 @@ function lognormal_table(d_g::Float64, sigma_g::Float64, N::Real,
     end
     return TabulatedSpectrum(bin_edges, dNdlogD)
 end
+
+"""
+    _spectrum_bin_probs(s) -> Vector{Float64}
+
+Normalized bin probabilities ∝ dNdlogD·ΔlogD (internal).
+"""
+function _spectrum_bin_probs(s::TabulatedSpectrum)
+    nbins = length(s.dNdlogD)
+    probs = Vector{Float64}(undef, nbins)
+    total = 0.0
+    for b in 1:nbins
+        total += s.dNdlogD[b] * (log(s.bin_edges[b + 1]) - log(s.bin_edges[b]))
+    end
+    total > 0 ||
+        throw(ArgumentError("spectrum has zero number concentration"))
+    for b in 1:nbins
+        probs[b] = s.dNdlogD[b] * (log(s.bin_edges[b + 1]) - log(s.bin_edges[b])) / total
+    end
+    return probs
+end
+
+"""
+    _sample_dry_diameters(rng, s, n) -> (diameters, bins)
+
+Inverse-CDF sampling: pick a bin from the cumulative bin probabilities,
+then draw log-D uniformly within the bin (internal).
+"""
+function _sample_dry_diameters(rng::AbstractRNG, s::TabulatedSpectrum, n::Int)
+    probs = _spectrum_bin_probs(s)
+    cum = cumsum(probs)
+    edges = s.bin_edges
+    diameters = Vector{Float64}(undef, n)
+    bins = Vector{Int}(undef, n)
+    for i in 1:n
+        b = min(searchsortedfirst(cum, rand(rng)), length(probs))
+        bins[i] = b
+        ln_lo = log(edges[b])
+        diameters[i] = exp(ln_lo + (log(edges[b + 1]) - ln_lo) * rand(rng))
+    end
+    return diameters, bins
+end
