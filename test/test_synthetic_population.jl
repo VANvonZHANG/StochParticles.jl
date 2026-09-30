@@ -121,9 +121,11 @@ end
 
     # anchor coverage / ordering validation
     @test_throws ArgumentError SizeResolvedComposition(
-        SPEC; anchors = [(1.0e-7, f1), (3.0e-7, f2)])              # first anchor inside grid
+        SPEC; anchors = [(1.0e-7, f1), (3.0e-7, f2)])              # first anchor above the number-median diameter
     @test_throws ArgumentError SizeResolvedComposition(
         SPEC; anchors = [(centers[90], f2), (centers[10], f1)])    # unsorted
+    @test_throws ArgumentError SizeResolvedComposition(
+        SPEC; anchors = [(centers[10], f1), (centers[20], f2)])    # last anchor below median
     @test_throws ArgumentError SizeResolvedComposition(SPEC; anchors = [(centers[10], f1)])
 end
 

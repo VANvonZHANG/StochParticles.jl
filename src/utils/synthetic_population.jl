@@ -199,6 +199,9 @@ function SizeResolvedComposition(spectrum::TabulatedSpectrum;
     edges = spectrum.bin_edges
     cum = cumsum(_spectrum_bin_probs(spectrum))
     med = findfirst(c -> c >= 0.5, cum)
+    med === nothing &&
+        throw(ArgumentError("spectrum probability mass never reaches 0.5; " *
+                            "cannot locate the number-median bin"))
     d_med = sqrt(edges[med] * edges[med + 1])
     ds[1] <= d_med ||
         throw(ArgumentError("first anchor ($(ds[1]) m) must lie at or below the " *
