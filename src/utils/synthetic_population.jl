@@ -24,7 +24,7 @@ struct TabulatedSpectrum
                                 "(got $(length(bin_edges)) and $(length(dNdlogD)))"))
         all(i -> bin_edges[i] < bin_edges[i + 1], 1:(length(bin_edges) - 1)) ||
             throw(ArgumentError("bin_edges must be strictly increasing"))
-        all(>=(0.0), bin_edges) ||
+        all(>(0.0), bin_edges) ||
             throw(ArgumentError("bin_edges must be positive"))
         all(>=(0.0), dNdlogD) ||
             throw(ArgumentError("dNdlogD must be non-negative"))

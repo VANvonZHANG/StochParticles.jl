@@ -15,6 +15,7 @@ const EDGES = collect(10.0 .^ range(-8.3, -4.5; length = 96))
     @test_throws ArgumentError TabulatedSpectrum([1.0, 3.0, 2.0], [1.0, 1.0])  # unsorted
     @test_throws ArgumentError TabulatedSpectrum([1.0, 1.0, 2.0], [1.0, 1.0])  # ties
     @test_throws ArgumentError TabulatedSpectrum([-1.0, 1.0, 2.0], [1.0, 1.0]) # non-positive
+    @test_throws ArgumentError TabulatedSpectrum([0.0, 1.0, 2.0], [1.0, 1.0]) # zero edge
     @test_throws ArgumentError TabulatedSpectrum([1.0, 2.0], [-0.1])           # negative dNdlogD
     @test_throws ArgumentError TabulatedSpectrum([1.0], Float64[])             # no bin
     @test_throws ArgumentError TabulatedSpectrum([1.0, 2.0, 3.0], [1.0])       # length mismatch
