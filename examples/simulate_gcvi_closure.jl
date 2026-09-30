@@ -1,8 +1,8 @@
-using Distributions
 using HDF5
 using OrdinaryDiffEq
 using Random
 using StaticArrays
+using Statistics
 using StochParticles
 
 include("simulation_io.jl")
@@ -13,18 +13,24 @@ const DRY_SPECIES = [1, 2, 3]    # closure chi mask (AS, AN, OA); BC inert
 
 Base.@kwdef struct GcviClosureConfig
     n_sim::Int = 1000
-    # synthetic "SMPS" spectrum: bimodal lognormal
+    # synthetic "SMPS" spectrum: bimodal lognormal baked onto the table
     aitken_dg::Float64 = 6.0e-8
     aitken_sigma_g::Float64 = 1.45
     aitken_concentration::Float64 = 8.0e11      # [m^-3]
     accumulation_dg::Float64 = 1.6e-7
     accumulation_sigma_g::Float64 = 1.55
     accumulation_concentration::Float64 = 3.2e11
-    # constant dry mean composition fbar (AS, AN, OA, BC) — M0 simplification,
-    # replaced by size-resolved fbar(D) in M2
-    fbar::SVector{4, Float64} = SVector(0.25, 0.15, 0.50, 0.10)
-    # hand-picked Dirichlet concentrations: external / intermediate / internal
-    nu_values::Vector{Float64} = [1.2, 12.0, 120.0]
+    bin_edges::Vector{Float64} = collect(10.0 .^ range(-8.3, -4.5; length = 96))
+    # size-resolved fbar(D) anchors (AS, AN, OA, BC): small particles
+    # OA-rich, large particles AS-rich; trend strength sized so that
+    # reachable_chi_max stays above 0.85 (spec §7 tuning gate)
+    fbar_anchors::Vector{Tuple{Float64,
+        SVector{4, Float64}}} = [
+        (3.0e-8, SVector(0.18, 0.15, 0.57, 0.10)),
+        (3.0e-7, SVector(0.35, 0.20, 0.30, 0.15))
+    ]
+    chi_grid::Vector{Float64} = [0.10, 0.25, 0.40, 0.60, 0.75]
+    chi_true::Float64 = 0.50                     # off-grid twin truth
     # open-loop environment: linear S ramp to S_peak, then hold
     T0::Float64 = 288.15
     S_peak::Float64 = 0.004
@@ -39,10 +45,8 @@ Base.@kwdef struct GcviClosureConfig
     activation_radius::Float64 = 1.0e-6
     # virtual GCVI
     gcvi::GCVIResponse = GCVIResponse()
-    bin_edges::Vector{Float64} = collect(10.0 .^ range(-8.3, -4.5; length = 96))
-    initial_seed_base::Int = 2026092500
-    seed_base::Int = 2026092500
-    truth_nu_index::Int = 2                       # middle nu is the twin truth
+    initial_seed_base::Int = 2026093000
+    seed_base::Int = 2026093000
 end
 
 function thermo(cfg::GcviClosureConfig)
@@ -57,34 +61,25 @@ function env_profile(cfg::GcviClosureConfig)
         [0.0, cfg.S_peak, cfg.S_peak])
 end
 
-function volume(cfg::GcviClosureConfig)
-    cfg.n_sim / (cfg.aitken_concentration + cfg.accumulation_concentration)
+function spectrum(cfg::GcviClosureConfig)
+    return lognormal_table(cfg.aitken_dg, cfg.aitken_sigma_g,
+        cfg.aitken_concentration, cfg.bin_edges) +
+           lognormal_table(cfg.accumulation_dg, cfg.accumulation_sigma_g,
+        cfg.accumulation_concentration, cfg.bin_edges)
 end
 
-function mode_counts(cfg::GcviClosureConfig)
-    total = cfg.aitken_concentration + cfg.accumulation_concentration
-    n_aitken = round(Int, cfg.n_sim * cfg.aitken_concentration / total)
-    return n_aitken, cfg.n_sim - n_aitken
+function fbar(cfg::GcviClosureConfig)
+    SizeResolvedComposition(spectrum(cfg); anchors = cfg.fbar_anchors)
 end
 
-"""Sample initial particles: SMPS-like bimodal dry diameters + Dirichlet(nu*fbar)
-composition. M0 simplification: constant fbar, hand-picked nu (no calibration)."""
-function initial_particles(cfg::GcviClosureConfig, nu::Float64)
-    n_aitken, n_accum = mode_counts(cfg)
-    diameters = vcat(
-        cfg.aitken_dg .* exp.(log(cfg.aitken_sigma_g) .* randn(n_aitken)),
-        cfg.accumulation_dg .* exp.(log(cfg.accumulation_sigma_g) .* randn(n_accum)))
-    particles = Vector{SVector{5, Float64}}(undef, cfg.n_sim)
-    for i in 1:(cfg.n_sim)
-        f = rand(Dirichlet(nu .* cfg.fbar))
-        rho_eff = 1.0 / sum(f[k] / cfg.densities[k] for k in 1:4)
-        m_total = (pi / 6.0) * diameters[i]^3 * rho_eff
-        particles[i] = SVector{5, Float64}(m_total .* f..., 0.0)
-    end
-    # equilibrate haze to Kohler equilibrium at the (subsaturated) ramp start
-    pre_equilibrate!(particles, thermo(cfg), cfg.densities, cfg.T0,
-        saturation_vapor_pressure(cfg.T0); h2o_idx = cfg.h2o_idx)
-    return particles
+volume(cfg::GcviClosureConfig) = cfg.n_sim / number_concentration(spectrum(cfg))
+
+function population_spec(cfg::GcviClosureConfig, chi_target::Float64)
+    return SyntheticPopulationSpec(
+        n_sim = cfg.n_sim, spectrum = spectrum(cfg), fbar = fbar(cfg),
+        chi_target = chi_target, densities = cfg.densities,
+        h2o_idx = cfg.h2o_idx, chi_species = DRY_SPECIES,
+        T0 = cfg.T0, S0 = 0.0)
 end
 
 function dry_diameters_from_state(u, sys, cfg::GcviClosureConfig)
@@ -95,11 +90,6 @@ function dry_diameters_from_state(u, sys, cfg::GcviClosureConfig)
         out[i] = cbrt(6.0 * V_dry / pi)
     end
     return out
-end
-
-function measured_chi(cfg::GcviClosureConfig, particles)
-    sys = ParticleSystem(Val(A), cfg.n_sim, volume(cfg), env_profile(cfg))
-    return mixing_state_index(make_u0(particles), sys; species = DRY_SPECIES)
 end
 
 function record_extras(t, u, sys, cfg::GcviClosureConfig)
@@ -156,53 +146,73 @@ end
 
 function main()
     cfg = GcviClosureConfig()
+    chi_inf = reachable_chi_max(spectrum(cfg), fbar(cfg);
+        densities = cfg.densities, chi_species = DRY_SPECIES)
+    @assert chi_inf > 0.85 "chi_inf = $chi_inf <= 0.85: weaken fbar anchors (spec §7)"
+    @assert !(cfg.chi_true in cfg.chi_grid) "chi_true must be off-grid"
+    chi_cases = vcat(cfg.chi_grid, cfg.chi_true)
     n_replicates = example_replicates()
     h5_path = joinpath(example_data_dir(), GCVI_BASENAME * ".h5")
     recreate_h5(h5_path; scene_name = GCVI_BASENAME, n_replicates = n_replicates,
-        notes = "GCVI closure M0 walking skeleton: nu scan, open-loop S(t) ramp, virtual GCVI.")
+        notes = "GCVI closure M2: calibrated chi grid (truth off-grid at 0.5), " *
+                "tabulated spectrum, size-resolved fbar(D), open-loop S(t) ramp.")
 
     truth_record_final = nothing
     truth_chi = NaN
+    chis_realized = Dict{Int, Vector{Float64}}()
     h5open(h5_path, "r+") do file
-        for (nu_idx, nu) in enumerate(cfg.nu_values)
-            case_group = ensure_case_group(file, "nu_$(nu)";
+        for (case_idx, chi) in enumerate(chi_cases)
+            truth = chi == cfg.chi_true
+            case_group = ensure_case_group(file, "chi_$(chi)";
                 attrs_dict = Dict{String, Any}(
-                    "nu" => nu, "truth" => nu_idx == cfg.truth_nu_index))
+                    "chi_target" => chi, "truth" => truth))
+            case_nu = nothing
             for replicate_idx in 1:n_replicates
-                # fixed initial population per nu; process stochasticity per replicate
-                Random.seed!(cfg.initial_seed_base + nu_idx)
-                particles = initial_particles(cfg, nu)
-                chi_realized = measured_chi(cfg, particles)
-                # M0 note: processes = condensation only (no jumps) -> solve_split consumes no RNG; replicates within a case are expected bitwise identical; the per-replicate seed matters once jump processes are enabled.
-                Random.seed!(cfg.seed_base + 1000 * nu_idx + replicate_idx)
-
-                sol, records = solve_case(cfg, deepcopy(particles))
-                @assert sol.retcode == ReturnCode.Success
-
+                # per-replicate population resampling: replicate spread IS the
+                # identifiability noise (chi fluctuation + J noise floor)
+                initial_seed = cfg.initial_seed_base + 100 * case_idx + replicate_idx
+                particles, dry0,
+                meta = synthesize_population(
+                    population_spec(cfg, chi);
+                    seed = initial_seed, thermo = thermo(cfg))
+                @assert abs(meta.chi_realized - chi) < 0.02
+                case_nu === nothing && (case_nu = meta.nu)
+                push!(get!(chis_realized, case_idx, Float64[]), meta.chi_realized)
                 attrs_dict = Dict{String, Any}(
-                    "nu" => nu, "chi_realized" => chi_realized,
-                    "seed" => cfg.seed_base + 1000 * nu_idx + replicate_idx,
-                    "initial_seed" => cfg.initial_seed_base + nu_idx)
+                    "chi_target" => chi, "chi_realized" => meta.chi_realized,
+                    "nu" => meta.nu, "seed" =>
+                        cfg.seed_base + 1000 * case_idx + replicate_idx,
+                    "initial_seed" => initial_seed, "truth" => truth)
+                Random.seed!(cfg.seed_base + 1000 * case_idx + replicate_idx)
+                sol, records = solve_case(cfg, particles)
+                @assert sol.retcode == ReturnCode.Success
                 rep_group = create_replicate_group(case_group, replicate_idx)
                 _write_attrs!(rep_group, attrs_dict)
-                sys0 = ParticleSystem(Val(A), cfg.n_sim, volume(cfg), env_profile(cfg))
-                dry0 = dry_diameters_from_state(make_u0(particles), sys0, cfg)
                 write_records_common!(rep_group, records, cfg.n_sim, cfg.bin_edges;
                     dry_diameter_initial = dry0, extra_attrs = attrs_dict)
-
-                if nu_idx == cfg.truth_nu_index && replicate_idx == 1
+                if truth && replicate_idx == 1
                     truth_record_final = records[end]
-                    truth_chi = chi_realized
+                    truth_chi = meta.chi_realized
                 end
+                println("case chi=$chi rep=$replicate_idx: " *
+                        "chi_realized=$(round(meta.chi_realized, digits = 4)) " *
+                        "nu=$(round(meta.nu, digits = 2))")
             end
+            attrs(case_group)["nu"] = case_nu
+            sigma_chi = std(chis_realized[case_idx])
+            @assert sigma_chi <= 0.02 "sigma_chi = $sigma_chi exceeds 0.02 for chi=$chi"
+            println("case chi=$chi DONE: nu=$(round(case_nu, digits = 2)), " *
+                    "chi_realized=$(round(mean(chis_realized[case_idx]), digits = 4)) " *
+                    "± $(round(sigma_chi, digits = 4))")
         end
     end
 
     obs_path = joinpath(example_data_dir(), "synthetic", "twin_obs_v0.h5")
     mkpath(dirname(obs_path))
     write_twin_obs(obs_path, cfg, truth_record_final, truth_chi)
-    println("Wrote GCVI closure skeleton to $h5_path")
+    println("Wrote GCVI closure M2 run to $h5_path")
     println("Wrote twin observations to $obs_path (chi_true = $truth_chi)")
+    println("chi_inf = $(round(chi_inf, digits = 4))")
     return h5_path
 end
 
