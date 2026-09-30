@@ -129,17 +129,28 @@ function solve_case(cfg::GcviClosureConfig, particles)
         abstol = 1.0e-24, reltol = 1.0e-6)
 end
 
-function write_twin_obs(path, cfg::GcviClosureConfig, final_record, chi_true)
+function write_twin_obs(path, cfg::GcviClosureConfig, truth_records, chis_true)
+    # pooled observation (schema v2): real SMPS/ACSM instruments average over
+    # the sampling window, so the twin obs is the truth-case replicate mean,
+    # not a single realization (a single-replicate obs makes the closure cost
+    # measure replicate identity rather than chi)
+    n = length(truth_records)
+    cr_spec = mean([collect(r.cr_spectrum) for r in truth_records])
+    ci_spec = mean([collect(r.ci_spectrum) for r in truth_records])
+    cr_chem = mean([collect(r.cr_chemistry) for r in truth_records])
+    ci_chem = mean([collect(r.ci_chemistry) for r in truth_records])
+    chi_true = mean(chis_true)
     h5open(path, "w") do file
         g = create_group(file, "obs")
-        attrs(g)["schema_version"] = "synthetic-obs-v1"
+        attrs(g)["schema_version"] = "synthetic-obs-v2"
         attrs(g)["chi_true"] = chi_true
+        attrs(g)["n_replicates_pooled"] = n
         attrs(g)["acsm_species"] = "AS,AN,OA"
         g["bin_edges"] = collect(cfg.bin_edges)
-        g["cr_dNdlogD"] = collect(final_record.cr_spectrum)
-        g["ci_dNdlogD"] = collect(final_record.ci_spectrum)
-        g["cr_chemistry"] = collect(final_record.cr_chemistry)
-        g["ci_chemistry"] = collect(final_record.ci_chemistry)
+        g["cr_dNdlogD"] = cr_spec
+        g["ci_dNdlogD"] = ci_spec
+        g["cr_chemistry"] = cr_chem
+        g["ci_chemistry"] = ci_chem
     end
     return path
 end
@@ -157,8 +168,8 @@ function main()
         notes = "GCVI closure M2: calibrated chi grid (truth off-grid at 0.5), " *
                 "tabulated spectrum, size-resolved fbar(D), open-loop S(t) ramp.")
 
-    truth_record_final = nothing
-    truth_chi = NaN
+    truth_records = []
+    truth_chis = Float64[]
     chis_realized = Dict{Int, Vector{Float64}}()
     h5open(h5_path, "r+") do file
         for (case_idx, chi) in enumerate(chi_cases)
@@ -189,9 +200,9 @@ function main()
                 _write_attrs!(rep_group, attrs_dict)
                 write_records_common!(rep_group, records, cfg.n_sim, cfg.bin_edges;
                     dry_diameter_initial = dry0, extra_attrs = attrs_dict)
-                if truth && replicate_idx == 1
-                    truth_record_final = records[end]
-                    truth_chi = meta.chi_realized
+                if truth
+                    push!(truth_records, records[end])
+                    push!(truth_chis, meta.chi_realized)
                 end
                 println("case chi=$chi rep=$replicate_idx: " *
                         "chi_realized=$(round(meta.chi_realized, digits = 4)) " *
@@ -215,9 +226,10 @@ function main()
 
     obs_path = joinpath(example_data_dir(), "synthetic", "twin_obs_v0.h5")
     mkpath(dirname(obs_path))
-    write_twin_obs(obs_path, cfg, truth_record_final, truth_chi)
+    write_twin_obs(obs_path, cfg, truth_records, truth_chis)
     println("Wrote GCVI closure M2 run to $h5_path")
-    println("Wrote twin observations to $obs_path (chi_true = $truth_chi)")
+    println("Wrote twin observations to $obs_path (pooled over $(length(truth_chis)) " *
+            "truth replicates, chi_true = $(round(mean(truth_chis), digits = 4)))")
     println("chi_inf = $(round(chi_inf, digits = 4))")
     return h5_path
 end

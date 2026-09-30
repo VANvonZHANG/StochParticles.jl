@@ -16,8 +16,8 @@ import numpy as np
 
 from analysis.figure_style import PALETTE, apply_publication_style
 from analysis.gcvi_closure import (case_statistics, chi_realized, chi_target_of,
-                                   cost_curve, load_observations, truth_case_name,
-                                   twin_gate)
+                                   cost_curve, load_observations, pool_observation,
+                                   truth_case_name, twin_gate)
 from analysis.stochparticles_io import DATA_DIR, FIG_DIR, read_scene
 
 # PALETTE is a name->hex dict in figure_style; scan lines need a color sequence.
@@ -28,6 +28,9 @@ def main() -> None:
     apply_publication_style()
     scene = read_scene(DATA_DIR / "gcvi_closure.h5")
     obs = load_observations(DATA_DIR / "synthetic" / "twin_obs_v0.h5")
+    # pooled (time-averaged) observation: real instruments average over the
+    # sampling window; a single-replicate obs measures replicate identity
+    obs = pool_observation(scene, obs)
     rows = cost_curve(scene, obs)
     truth_target = chi_target_of(scene, truth_case_name(scene))
     rows = [r for r in rows if abs(r[0] - truth_target) > 1e-9]

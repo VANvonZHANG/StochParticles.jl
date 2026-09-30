@@ -51,13 +51,19 @@ def chi_target_of(scene: dict, case_name: str) -> float:
     return float(np.mean([r.attrs["chi_target"] for r in scene[case_name]]))
 
 
-def kld(p, q, floor: float = 1e-12) -> float:
+def kld(p, q, floor=None) -> float:
     """KLD(p || q) over number-normalized spectra; q is floored.
 
     Empty-spectrum guard (calibration sweeps can produce empty CR output):
     both empty counts as a match (0.0); an empty simulation against a
     non-empty observation is the maximal mismatch (inf) — the formal value
     of 0 would wrongly declare a perfect match.
+
+    `floor=None` (default) uses a half-count-equivalent floor, estimated
+    from q's smallest nonzero bin: for a particle-sampled spectrum that bin
+    IS one particle, so an occupied-in-p / empty-in-q bin costs
+    ~log(2·k) nats instead of the ~27 nats an arbitrary 1e-12 floor charges.
+    A numeric floor restores the old fixed-floor behavior.
     """
     p = np.asarray(p, dtype=float)
     q = np.asarray(q, dtype=float)
@@ -65,11 +71,34 @@ def kld(p, q, floor: float = 1e-12) -> float:
         return 0.0
     if p.sum() == 0.0:
         return float("inf")
+    if floor is None:
+        positive = q[q > 0.0]
+        floor = float(positive.min()) / 2.0 if positive.size else 1e-12
     q = np.maximum(q, floor)
     p = p / p.sum()
     q = q / q.sum()
     mask = p > 0
     return float(np.sum(p[mask] * np.log(p[mask] / q[mask])))
+
+
+def rebin_spectrum(bin_edges, dNdlogD, stride: int = 3):
+    """Merge `stride` adjacent bins (SMPS-style coarsening).
+
+    With uniform log-spaced edges the merged dN/dlogD is the count-weighted
+    mean of the merged bins; trailing remainder bins are dropped. Returns
+    (new_edges, new_dNdlogD).
+    """
+    edges = np.asarray(bin_edges, dtype=float)
+    vals = np.asarray(dNdlogD, dtype=float)
+    log_edges = np.log10(edges)
+    new_edges = edges[::stride]
+    n_new = len(new_edges) - 1
+    out = np.empty(n_new)
+    for b in range(n_new):
+        lo, hi = b * stride, min(b * stride + stride, len(vals))
+        counts = vals[lo:hi] * np.diff(log_edges)[lo:hi]
+        out[b] = counts.sum() / (log_edges[min(hi, len(log_edges) - 1)] - log_edges[lo])
+    return new_edges, out
 
 
 def chem_mse(sim, obs) -> float:
@@ -78,12 +107,21 @@ def chem_mse(sim, obs) -> float:
 
 def _case_J_values(scene: dict, case_name: str, obs: dict,
                    w_size: float = 1.0, w_chem: float = 1.0) -> list:
-    """Per-replicate total J of one case against the observations."""
+    """Per-replicate total J of one case against the observations.
+
+    Spectra are coarsened to the closure binning (stride 3, 95 -> 31 bins)
+    before the KLD: at n_sim ~ 1000 the fine grid leaves ~3 CR particles
+    per bin and the KLD's empty-bin penalties measure replicate identity,
+    not chi (measured 2026-09-30: replicate-vs-replicate KLD floor 1.34 ±
+    0.30 exceeded every case-vs-obs J).
+    """
     values = []
     for rep in scene[case_name]:
         vi = final_virtual_instrument(rep)
-        j_size = 0.5 * (kld(vi["cr"], obs["cr_dNdlogD"]) +
-                        kld(vi["ci"], obs["ci_dNdlogD"]))
+        cr = rebin_spectrum(obs["bin_edges"], vi["cr"])[1]
+        ci = rebin_spectrum(obs["bin_edges"], vi["ci"])[1]
+        j_size = 0.5 * (kld(cr, obs["cr_dNdlogD_rebinned"]) +
+                        kld(ci, obs["ci_dNdlogD_rebinned"]))
         j_chem = 0.5 * (chem_mse(vi["cr_chemistry"], obs["cr_chemistry"]) +
                         chem_mse(vi["ci_chemistry"], obs["ci_chemistry"]))
         values.append(w_size * j_size + w_chem * j_chem)
@@ -114,13 +152,42 @@ def truth_case_name(scene: dict) -> str:
     return truths[0]
 
 
+def pool_observation(scene: dict, obs: dict, stride: int = 3) -> dict:
+    """Pooled observation: truth-case replicate-mean instrument output.
+
+    Real SMPS/ACSM observations average over a sampling window, so the twin
+    observation is the replicate mean, not a single realization (a
+    single-replicate obs makes the closure cost measure replicate identity:
+    sigma_J ~ 0.30 at the 2026-09-30 run). Spectra are pre-rebinned to the
+    closure binning so `kld` compares like with like. `chi_true` becomes
+    the truth case's mean realized chi.
+    """
+    truth = truth_case_name(scene)
+    reps = [final_virtual_instrument(r) for r in scene[truth]]
+    pooled = {
+        "bin_edges": obs["bin_edges"],
+        "cr_dNdlogD": np.mean([r["cr"] for r in reps], axis=0),
+        "ci_dNdlogD": np.mean([r["ci"] for r in reps], axis=0),
+        "cr_chemistry": np.mean([r["cr_chemistry"] for r in reps], axis=0),
+        "ci_chemistry": np.mean([r["ci_chemistry"] for r in reps], axis=0),
+        "chi_true": float(np.mean([r.attrs["chi_realized"] for r in scene[truth]])),
+        "n_replicates_pooled": len(reps),
+    }
+    pooled["cr_dNdlogD_rebinned"] = rebin_spectrum(obs["bin_edges"],
+                                                   pooled["cr_dNdlogD"], stride)[1]
+    pooled["ci_dNdlogD_rebinned"] = rebin_spectrum(obs["bin_edges"],
+                                                   pooled["ci_dNdlogD"], stride)[1]
+    return pooled
+
+
 def twin_gate(scene: dict, obs: dict, radius: float = 0.10) -> dict:
     """Twin-v1 gate: argmin J over the chi grid must bracket chi_true.
 
-    Noise floor sigma_J: std of per-replicate J in the truth case against
-    the fixed observation; the obs-source replicate is excluded because its
-    J is identically 0. `separation > 2*sigma_J` is a soft check (printed,
-    not gating).
+    `obs` should be the pooled observation (`pool_observation`). Noise
+    floor sigma_J: std of per-replicate J in the truth case against the
+    pooled observation — with a pooled obs no replicate is the obs source,
+    so all replicates contribute. `separation > 2*sigma_J` is a soft check
+    (printed, not gating).
     """
     truth = truth_case_name(scene)
     grid_names = [n for n in scene if n != truth]
@@ -133,7 +200,7 @@ def twin_gate(scene: dict, obs: dict, radius: float = 0.10) -> dict:
     chi_true = obs["chi_true"]
     ok = abs(chi_hat - chi_true) <= radius
     truth_J = _case_J_values(scene, truth, obs, 1.0, 1.0)
-    sigma_j = float(np.std(truth_J[1:])) if len(truth_J) > 1 else 0.0
+    sigma_j = float(np.std(truth_J)) if len(truth_J) > 1 else 0.0
     separation = float(max(js) - min(js))
     verdict = {
         "pass": bool(ok), "chi_hat": chi_hat, "chi_true": chi_true,
