@@ -314,3 +314,127 @@ function synthesize_population(spec::SyntheticPopulationSpec;
     return particles, dry_diameters,
         (chi_realized = chi_realized, nu = nu_used, seed = Int(seed))
 end
+
+_entropy(p) = -sum(x -> x > 0 ? x * log(x) : 0.0, p)
+
+"""
+    reachable_chi_max(spectrum, fbar; densities, chi_species) -> Float64
+
+χ at ν → ∞: every particle carries exactly its bin's mean composition
+f̄(D). Exact for piecewise-constant f̄ and mirrors the `mixing_state_index`
+convention: D_eps with count-share weights (unweighted per-particle
+average), D_gamma with masked-dry-mass shares from the within-bin
+log-uniform sampling model, `E[D³|b] = (e_hi³ − e_lo³)/(3·Δln b)`.
+Size-independent f̄ gives exactly 1.0.
+"""
+function reachable_chi_max(spectrum::TabulatedSpectrum,
+        fbar::SizeResolvedComposition;
+        densities::SVector, chi_species::Vector{Int})
+    K = size(fbar.fractions, 1)
+    edges = spectrum.bin_edges
+    nbins = length(edges) - 1
+    probs = _spectrum_bin_probs(spectrum)
+    fmask = Vector{Vector{Float64}}(undef, nbins)
+    mass = Vector{Float64}(undef, nbins)
+    for b in 1:nbins
+        col = fbar.fractions[:, b]
+        masked_sum = sum(col[chi_species])
+        masked_sum > 0 ||
+            throw(ArgumentError("bin $b has zero masked dry mass; chi is undefined"))
+        fmask[b] = col[chi_species] ./ masked_sum
+        e3 = (edges[b + 1]^3 - edges[b]^3) /
+             (3.0 * (log(edges[b + 1]) - log(edges[b])))
+        rho_eff = 1.0 / sum(col[k] / densities[k] for k in 1:K)
+        mass[b] = probs[b] * e3 * rho_eff * masked_sum
+    end
+    d_eps = sum(probs[b] * _entropy(fmask[b]) for b in 1:nbins)
+    w = mass ./ sum(mass)
+    d_gamma = _entropy(sum(w[b] * fmask[b] for b in 1:nbins))
+    d_gamma > 0 || return NaN
+    return d_eps / d_gamma
+end
+
+"""
+    _population_chi(rng, spectrum, fbar, nu, n; densities, chi_species)
+
+χ of one finite population drawn through the exact `synthesize_population`
+sampling path (dry masses only — masked χ is water-invariant). Internal.
+"""
+function _population_chi(rng::AbstractRNG, spectrum::TabulatedSpectrum,
+        fbar::SizeResolvedComposition, nu::Float64, n::Int;
+        densities::SVector, chi_species::Vector{Int})
+    K = size(fbar.fractions, 1)
+    dry_densities = SVector{K, Float64}(densities[1:K])
+    particles, _ = _assemble_population(rng, spectrum, fbar, nu, n, dry_densities)
+    volume = n / number_concentration(spectrum)
+    gas = PrescribedProfile([0.0], [288.15], [0.0])
+    sys = ParticleSystem(Val(K + 1), n, volume, gas)
+    return mixing_state_index(make_u0(particles), sys; species = chi_species)
+end
+
+# ν(χ) calibration cache; assumes spectrum/fbar objects are not mutated
+# after construction (keys use objectid)
+const _NU_CACHE = Dict{
+    Tuple{UInt64, UInt64, Float64, Int, Int, Vector{Int}}, Float64}()
+
+"""
+    empty_nu_cache!()
+
+Clear the `nu_for_chi` calibration cache (tests only).
+"""
+empty_nu_cache!() = empty!(_NU_CACHE)
+
+"""
+    nu_for_chi(spectrum, fbar, chi_target; densities, chi_species,
+               n_mc = 20_000, n_draws = 5, rng) -> Float64
+
+Calibrate the Dirichlet concentration ν reaching `chi_target` in E[χ]:
+bisection in log ν (χ(ν) is monotone in expectation), each evaluation the
+mean χ of `n_draws` Monte-Carlo populations of `n_mc` particles drawn
+through the exact `synthesize_population` sampling path and scored with the
+same `mixing_state_index` diagnostic. Results cached per
+(spectrum, fbar, chi_target, n_mc, n_draws, chi_species). Throws
+`ArgumentError` when the target is unreachable
+(`chi_target ≥ reachable_chi_max − 0.01`).
+"""
+function nu_for_chi(spectrum::TabulatedSpectrum,
+        fbar::SizeResolvedComposition, chi_target::Float64;
+        densities::SVector, chi_species::Vector{Int},
+        n_mc::Int = 20_000, n_draws::Int = 5,
+        rng::AbstractRNG = MersenneTwister(20260930))
+    key = (objectid(spectrum), objectid(fbar), chi_target, n_mc, n_draws,
+        chi_species)
+    haskey(_NU_CACHE, key) && return _NU_CACHE[key]
+    chi_inf = reachable_chi_max(spectrum, fbar;
+        densities = densities, chi_species = chi_species)
+    chi_target < chi_inf - 0.01 || throw(ArgumentError(
+        "chi_target=$chi_target is unreachable for this spectrum/fbar: " *
+        "upper bound chi_inf=$(round(chi_inf, digits = 4)); " *
+        "valid range is (0, $(round(chi_inf, digits = 4)))"))
+    chi_of(nu::Float64) = begin
+        s = 0.0
+        for _ in 1:n_draws
+            s += _population_chi(rng, spectrum, fbar, nu, n_mc;
+                densities = densities, chi_species = chi_species)
+        end
+        s / n_draws
+    end
+    lo, hi = 1.0e-2, 1.0e6
+    chi_lo = chi_of(lo)
+    chi_lo < chi_target || throw(ArgumentError(
+        "lower bracket nu=$lo already gives chi=$(round(chi_lo, digits = 4)) " *
+        ">= target $chi_target"))
+    nu_star = sqrt(lo * hi)
+    for _ in 1:100
+        nu_star = sqrt(lo * hi)
+        chi_mid = chi_of(nu_star)
+        if chi_mid < chi_target
+            lo = nu_star
+        else
+            hi = nu_star
+        end
+        (abs(chi_mid - chi_target) < 0.002 || hi / lo < 1.001) && break
+    end
+    _NU_CACHE[key] = nu_star
+    return nu_star
+end

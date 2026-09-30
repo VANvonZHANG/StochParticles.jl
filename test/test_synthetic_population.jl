@@ -212,3 +212,81 @@ end
         end
     end
 end
+
+
+# empty_nu_cache! is produced but deliberately not exported (its docstring
+# marks it "tests only"); bring it into scope for the calibration testsets
+using StochParticles: empty_nu_cache!
+
+@testset "reachable_chi_max" begin
+    # size-independent fbar: the ν→∞ limit is exactly 1
+    @test reachable_chi_max(SPEC, constant_fbar(SVector(0.25, 0.15, 0.50, 0.10), SPEC);
+        densities = RHO, chi_species = MASK3) ≈ 1.0 atol = 1e-12
+    # driver anchors: comfortably above the top grid point 0.75
+    chi_inf = reachable_chi_max(SPEC, FBAR; densities = RHO, chi_species = MASK3)
+    @test chi_inf > 0.85
+    println("chi_inf(driver anchors) = $chi_inf")
+    # sharp two-regime composition: mostly-external ceiling far below 1
+    strong = Matrix{Float64}(undef, 4, length(EDGES) - 1)
+    for b in 1:(length(EDGES) - 1)
+        strong[:, b] = b <= 40 ? [0.0, 0.0, 0.9, 0.1] : [0.9, 0.05, 0.03, 0.02]
+    end
+    strong_fbar = SizeResolvedComposition(EDGES, strong)
+    @test reachable_chi_max(SPEC, strong_fbar;
+        densities = RHO, chi_species = MASK3) < 0.5
+    @test_throws ArgumentError nu_for_chi(SPEC, strong_fbar, 0.75;
+        densities = RHO, chi_species = MASK3)
+end
+
+@testset "chi(nu) monotone" begin
+    rng = MersenneTwister(42)
+    chis = [StochParticles._population_chi(rng, SPEC, FBAR, nu, 20_000;
+             densities = RHO, chi_species = MASK3)
+            for nu in [0.5, 2.0, 10.0, 50.0, 200.0]]
+    @test all(diff(chis) .> 0.01)
+end
+
+@testset "nu_for_chi acceptance gate (|chi_realized - chi_target| < 0.02)" begin
+    empty_nu_cache!()
+    for chi_target in [0.10, 0.25, 0.40, 0.50, 0.60, 0.75]
+        nu = nu_for_chi(SPEC, FBAR, chi_target;
+            densities = RHO, chi_species = MASK3, rng = MersenneTwister(20260930))
+        @test nu > 0
+        chi_real = StochParticles._population_chi(
+            MersenneTwister(70_000 + round(Int, 100 * chi_target)),
+            SPEC, FBAR, nu, 1000; densities = RHO, chi_species = MASK3)
+        println("chi_target=$chi_target  nu=$(round(nu, digits = 3))  chi_realized=$(round(chi_real, digits = 4))")
+        @test abs(chi_real - chi_target) < 0.02
+    end
+end
+
+@testset "nu_for_chi cache and mask sensitivity" begin
+    empty_nu_cache!()
+    nu = nu_for_chi(SPEC, FBAR, 0.30;
+        densities = RHO, chi_species = MASK3, rng = MersenneTwister(1))
+    key = (objectid(SPEC), objectid(FBAR), 0.30, 20_000, 5, MASK3)
+    @test StochParticles._NU_CACHE[key] == nu
+    StochParticles._NU_CACHE[key] = -999.0
+    @test nu_for_chi(SPEC, FBAR, 0.30;
+        densities = RHO, chi_species = MASK3, rng = MersenneTwister(1)) == -999.0
+    empty_nu_cache!()
+    # the calibration must follow the diagnostic mask (wiring check)
+    nu3 = nu_for_chi(SPEC, FBAR, 0.50;
+        densities = RHO, chi_species = [1, 2, 3], rng = MersenneTwister(2))
+    nu4 = nu_for_chi(SPEC, FBAR, 0.50;
+        densities = RHO, chi_species = [1, 2, 3, 4], rng = MersenneTwister(2))
+    # wiring check only: the calibrator must follow the diagnostic mask. These
+    # anchors' BC contrast (0.10 -> 0.15) yields only ~0.4% true nu separation,
+    # so magnitude is not asserted -- bitwise inequality is the mask-sensitivity test.
+    @test nu3 !== nu4
+end
+
+@testset "synthesize_population calibrated path (nu = nothing)" begin
+    empty_nu_cache!()
+    expected_nu = nu_for_chi(SPEC, FBAR, 0.50;
+        densities = RHO, chi_species = MASK3, rng = MersenneTwister(20260930))
+    particles, dry_d, meta = synthesize_population(
+        pop_spec(0.0; chi = 0.50); seed = 20260930, thermo = THERMO)
+    @test meta.nu == expected_nu
+    @test abs(meta.chi_realized - 0.50) < 0.02
+end
