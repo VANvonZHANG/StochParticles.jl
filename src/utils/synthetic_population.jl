@@ -293,12 +293,13 @@ function synthesize_population(spec::SyntheticPopulationSpec;
 
     rng = MersenneTwister(seed)
     nu_used = nu === nothing ?
-        nu_for_chi(spec.spectrum, spec.fbar, spec.chi_target;
-            densities = spec.densities, chi_species = spec.chi_species,
-            rng = rng) :
-        Float64(nu)
+              nu_for_chi(spec.spectrum, spec.fbar, spec.chi_target;
+        densities = spec.densities, chi_species = spec.chi_species,
+        rng = rng) :
+              Float64(nu)
     dry_densities = SVector{K, Float64}(spec.densities[1:K])
-    particles, dry_diameters = _assemble_population(
+    particles,
+    dry_diameters = _assemble_population(
         rng, spec.spectrum, spec.fbar, nu_used, spec.n_sim, dry_densities)
 
     # dry-only chi is invariant to the equilibration water (masked species),
@@ -312,7 +313,7 @@ function synthesize_population(spec::SyntheticPopulationSpec;
     chi_realized = mixing_state_index(make_u0(particles), sys;
         species = spec.chi_species)
     return particles, dry_diameters,
-        (chi_realized = chi_realized, nu = nu_used, seed = Int(seed))
+    (chi_realized = chi_realized, nu = nu_used, seed = Int(seed))
 end
 
 _entropy(p) = -sum(x -> x > 0 ? x * log(x) : 0.0, p)

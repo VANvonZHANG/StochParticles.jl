@@ -124,7 +124,9 @@ end
 function solve_case(cfg::GcviClosureConfig, particles)
     condensation = H2OCondensationProcess(
         thermo(cfg), cfg.densities; h2o_idx = cfg.h2o_idx, w = 0.0)
-    record_func = (t, u, sys) -> merge_record(
+    record_func = (t,
+        u,
+        sys) -> merge_record(
         base_diagnostic_record(t, u, sys, Val(A), cfg.densities, cfg.bin_edges),
         record_extras(t, u, sys, cfg))
     # kg-scale states need explicit tolerances: solver defaults (abstol = 1e-6)

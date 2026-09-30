@@ -141,12 +141,15 @@ const THERMO = ThermodynamicsParams(
     SVector(0.61, 0.67, 0.10, 0.0, 0.0), 0.072, 1000.0, 18.015e-3, 2.5e6, 461.5,
     2.5e-5, 2.4e-2)
 
-pop_spec(nu; n = 1000, chi = 0.5) = SyntheticPopulationSpec(
-    n_sim = n, spectrum = SPEC, fbar = FBAR, chi_target = chi,
-    densities = RHO, h2o_idx = 5, chi_species = MASK3, T0 = 288.15, S0 = 0.0)
+function pop_spec(nu; n = 1000, chi = 0.5)
+    SyntheticPopulationSpec(
+        n_sim = n, spectrum = SPEC, fbar = FBAR, chi_target = chi,
+        densities = RHO, h2o_idx = 5, chi_species = MASK3, T0 = 288.15, S0 = 0.0)
+end
 
 @testset "synthesize_population (explicit nu)" begin
-    particles, dry_d, meta = synthesize_population(pop_spec(12.0); seed = 123,
+    particles, dry_d,
+    meta = synthesize_population(pop_spec(12.0); seed = 123,
         thermo = THERMO, nu = 12.0)
     @test length(particles) == 1000 == length(dry_d)
     @test meta.nu == 12.0 && meta.seed == 123
@@ -159,7 +162,8 @@ pop_spec(nu; n = 1000, chi = 0.5) = SyntheticPopulationSpec(
     # haze equilibrium added non-negative water to the last slot
     @test all(p -> p[5] >= 0.0, particles)
     # same seed -> bitwise identical population
-    p2, d2, _ = synthesize_population(pop_spec(12.0); seed = 123, thermo = THERMO,
+    p2, d2,
+    _ = synthesize_population(pop_spec(12.0); seed = 123, thermo = THERMO,
         nu = 12.0)
     @test p2 == particles && d2 == dry_d
     # meta chi matches the library diagnostic recomputed by hand
@@ -192,7 +196,8 @@ end
 
 @testset "composition recovery of fbar(D)" begin
     n = 20_000
-    particles, dry_d, _ = synthesize_population(
+    particles, dry_d,
+    _ = synthesize_population(
         pop_spec(12.0; n = n); seed = 777, thermo = THERMO, nu = 12.0)
     bins = [searchsortedfirst(EDGES, d) - 1 for d in dry_d]
     nbins = length(EDGES) - 1
@@ -203,7 +208,7 @@ end
         for k in 1:4
             fk = FBAR.fractions[k, b]
             mean_k = sum(i -> particles[i][k] /
-                         sum(particles[i][j] for j in 1:4), idx) / n_b
+                              sum(particles[i][j] for j in 1:4), idx) / n_b
             # Dirichlet(nu*fbar) bin-mean noise sigma = sqrt(f*(1-f)/((nu+1)*n_b));
             # a flat 0.01 bound is below 1 sigma for bins near the 100-count
             # threshold, so take max(0.01, 4 sigma) (nu = 12.0 here)
@@ -212,7 +217,6 @@ end
         end
     end
 end
-
 
 # empty_nu_cache! is produced but deliberately not exported (its docstring
 # marks it "tests only"); bring it into scope for the calibration testsets
@@ -241,7 +245,7 @@ end
 @testset "chi(nu) monotone" begin
     rng = MersenneTwister(42)
     chis = [StochParticles._population_chi(rng, SPEC, FBAR, nu, 20_000;
-             densities = RHO, chi_species = MASK3)
+                densities = RHO, chi_species = MASK3)
             for nu in [0.5, 2.0, 10.0, 50.0, 200.0]]
     @test all(diff(chis) .> 0.01)
 end
@@ -285,7 +289,8 @@ end
     empty_nu_cache!()
     expected_nu = nu_for_chi(SPEC, FBAR, 0.50;
         densities = RHO, chi_species = MASK3, rng = MersenneTwister(20260930))
-    particles, dry_d, meta = synthesize_population(
+    particles, dry_d,
+    meta = synthesize_population(
         pop_spec(0.0; chi = 0.50); seed = 20260930, thermo = THERMO)
     @test meta.nu == expected_nu
     @test abs(meta.chi_realized - 0.50) < 0.02
