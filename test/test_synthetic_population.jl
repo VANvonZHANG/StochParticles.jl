@@ -134,3 +134,81 @@ end
     @test all(isapprox.(sum(FBAR.fractions; dims = 1), 1.0; atol = 1e-12))
     @test all(>=(0.0), FBAR.fractions)
 end
+
+const RHO = SVector(1770.0, 1720.0, 1400.0, 1800.0, 1000.0)
+const MASK3 = [1, 2, 3]
+const THERMO = ThermodynamicsParams(
+    SVector(0.61, 0.67, 0.10, 0.0, 0.0), 0.072, 1000.0, 18.015e-3, 2.5e6, 461.5,
+    2.5e-5, 2.4e-2)
+
+pop_spec(nu; n = 1000, chi = 0.5) = SyntheticPopulationSpec(
+    n_sim = n, spectrum = SPEC, fbar = FBAR, chi_target = chi,
+    densities = RHO, h2o_idx = 5, chi_species = MASK3, T0 = 288.15, S0 = 0.0)
+
+@testset "synthesize_population (explicit nu)" begin
+    particles, dry_d, meta = synthesize_population(pop_spec(12.0); seed = 123,
+        thermo = THERMO, nu = 12.0)
+    @test length(particles) == 1000 == length(dry_d)
+    @test meta.nu == 12.0 && meta.seed == 123
+    @test isfinite(meta.chi_realized) && 0.0 <= meta.chi_realized <= 1.0
+    # bitwise dry-volume conservation per particle
+    for i in 1:1000
+        m = particles[i]
+        @test (pi / 6.0) * dry_d[i]^3 ≈ sum(m[k] / RHO[k] for k in 1:4) rtol = 1e-12
+    end
+    # haze equilibrium added non-negative water to the last slot
+    @test all(p -> p[5] >= 0.0, particles)
+    # same seed -> bitwise identical population
+    p2, d2, _ = synthesize_population(pop_spec(12.0); seed = 123, thermo = THERMO,
+        nu = 12.0)
+    @test p2 == particles && d2 == dry_d
+    # meta chi matches the library diagnostic recomputed by hand
+    sys = ParticleSystem(Val(5), 1000, 1000 / number_concentration(SPEC),
+        PrescribedProfile([0.0], [288.15], [0.0]))
+    @test meta.chi_realized ==
+          mixing_state_index(make_u0(particles), sys; species = MASK3)
+end
+
+@testset "synthesize_population validation" begin
+    bad_h2o = SyntheticPopulationSpec(n_sim = 10, spectrum = SPEC, fbar = FBAR,
+        chi_target = 0.5, densities = RHO, h2o_idx = 3, chi_species = MASK3,
+        T0 = 288.15, S0 = 0.0)
+    @test_throws ArgumentError synthesize_population(bad_h2o; seed = 1, thermo = THERMO)
+    bad_rho = SyntheticPopulationSpec(n_sim = 10, spectrum = SPEC, fbar = FBAR,
+        chi_target = 0.5, densities = SVector{4, Float64}(RHO[1:4]), h2o_idx = 5,
+        chi_species = MASK3, T0 = 288.15, S0 = 0.0)
+    @test_throws ArgumentError synthesize_population(bad_rho; seed = 1, thermo = THERMO)
+    bad_mask = SyntheticPopulationSpec(n_sim = 10, spectrum = SPEC, fbar = FBAR,
+        chi_target = 0.5, densities = RHO, h2o_idx = 5, chi_species = [1, 2, 5],
+        T0 = 288.15, S0 = 0.0)
+    @test_throws ArgumentError synthesize_population(bad_mask; seed = 1, thermo = THERMO)
+    other_edges = collect(10.0 .^ range(-8.3, -4.5; length = 48))
+    other_spec = lognormal_table(6.0e-8, 1.45, 8.0e11, other_edges)
+    bad_grid = SyntheticPopulationSpec(n_sim = 10, spectrum = other_spec, fbar = FBAR,
+        chi_target = 0.5, densities = RHO, h2o_idx = 5, chi_species = MASK3,
+        T0 = 288.15, S0 = 0.0)
+    @test_throws ArgumentError synthesize_population(bad_grid; seed = 1, thermo = THERMO)
+end
+
+@testset "composition recovery of fbar(D)" begin
+    n = 20_000
+    particles, dry_d, _ = synthesize_population(
+        pop_spec(12.0; n = n); seed = 777, thermo = THERMO, nu = 12.0)
+    bins = [searchsortedfirst(EDGES, d) - 1 for d in dry_d]
+    nbins = length(EDGES) - 1
+    for b in 1:nbins
+        idx = findall(==(b), bins)
+        length(idx) >= 100 || continue
+        n_b = length(idx)
+        for k in 1:4
+            fk = FBAR.fractions[k, b]
+            mean_k = sum(i -> particles[i][k] /
+                         sum(particles[i][j] for j in 1:4), idx) / n_b
+            # Dirichlet(nu*fbar) bin-mean noise sigma = sqrt(f*(1-f)/((nu+1)*n_b));
+            # a flat 0.01 bound is below 1 sigma for bins near the 100-count
+            # threshold, so take max(0.01, 4 sigma) (nu = 12.0 here)
+            sig = sqrt(fk * (1 - fk) / ((12.0 + 1) * n_b))
+            @test abs(mean_k - fk) < max(0.01, 4.0 * sig)
+        end
+    end
+end

@@ -5,6 +5,7 @@
 # and Monte-Carlo ν(χ) calibration (GCVI closure blueprint contract 2).
 
 using StaticArrays
+using Distributions
 
 """
     TabulatedSpectrum(bin_edges, dNdlogD)
@@ -221,4 +222,95 @@ function SizeResolvedComposition(spectrum::TabulatedSpectrum;
         mat[:, b] .= col ./ sum(col)
     end
     return SizeResolvedComposition(edges, mat)
+end
+
+"""
+    SyntheticPopulationSpec(; n_sim, spectrum, fbar, chi_target, densities,
+                            h2o_idx, chi_species, T0, S0)
+
+Description of a synthetic initial population (blueprint contract 2).
+`densities` includes water in the last slot; `h2o_idx` must equal the number
+of dry species + 1; `chi_species` masks the dry species used by the closure
+χ (e.g. `[1, 2, 3]` = AS, AN, OA).
+"""
+Base.@kwdef struct SyntheticPopulationSpec
+    n_sim::Int
+    spectrum::TabulatedSpectrum
+    fbar::SizeResolvedComposition
+    chi_target::Float64
+    densities::SVector{A, Float64} where {A}
+    h2o_idx::Int
+    chi_species::Vector{Int}
+    T0::Float64
+    S0::Float64
+end
+
+"""
+    _assemble_population(rng, spectrum, fbar, nu, n, dry_densities)
+        -> (particles, diameters)
+
+Shared sampling path of `synthesize_population` and the `nu_for_chi`
+Monte-Carlo calibration: spectrum inverse-CDF diameters + Dirichlet(ν·f̄(D))
+dry fractions + volume-additive mass assembly (water slot = 0). Internal.
+"""
+function _assemble_population(rng::AbstractRNG, spectrum::TabulatedSpectrum,
+        fbar::SizeResolvedComposition, nu::Float64, n::Int,
+        dry_densities::SVector{K, Float64}) where {K}
+    diameters, bins = _sample_dry_diameters(rng, spectrum, n)
+    particles = Vector{SVector{K + 1, Float64}}(undef, n)
+    for i in 1:n
+        f = rand(rng, Dirichlet(nu .* fbar.fractions[:, bins[i]]))
+        rho_eff = 1.0 / sum(f[k] / dry_densities[k] for k in 1:K)
+        m_total = (pi / 6.0) * diameters[i]^3 * rho_eff
+        particles[i] = SVector{K + 1, Float64}(m_total .* f..., 0.0)
+    end
+    return particles, diameters
+end
+
+"""
+    synthesize_population(spec; seed, thermo, nu = nothing)
+        -> (particles, dry_diameters, meta)
+
+Generate the initial population: inverse-CDF dry diameters from the
+spectrum, Dirichlet(ν·f̄(D)) dry compositions, volume-additive mass
+assembly, haze pre-equilibration at (T0, S0). `nu = nothing` calibrates ν
+for `spec.chi_target` via `nu_for_chi` (requires a reachable target); an
+explicit ν skips calibration. `meta = (chi_realized, nu, seed)`.
+"""
+function synthesize_population(spec::SyntheticPopulationSpec;
+        seed::Integer, thermo::ThermodynamicsParams,
+        nu::Union{Nothing, Float64} = nothing)
+    K = size(spec.fbar.fractions, 1)
+    A = K + 1
+    spec.h2o_idx == A ||
+        throw(ArgumentError("h2o_idx must be $A (dry species occupy slots 1:$K)"))
+    length(spec.densities) == A ||
+        throw(ArgumentError("densities must have length $A (dry species + water)"))
+    all(k -> 1 <= k <= K, spec.chi_species) ||
+        throw(ArgumentError("chi_species must index dry species 1:$K, got $(spec.chi_species)"))
+    spec.fbar.bin_edges == spec.spectrum.bin_edges ||
+        throw(ArgumentError("fbar bin_edges must match spectrum bin_edges"))
+
+    rng = MersenneTwister(seed)
+    nu_used = nu === nothing ?
+        nu_for_chi(spec.spectrum, spec.fbar, spec.chi_target;
+            densities = spec.densities, chi_species = spec.chi_species,
+            rng = rng) :
+        Float64(nu)
+    dry_densities = SVector{K, Float64}(spec.densities[1:K])
+    particles, dry_diameters = _assemble_population(
+        rng, spec.spectrum, spec.fbar, nu_used, spec.n_sim, dry_densities)
+
+    # dry-only chi is invariant to the equilibration water (masked species),
+    # so chi_realized is computed on the final initial state
+    pre_equilibrate!(particles, thermo, spec.densities, spec.T0,
+        saturation_vapor_pressure(spec.T0) * (1.0 + spec.S0); h2o_idx = A)
+
+    volume = spec.n_sim / number_concentration(spec.spectrum)
+    gas = PrescribedProfile([0.0], [spec.T0], [spec.S0])
+    sys = ParticleSystem(Val(A), spec.n_sim, volume, gas)
+    chi_realized = mixing_state_index(make_u0(particles), sys;
+        species = spec.chi_species)
+    return particles, dry_diameters,
+        (chi_realized = chi_realized, nu = nu_used, seed = Int(seed))
 end
