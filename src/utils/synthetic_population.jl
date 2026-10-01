@@ -12,7 +12,10 @@ using Distributions
 
 Tabulated dry number spectrum: `dNdlogD[b]` is dN/dlogD [m⁻³] of bin `b`
 (geometric grid; uniform-in-log-D bins are assumed for sampling). Future
-SMPS measurements drop in directly as the two vectors.
+SMPS measurements drop in directly as the two vectors. dNdlogD is per
+natural log diameter (dN/dlnD); SMPS tables in dN/dlog₁₀D must be
+multiplied by 1/ln(10) = 0.4343 before use — `number_concentration`
+integrates ΔlnD.
 """
 struct TabulatedSpectrum
     bin_edges::Vector{Float64}
@@ -375,6 +378,9 @@ end
 
 # ν(χ) calibration cache; assumes spectrum/fbar objects are not mutated
 # after construction (keys use objectid)
+# The key deliberately omits `densities`: callers reusing the same
+# spectrum/fbar objects with different densities get a stale ν (χ∞ itself
+# depends on densities); the driver uses one fixed density vector.
 const _NU_CACHE = Dict{
     Tuple{UInt64, UInt64, Float64, Int, Int, Vector{Int}}, Float64}()
 
