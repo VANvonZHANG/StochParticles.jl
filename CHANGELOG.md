@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-30
+
+Milestone release (M2 of the GCVI closure blueprint). No breaking API
+changes — the minor bump marks the milestone.
+
+### Added
+
+- Synthetic-population initialization subsystem
+  (`src/utils/synthetic_population.jl`): `TabulatedSpectrum` (tabulated
+  dN/dlogD with exact inverse-CDF sampling), `lognormal_table` (analytic
+  CDF-difference discretization), `SizeResolvedComposition`
+  (size-resolved mean dry composition with anchor interpolation),
+  `constant_fbar`, `SyntheticPopulationSpec`, `synthesize_population`
+  (spectrum sampling + Dirichlet(ν·f̄(D)) composition + haze
+  pre-equilibration), `nu_for_chi` (Monte-Carlo ν(χ) calibration on the
+  exact generation path, cached), and `reachable_chi_max` (χ∞
+  reachability bound for size-resolved f̄).
+- `Distributions` dependency (Dirichlet sampling).
+- Twin experiment v1 in `examples/`: calibrated χ grid
+  {0.10, 0.25, 0.40, 0.60, 0.75} with off-grid truth χ = 0.50,
+  per-replicate population resampling, σ_χ monitoring, KLD empty-spectrum
+  guard, per-replicate pooled J with error bars, and the twin-v1 gate with
+  J(χ_true) noise floor.
+
+### Changed
+
+- `cost_curve` now averages J over replicates *after* evaluating J (J is
+  nonlinear; the previous mean-of-inputs pooling biased the cost) and
+  reports mean ± std per case.
+
+### Fixed
+
+- M2 driver χ gate is now case-level (mean realized χ within tolerance): realized-χ sd ≈ 0.011 at n_sim = 1000 in the sparse-mixing regime, so single-replicate excursions are the resampling noise the twin experiment quantifies, not synthesis errors.
+- Twin-v1 gate metric repair: pooled observation (`synthetic-obs-v2` schema, truth-case replicate mean — matching real instruments' sampling-window averaging), half-count KLD floor (one-particle equivalent instead of 1e-12), and J_size on a coarsened 31-bin closure grid; J(χ_true) noise floor σ_J 0.30 → 0.0049 — twin gate now PASS with U-shaped J and argmin inside the truth bracket.
+- Pooled-observation Python path cross-checked against the exported `synthetic-obs-v2` file; closure-grid stride unified in a shared `CLOSURE_STRIDE` constant across Julia and Python.
+
 ## [0.9.1] - 2026-09-29
 
 ### Fixed
@@ -271,4 +307,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.8.0]: https://github.com/VANvonZHANG/StochParticles.jl/releases/tag/v0.8.0
 [0.9.0]: https://github.com/VANvonZHANG/StochParticles.jl/releases/tag/v0.9.0
 [0.9.1]: https://github.com/VANvonZHANG/StochParticles.jl/releases/tag/v0.9.1
-[unreleased]: https://github.com/VANvonZHANG/StochParticles.jl/compare/v0.9.1...HEAD
+[0.10.0]: https://github.com/VANvonZHANG/StochParticles.jl/compare/v0.9.1...v0.10.0
+[unreleased]: https://github.com/VANvonZHANG/StochParticles.jl/compare/v0.10.0...HEAD

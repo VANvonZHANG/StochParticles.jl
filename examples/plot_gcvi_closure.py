@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""GCVI closure M0: CR spectra across nu and the J(chi) cost curve."""
+"""GCVI closure M2: CR spectra across the chi grid and the J(chi) cost curve."""
 
 from __future__ import annotations
 
@@ -15,7 +15,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from analysis.figure_style import PALETTE, apply_publication_style
-from analysis.gcvi_closure import case_statistics, chi_realized, cost_curve, load_observations
+from analysis.gcvi_closure import (case_statistics, chi_realized, chi_target_of,
+                                   cost_curve, load_observations, pool_observation,
+                                   truth_case_name, twin_gate)
 from analysis.stochparticles_io import DATA_DIR, FIG_DIR, read_scene
 
 # PALETTE is a name->hex dict in figure_style; scan lines need a color sequence.
@@ -26,7 +28,12 @@ def main() -> None:
     apply_publication_style()
     scene = read_scene(DATA_DIR / "gcvi_closure.h5")
     obs = load_observations(DATA_DIR / "synthetic" / "twin_obs_v0.h5")
+    # pooled (time-averaged) observation: real instruments average over the
+    # sampling window; a single-replicate obs measures replicate identity
+    obs = pool_observation(scene, obs)
     rows = cost_curve(scene, obs)
+    truth_target = chi_target_of(scene, truth_case_name(scene))
+    rows = [r for r in rows if abs(r[0] - truth_target) > 1e-9]
 
     case_names = sorted(scene)
     edges = obs["bin_edges"]
@@ -49,17 +56,29 @@ def main() -> None:
     ax.legend(frameon=False, fontsize=6)
 
     ax = axes[1]
-    chi = [r[0] for r in rows]
-    j_total = [r[3] for r in rows]
-    ax.plot(chi, j_total, marker="o", color=SCAN_COLORS[0], label="J(chi)")
-    best_idx = int(np.argmin(j_total))
-    ax.plot(chi[best_idx], j_total[best_idx], marker="*", markersize=12,
-            color=SCAN_COLORS[1], label=f"argmin J: chi={chi[best_idx]:.2f}")
+    chi_t = [r[0] for r in rows]
+    j_mean = [r[1] for r in rows]
+    j_std = [r[2] for r in rows]
+    ax.errorbar(chi_t, j_mean, yerr=j_std, marker="o", capsize=2,
+                color=SCAN_COLORS[0], label="J(chi) mean±std")
+    best_idx = int(np.argmin(j_mean))
+    ax.plot(chi_t[best_idx], j_mean[best_idx], marker="*", markersize=12,
+            color=SCAN_COLORS[1], label=f"argmin J: chi={chi_t[best_idx]:.2f}")
     ax.axvline(obs["chi_true"], color="black", linestyle="--", linewidth=1.0,
                label=f"chi_true={obs['chi_true']:.2f}")
-    ax.set_xlabel("Realized chi")
+    # chi_realized overlay at the bottom: generation noise per case
+    names = sorted(scene, key=lambda n: chi_target_of(scene, n))
+    truth = [n for n in names if bool(scene[n][0].attrs.get("truth", False))]
+    scan_names = [n for n in names if n not in truth]
+    chi_r = [chi_realized(scene, n) for n in scan_names]
+    chi_r_std = [float(np.std([r.attrs["chi_realized"] for r in scene[n]]))
+                 for n in scan_names]
+    yline = min(j_mean) - max(j_std) - 0.05 * (max(j_mean) - min(j_mean))
+    ax.errorbar(chi_r, [yline] * len(chi_r), xerr=chi_r_std, fmt="|",
+                color="gray", capsize=2, label="chi_realized (mean±std)")
+    ax.set_xlabel("Target chi")
     ax.set_ylabel("J(chi)")
-    ax.set_title("Closure cost curve (twin v0)", fontsize=8)
+    ax.set_title("Closure cost curve (twin v1)", fontsize=8)
     ax.legend(frameon=False, fontsize=6)
 
     fig.tight_layout()
@@ -68,9 +87,10 @@ def main() -> None:
     print(f"Saved {out}")
 
     print("J(chi) curve:")
-    for c, j_size, j_chem, j in rows:
-        print(f"  chi={c:.3f}  J_size={j_size:.4f}  J_chem={j_chem:.5f}  J={j:.4f}")
-    print(f"chi_true = {obs['chi_true']:.3f}; argmin J at chi = {chi[best_idx]:.3f}")
+    for c, j_mean_, j_std_ in rows:
+        print(f"  chi_target={c:.3f}  J={j_mean_:.4f} ± {j_std_:.4f}")
+    print(f"chi_true = {obs['chi_true']:.3f}")
+    verdict = twin_gate(scene, obs)
 
 
 if __name__ == "__main__":
