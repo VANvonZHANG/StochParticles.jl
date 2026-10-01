@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""GCVI closure M0: CR spectra across nu and the J(chi) cost curve."""
+"""GCVI closure M2: CR spectra across the chi grid and the J(chi) cost curve."""
 
 from __future__ import annotations
 

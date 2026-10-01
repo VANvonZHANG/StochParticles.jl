@@ -11,8 +11,9 @@ from .stochparticles_io import read_scene
 def load_observations(path) -> dict:
     """Load twin/real observations: CR/CI spectra + chemistry + chi_true.
 
-    Schema `synthetic-obs-v1`; the real-data ingestion project will emit the
-    same fields, making this reader the single swap point.
+    Current schema `synthetic-obs-v2`: truth-case replicate mean, with the
+    replicate count in the `n_replicates_pooled` attr; v1 files (single
+    replicate) still load but are superseded.
     """
     with h5py.File(path, "r") as f:
         g = f["obs"]
@@ -86,7 +87,9 @@ def rebin_spectrum(bin_edges, dNdlogD, stride: int = 3):
 
     With uniform log-spaced edges the merged dN/dlogD is the count-weighted
     mean of the merged bins; trailing remainder bins are dropped. Returns
-    (new_edges, new_dNdlogD).
+    (new_edges, new_dNdlogD). Merged values preserve the input's
+    normalization convention (the Julia side is dN/dlnD; only ratios are
+    used downstream).
     """
     edges = np.asarray(bin_edges, dtype=float)
     vals = np.asarray(dNdlogD, dtype=float)
