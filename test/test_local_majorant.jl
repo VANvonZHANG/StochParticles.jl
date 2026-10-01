@@ -142,12 +142,15 @@ end
 
 @testset "solve_split tolerance passthrough" begin
     particles = [SVector(1.0e-18), SVector(2.0e-18), SVector(3.0e-18)]
-    rec_mass = (t, u, sys) -> (t = t,
+    rec_mass = (
+        t, u, sys) -> (t = t,
         mass = StochParticles.total_mass(u, Val(1), sys.n_active))
-    sol_default, recs_default = solve_split(particles, 1.0e-6, t -> SVector(0.0),
+    sol_default,
+    recs_default = solve_split(particles, 1.0e-6, t -> SVector(0.0),
         (ConstDrift(),), Tsit5(); tspan = (0.0, 400.0), dt_split = 10.0,
         saveat = 50.0, record_func = rec_mass)
-    sol_strict, recs_strict = solve_split(particles, 1.0e-6, t -> SVector(0.0),
+    sol_strict,
+    recs_strict = solve_split(particles, 1.0e-6, t -> SVector(0.0),
         (ConstDrift(),), Tsit5(); tspan = (0.0, 400.0), dt_split = 10.0,
         saveat = 50.0, record_func = rec_mass, abstol = 1.0e-24, reltol = 1.0e-10)
     @test sol_default.retcode == ReturnCode.Success

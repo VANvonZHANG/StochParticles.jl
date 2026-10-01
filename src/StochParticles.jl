@@ -49,6 +49,8 @@ export AbstractEnvSource, PrescribedProfile
 export Species, species_vectors
 export AS, AN, BC, OA, H2O
 export lognormal_masses, diameters_from_masses
+export TabulatedSpectrum, lognormal_table, SizeResolvedComposition, constant_fbar,
+       SyntheticPopulationSpec, synthesize_population, nu_for_chi, reachable_chi_max
 export plot_concentration_evolution, plot_size_distribution_heatmap,
        plot_kernel_contributions, plot_simulation_summary
 export save_checkpoint, load_checkpoint, list_checkpoints, restore_rng
@@ -90,6 +92,7 @@ include("utils/binning.jl")
 include("utils/env_source.jl")
 include("utils/parameters.jl")
 include("utils/initial_conditions.jl")
+include("utils/synthetic_population.jl")
 include("utils/preset_species.jl")
 
 # ---- I/O ----
