@@ -279,10 +279,18 @@ end
         densities = RHO, chi_species = [1, 2, 3], rng = MersenneTwister(2))
     nu4 = nu_for_chi(SPEC, FBAR, 0.50;
         densities = RHO, chi_species = [1, 2, 3, 4], rng = MersenneTwister(2))
-    # wiring check only: the calibrator must follow the diagnostic mask. These
-    # anchors' BC contrast (0.10 -> 0.15) yields only ~0.4% true nu separation,
-    # so magnitude is not asserted -- bitwise inequality is the mask-sensitivity test.
-    @test nu3 !== nu4
+    @test nu3 > 0 && nu4 > 0
+    # wiring check, version-robust: on identical populations (same rng) the
+    # masked chi differs deterministically whenever the mask matters.
+    # Bitwise inequality of the two bisection endpoints is NOT portable: with
+    # these anchors' ~0.4% true nu separation inside the 0.002 convergence
+    # tolerance, both searches can take identical branch sequences and land
+    # on the same nu (observed on Julia 1.12 CI, 2026-10-01).
+    chi3 = StochParticles._population_chi(MersenneTwister(11), SPEC, FBAR, 1.0,
+        20_000; densities = RHO, chi_species = [1, 2, 3])
+    chi4 = StochParticles._population_chi(MersenneTwister(11), SPEC, FBAR, 1.0,
+        20_000; densities = RHO, chi_species = [1, 2, 3, 4])
+    @test chi3 != chi4
 end
 
 @testset "synthesize_population calibrated path (nu = nothing)" begin
