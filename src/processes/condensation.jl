@@ -56,19 +56,32 @@ end
 Physically rigorous H2O condensation flux implementing κ-Köhler theory.
 
 # Constructor
-    H2OCondensationFlux(thermo, h2o_idx, densities, w)
+    H2OCondensationFlux(thermo, h2o_idx, densities, w, activation_gate)
 
 # Fields
 - `thermo::ThermodynamicsParams` — thermodynamic parameters
 - `h2o_idx::Int` — index of H2O in the species vector
 - `densities::SVector{A,Float64}` — per-species densities
 - `w::Float64` — updraft velocity `m/s` (used when parcel model is active)
+- `activation_gate::Symbol` — `:sc_threshold` (default, legacy: zero flux
+  whenever S_env ≤ Sc — branch-blind) or `:branch_aware` (past-peak droplets
+  follow their branch equilibrium instead of freezing when S falls back
+  below Sc; haze branch unchanged)
 """
 struct H2OCondensationFlux{A}
     thermo::ThermodynamicsParams{A}
     h2o_idx::Int
     densities::SVector{A, Float64}
     w::Float64
+    activation_gate::Symbol
+end
+
+function H2OCondensationFlux(thermo::ThermodynamicsParams{A}, h2o_idx::Int,
+        densities::SVector{A, Float64}, w::Float64 = 0.0,
+        activation_gate::Symbol = :sc_threshold) where {A}
+    activation_gate in (:sc_threshold, :branch_aware) ||
+        throw(ArgumentError("activation_gate must be :sc_threshold or :branch_aware, got $activation_gate"))
+    return H2OCondensationFlux{A}(thermo, h2o_idx, densities, w, activation_gate)
 end
 
 """
@@ -107,11 +120,22 @@ function (flux::H2OCondensationFlux{A})(
     end
     m_w = μ[h2o_idx]
 
-    # Always check activation: non-activated particles get zero flux
-    Sc = critical_supersaturation(m_dry, thermo, densities, T)
+    # Activation gate (spec §3.1). The legacy gate is branch-blind: once a
+    # droplet is past the Köhler peak (D_wet > D_crit) its branch equilibrium
+    # sits BELOW Sc, so when S_env falls back below Sc the gate wrongly
+    # freezes it. :branch_aware keeps the haze-branch freeze (D_wet <= D_crit)
+    # but lets the p_eq-based flux take over on the droplet branch — flux is
+    # continuous across D_crit because p_eq(D_crit) = p_sat·(1+Sc).
+    Sc, D_crit = critical_point(m_dry, thermo, densities, T)
     S_env = p_v / saturation_vapor_pressure(T) - 1.0
     if S_env <= Sc
-        return zero(SVector{A, Float64})
+        if flux.activation_gate === :sc_threshold
+            return zero(SVector{A, Float64})
+        end
+        D_wet = 2.0 * particle_wet_radius(m_dry, m_w, densities)
+        if D_wet <= D_crit
+            return zero(SVector{A, Float64})
+        end
     end
 
     # Equilibrium vapor pressure over droplet
@@ -139,7 +163,7 @@ function (flux::H2OCondensationFlux{A})(
 end
 
 """
-    H2OCondensationProcess(thermo, densities; h2o_idx, w)
+    H2OCondensationProcess(thermo, densities; h2o_idx, w, activation_gate)
 
 Convenience constructor for a `CondensationProcess` with physically rigorous H2O flux.
 
@@ -148,6 +172,7 @@ Convenience constructor for a `CondensationProcess` with physically rigorous H2O
 - `densities::SVector{A,Float64}` — per-species densities
 - `h2o_idx::Int` — index of H2O in species vector (default: last species)
 - `w::Float64` — updraft velocity `m/s` (default: 1.0)
+- `activation_gate::Symbol` — `:sc_threshold` (default) or `:branch_aware`
 
 # Returns
 - `CondensationProcess` with `H2OCondensationFlux`
@@ -163,9 +188,10 @@ function H2OCondensationProcess(
         thermo::ThermodynamicsParams{A},
         densities::SVector{A, Float64};
         h2o_idx::Int = A,
-        w::Float64 = 1.0
+        w::Float64 = 1.0,
+        activation_gate::Symbol = :sc_threshold
 ) where {A}
-    flux = H2OCondensationFlux(thermo, h2o_idx, densities, w)
+    flux = H2OCondensationFlux(thermo, h2o_idx, densities, w, activation_gate)
     return CondensationProcess((μ, g, t) -> flux(μ, g, nothing, t))
 end
 
