@@ -111,38 +111,6 @@ function ParticleProblem(
     return jprob
 end
 
-# ---- Parcel state extraction (NEW) ----
-
-"""
-    extract_parcel(u::Vector{Float64}, n_sim, A) -> ParcelState
-
-Extract parcel variables from the end of the ODE state vector.
-"""
-function extract_parcel(u::Vector{Float64}, n_sim::Int, A::Int)
-    offset = n_sim * A
-    return ParcelState(
-        u[offset + 1],  # T
-        u[offset + 2],  # p
-        u[offset + 3],  # qv
-        u[offset + 4]  # S
-    )
-end
-
-"""
-    set_parcel!(u::Vector{Float64}, parcel::ParcelState, n_sim, A)
-
-Write parcel variables into the end of the ODE state vector.
-"""
-function set_parcel!(
-        u::Vector{Float64}, parcel::ParcelState, n_sim::Int, A::Int)
-    offset = n_sim * A
-    u[offset + 1] = parcel.T
-    u[offset + 2] = parcel.p
-    u[offset + 3] = parcel.qv
-    u[offset + 4] = parcel.S
-    nothing
-end
-
 """
     solve_split(particles, volume, gas_phase_fn, processes, solver;
                 tspan, n_sim, dt_split, saveat, record_func,
