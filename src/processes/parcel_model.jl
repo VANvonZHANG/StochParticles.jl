@@ -28,8 +28,9 @@ const EPSILON_MA = 0.622
 
 Diagnosed supersaturation S = qv·p / (ε·p_sat(T)) − 1.
 """
-parcel_supersaturation(parcel::ParcelState) =
+function parcel_supersaturation(parcel::ParcelState)
     parcel.qv * parcel.p / (EPSILON_MA * saturation_vapor_pressure(parcel.T)) - 1.0
+end
 
 """
     parcel_drift(parcel, total_cond_rate, w, m_air; thermo, g = 9.81) -> SVector{3}
@@ -91,12 +92,16 @@ function set_parcel_drift!(du::Vector{Float64}, drift::SVector{3, Float64},
 end
 
 # Val-form conveniences: make_ode_func holds the species count as Val{A}
-extract_parcel(u::Vector{Float64}, n_sim::Int, ::Val{A}) where {A} =
+function extract_parcel(u::Vector{Float64}, n_sim::Int, ::Val{A}) where {A}
     extract_parcel(u, n_sim, A)
-set_parcel_state!(u::Vector{Float64}, parcel::ParcelState, n_sim::Int, ::Val{A}) where {A} =
+end
+function set_parcel_state!(u::Vector{Float64}, parcel::ParcelState, n_sim::Int, ::Val{A}) where {A}
     set_parcel_state!(u, parcel, n_sim, A)
-set_parcel_drift!(du::Vector{Float64}, drift::SVector{3, Float64}, n_sim::Int,
-        ::Val{A}) where {A} = set_parcel_drift!(du, drift, n_sim, A)
+end
+function set_parcel_drift!(du::Vector{Float64}, drift::SVector{3, Float64}, n_sim::Int,
+        ::Val{A}) where {A}
+    set_parcel_drift!(du, drift, n_sim, A)
+end
 
 """
     ParcelProcess(w, h2o_idx, m_air, thermo, T0, p0, qv0) <: PhysicsProcess

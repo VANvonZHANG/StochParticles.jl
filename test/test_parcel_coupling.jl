@@ -16,7 +16,8 @@ const DENS2 = SVector(1770.0, 1000.0)
     m_air = p0 / (StochParticles.R_DRY_AIR * T0) * V
     pp = ParcelProcess(w, 2, m_air, THERMO2, T0, p0, qv0)
     dummy = [SVector(1.0e-18, 0.0)]
-    sol, records = solve_split(dummy, V, ParcelCoupled(pp.parcel), (pp,), Tsit5();
+    sol,
+    records = solve_split(dummy, V, ParcelCoupled(pp.parcel), (pp,), Tsit5();
         tspan = (0.0, 600.0), n_sim = 1, dt_split = 10.0, saveat = 60.0,
         record_func = (t, u, sys) -> (t = t, T = u[3], p = u[4], qv = u[5]),
         abstol = 1.0e-10, reltol = 1.0e-8)
@@ -85,9 +86,10 @@ _m3_edges() = collect(10.0 .^ range(-8.3, -4.5; length = 96))
 function _m3_population(n_sim, seed, N_total)
     tbl = lognormal_table(6.0e-8, 1.45, 8.0e11, _m3_edges()) +
           lognormal_table(1.6e-7, 1.55, 3.2e11, _m3_edges())
-    fb = SizeResolvedComposition(tbl; anchors = [
-        (3.0e-8, SVector(0.18, 0.15, 0.57, 0.10)),
-        (3.0e-7, SVector(0.35, 0.20, 0.30, 0.15))])
+    fb = SizeResolvedComposition(tbl;
+        anchors = [
+            (3.0e-8, SVector(0.18, 0.15, 0.57, 0.10)),
+            (3.0e-7, SVector(0.35, 0.20, 0.30, 0.15))])
     spec = SyntheticPopulationSpec(n_sim = n_sim, spectrum = tbl, fbar = fb,
         chi_target = 0.5, densities = DENS5, h2o_idx = 5, chi_species = [1, 2, 3],
         T0 = 285.0, S0 = -0.002)
@@ -96,9 +98,10 @@ end
 
 function _m3_mono_population(n_sim, seed, dg, sg, N)
     tbl = lognormal_table(dg, sg, N, _m3_edges())
-    fb = SizeResolvedComposition(tbl; anchors = [
-        (3.0e-8, SVector(0.18, 0.15, 0.57, 0.10)),
-        (3.0e-7, SVector(0.35, 0.20, 0.30, 0.15))])
+    fb = SizeResolvedComposition(tbl;
+        anchors = [
+            (3.0e-8, SVector(0.18, 0.15, 0.57, 0.10)),
+            (3.0e-7, SVector(0.35, 0.20, 0.30, 0.15))])
     spec = SyntheticPopulationSpec(n_sim = n_sim, spectrum = tbl, fbar = fb,
         chi_target = 0.5, densities = DENS5, h2o_idx = 5, chi_species = [1, 2, 3],
         T0 = 285.0, S0 = -0.002)
@@ -113,13 +116,15 @@ function _closed_loop_run(particles, n_sim, N_total; gate = :sc_threshold)
     pp = ParcelProcess(0.5, 5, m_air, THERMO5, T0, p0, qv0)
     cond = H2OCondensationProcess(THERMO5, DENS5; h2o_idx = 5, w = 0.0,
         activation_gate = gate)
-    record = (t, u, sys) -> (
+    record = (t,
+        u,
+        sys) -> (
         t = t,
-        L_water = sum(get_particle(u, i, Val(5))[5] for i in 1:sys.n_active) +
+        L_water = sum(get_particle(u, i, Val(5))[5] for i in 1:(sys.n_active)) +
                   m_air * u[sys.n_sim * 5 + 3],
         act_frac = activation_fraction(u, sys, Val(5); mode = :radius_threshold,
             threshold = 1.0e-6, densities = DENS5),
-        S = parcel_supersaturation(extract_parcel(u, sys.n_sim, 5)),
+        S = parcel_supersaturation(extract_parcel(u, sys.n_sim, 5))
     )
     return solve_split(particles, V, ParcelCoupled(pp.parcel), (cond, pp), Tsit5();
         tspan = (0.0, 600.0), n_sim = n_sim, dt_split = 10.0, saveat = 60.0,
@@ -140,9 +145,11 @@ end
     n_sim = 300
     particles_bi, _, _ = _m3_population(n_sim, 202, 1.12e12)
     _, rec_bi = _closed_loop_run(particles_bi, n_sim, 1.12e12)
-    _, rec_a = _closed_loop_run(
+    _,
+    rec_a = _closed_loop_run(
         _m3_mono_population(n_sim, 203, 6.0e-8, 1.45, 8.0e11), n_sim, 8.0e11)
-    _, rec_c = _closed_loop_run(
+    _,
+    rec_c = _closed_loop_run(
         _m3_mono_population(n_sim, 204, 1.6e-7, 1.55, 3.2e11), n_sim, 3.2e11)
     Nd_bi = rec_bi[end].act_frac * 1.12e12
     Nd_a = rec_a[end].act_frac * 8.0e11
@@ -155,7 +162,7 @@ end
     S_max_c = maximum(r.S for r in rec_c)
     println("M3-4 S_max: bi=$S_max_bi aitken_only=$S_max_a accum_only=$S_max_c")
     @test S_max_bi < S_max_a   # 往 Aitken 里加大 CCN 积聚模 → 峰前汇增强 → S_max 压制
-                              #（bi vs 仅C 添加的是小 CCN：门冻结其 haze 吸湿、活化在 S_max 之后，压不了峰）
+    #（bi vs 仅C 添加的是小 CCN：门冻结其 haze 吸湿、活化在 S_max 之后，压不了峰）
 end
 
 @testset "reequilibrate_haze! adjusts haze and conserves water" begin
@@ -169,7 +176,9 @@ end
     set_particle!(u, 1, Val(A), SVector(m_as, m_w_eq))
     set_particle!(u, 2, Val(A), SVector(m_as, m_w_eq))
     m_air = 1.0e-10
-    u[n_sim*A+1] = T; u[n_sim*A+2] = 9.0e4; u[n_sim*A+3] = 0.0096
+    u[n_sim * A + 1] = T;
+    u[n_sim * A + 2] = 9.0e4;
+    u[n_sim * A + 3] = 0.0096
     L_before = u[2] + u[4] + m_air * u[7]
     # S 升到 +0.1%（仍 < Sc=0.16% → 两颗粒均在霾支）：haze 吸水到新平衡
     delta = reequilibrate_haze!(u, sys, THERMO2, DENS2; h2o_idx = 2,

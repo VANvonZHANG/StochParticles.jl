@@ -34,8 +34,8 @@ export water_activity, ThermodynamicsParams, saturation_vapor_pressure,
        modified_diffusion_coefficient, particle_wet_radius, equilibrium_vapor_pressure,
        critical_supersaturation, equilibrium_water_mass
 export ParcelState, parcel_drift, parcel_supersaturation, ParcelProcess,
-    ParcelCoupled, extract_parcel, set_parcel_state!, set_parcel_drift!,
-    critical_point, reequilibrate_haze!
+       ParcelCoupled, extract_parcel, set_parcel_state!, set_parcel_drift!,
+       critical_point, reequilibrate_haze!
 export number_concentration, mass_concentration, species_mass_concentration,
        species_fractions,
        mixing_state_index, particle_mixing_entropy, shannon_entropy

@@ -112,7 +112,8 @@ end
     for gate in (:sc_threshold, :branch_aware)
         cond = H2OCondensationProcess(THERMO2, DENS2; h2o_idx = 2, w = 0.0,
             activation_gate = gate)
-        _, recs = solve_split(deepcopy(particles), 1.0e-15, env, (cond,), Tsit5();
+        _,
+        recs = solve_split(deepcopy(particles), 1.0e-15, env, (cond,), Tsit5();
             tspan = (0.0, 600.0), n_sim = 1, dt_split = 5.0, saveat = 30.0,
             record_func = (t, u, sys) -> (t = t, D = wet_D(u)),
             abstol = 1.0e-24, reltol = 1.0e-8)

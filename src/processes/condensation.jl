@@ -257,7 +257,7 @@ function reequilibrate_haze!(u::Vector{Float64}, sys::ParticleSystem{A},
         h2o_idx::Int, T::Float64, S::Float64, m_air::Float64) where {A}
     p_v = saturation_vapor_pressure(T) * (1.0 + S)
     delta = 0.0
-    for i in 1:sys.n_active
+    for i in 1:(sys.n_active)
         μ = get_particle(u, i, Val(A))
         m_dry = zero(SVector{A, Float64})
         for k in 1:A

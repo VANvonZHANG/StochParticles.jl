@@ -38,15 +38,18 @@ end
     parcel = ParcelState(293.15, 1.01325e5, 0.01)
     m_air, w, rate = 1.0e-9, 1.0, 3.0e-15
     d = parcel_drift(parcel, rate, w, m_air; thermo = THERMO2)
-    @test d[1] ≈ -9.81 / StochParticles.CP_DRY_AIR * w +
-                 2.5e6 * rate / (m_air * StochParticles.CP_DRY_AIR) atol = 1e-14
+    @test d[1] ≈
+          -9.81 / StochParticles.CP_DRY_AIR * w +
+          2.5e6 * rate / (m_air * StochParticles.CP_DRY_AIR) atol = 1e-14
     @test d[3] ≈ -rate / m_air atol = 1e-20
 end
 
 @testset "extract/set 3-slot tail" begin
     n_sim, A = 3, 2
     u = zeros(n_sim * A + 3)
-    u[n_sim*A+1] = 285.0; u[n_sim*A+2] = 9.0e4; u[n_sim*A+3] = 0.0096
+    u[n_sim * A + 1] = 285.0;
+    u[n_sim * A + 2] = 9.0e4;
+    u[n_sim * A + 3] = 0.0096
     pr = extract_parcel(u, n_sim, A)
     @test pr isa ParcelState
     @test pr.T == 285.0 && pr.p == 9.0e4 && pr.qv == 0.0096

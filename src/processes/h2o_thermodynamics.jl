@@ -284,9 +284,11 @@ pre-M3 (same search, same values) — existing tests are the regression gate.
 Petters & Kreidenweis (2007), ACP. Numerical maximum of exact Köhler curve
 replaces the approximate analytical formula.
 """
-critical_supersaturation(m_dry::SVector{A, Float64}, thermo::ThermodynamicsParams{A},
-        densities::SVector{A, Float64}, T::Float64) where {A} =
+function critical_supersaturation(
+        m_dry::SVector{A, Float64}, thermo::ThermodynamicsParams{A},
+        densities::SVector{A, Float64}, T::Float64) where {A}
     critical_point(m_dry, thermo, densities, T)[1]
+end
 
 """
     equilibrium_water_mass(m_dry, thermo, densities, T, p_v) -> Float64
