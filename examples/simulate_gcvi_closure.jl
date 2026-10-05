@@ -314,8 +314,12 @@ function main()
                 # (measured 5/64 seeds beyond 0.02), and single-replicate
                 # excursions ARE the resampling noise this experiment must
                 # quantify (sigma_J). Gate the calibration accuracy at case level.
-                mean_dev = abs(mean(chis_realized[case_idx]) - chi)
-                @assert mean_dev < 0.02 "case-level chi deviation $mean_dev >= 0.02 for chi=$chi"
+                # mean gate likewise needs >= 2 replicates (single-draw
+                # excursions ~8% at sd 0.011 — 1-rep smokes check nothing)
+                if length(chis_realized[case_idx]) > 1
+                    mean_dev = abs(mean(chis_realized[case_idx]) - chi)
+                    @assert mean_dev < 0.02 "case-level chi deviation $mean_dev >= 0.02 for chi=$chi"
+                end
                 # sigma gate needs >= 2 replicates (std of one sample is NaN);
                 # single-replicate smoke runs check the mean gate only
                 if length(chis_realized[case_idx]) > 1
