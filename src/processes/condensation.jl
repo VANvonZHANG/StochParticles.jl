@@ -123,6 +123,15 @@ function (flux::H2OCondensationFlux{A})(
     end
     m_w = μ[h2o_idx]
 
+    # Non-physical solver TRIAL state (negative mass): adaptive solvers
+    # evaluate the RHS at rejected candidate points; return zero drift there
+    # instead of throwing in the Kohler search (sqrt of a negative argument).
+    # Accepted states are physical — the water-conservation invariant guards
+    # this at record time.
+    if m_w < 0.0 || any(k != h2o_idx && μ[k] <= 0.0 for k in 1:A)
+        return zero(SVector{A, Float64})
+    end
+
     # Activation gate (spec §3.1). The legacy gate is branch-blind: once a
     # droplet is past the Köhler peak (D_wet > D_crit) its branch equilibrium
     # sits BELOW Sc, so when S_env falls back below Sc the gate wrongly

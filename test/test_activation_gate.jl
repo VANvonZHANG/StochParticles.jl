@@ -126,3 +126,13 @@ end
     @test ba_path[end] < maximum(ba_path)          # branch 版深落后蒸发（退回霾支）
     @test sc_path[end] > ba_path[end]              # 冻结版停在高位、branch 版缩回
 end
+
+@testset "flux guard: non-physical trial state returns zero" begin
+    f_ba = H2OCondensationFlux(THERMO2, 2, DENS2, 0.0, :branch_aware)
+    m_as = 4.0 / 3.0 * π * (50.0e-9)^3 * 1770.0
+    p_sat = saturation_vapor_pressure(285.0)
+    env = SVector(285.0, p_sat * 1.004)
+    @test f_ba(SVector(-1e-18, 1e-19), env, nothing, 0.0) == SVector(0.0, 0.0)
+    @test f_ba(SVector(m_as, -1e-18), env, nothing, 0.0) == SVector(0.0, 0.0)
+    @test f_ba(SVector(0.0, 0.0), env, nothing, 0.0) == SVector(0.0, 0.0)  # V_dry==0 case
+end
