@@ -157,3 +157,26 @@ end
     @test S_max_bi < S_max_a   # 往 Aitken 里加大 CCN 积聚模 → 峰前汇增强 → S_max 压制
                               #（bi vs 仅C 添加的是小 CCN：门冻结其 haze 吸湿、活化在 S_max 之后，压不了峰）
 end
+
+@testset "reequilibrate_haze! adjusts haze and conserves water" begin
+    n_sim, A = 2, 2
+    sys = ParticleSystem(Val(A), n_sim, 1.0e-12, t -> SVector(285.0, 1000.0))
+    T, p_sat = 285.0, saturation_vapor_pressure(285.0)
+    m_as = 4.0 / 3.0 * π * (50.0e-9)^3 * 1770.0
+    m_dry = SVector(m_as, 0.0)                   # 100nm AS → Sc ≈ 0.16%
+    m_w_eq = equilibrium_water_mass(m_dry, THERMO2, DENS2, T, p_sat * 0.999)  # haze @ S=-0.1%
+    u = zeros(n_sim * A + 3)
+    set_particle!(u, 1, Val(A), SVector(m_as, m_w_eq))
+    set_particle!(u, 2, Val(A), SVector(m_as, m_w_eq))
+    m_air = 1.0e-10
+    u[n_sim*A+1] = T; u[n_sim*A+2] = 9.0e4; u[n_sim*A+3] = 0.0096
+    L_before = u[2] + u[4] + m_air * u[7]
+    # S 升到 +0.1%（仍 < Sc=0.16% → 两颗粒均在霾支）：haze 吸水到新平衡
+    delta = reequilibrate_haze!(u, sys, THERMO2, DENS2; h2o_idx = 2,
+        T = T, S = 0.001, m_air = m_air)
+    @test delta > 0.0
+    m_w_new = equilibrium_water_mass(m_dry, THERMO2, DENS2, T, p_sat * 1.001)
+    @test u[2] ≈ m_w_new rtol = 1e-3
+    L_after = u[2] + u[4] + m_air * u[7]
+    @test L_after ≈ L_before rtol = 1e-12         # 守恒强制（qv 回写）
+end

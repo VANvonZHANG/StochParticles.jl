@@ -239,3 +239,40 @@ function pre_equilibrate!(
     end
     return particles
 end
+
+"""
+    reequilibrate_haze!(u, sys, thermo, densities; h2o_idx, T, S, m_air) -> ΔΣm_w
+
+Split-step haze re-equilibration (spec §3.2, blueprint §4.3 precision
+switch, default OFF). For every NON-ACTIVATED particle — haze branch under
+BOTH gate modes, i.e. `S <= Sc && D_wet <= D_crit` — reset `m_w` to the
+Köhler equilibrium at the supplied `(T, S)`. Particles with `S > Sc` are
+skipped (they activate and grow via the ODE; their lower-branch root does
+not exist at S > Sc). Returns the total particle-water change ΔΣm_w [kg]
+and enforces water conservation by adjusting the parcel tail:
+`qv -= ΔΣ/m_air`.
+"""
+function reequilibrate_haze!(u::Vector{Float64}, sys::ParticleSystem{A},
+        thermo::ThermodynamicsParams{A}, densities::SVector{A, Float64};
+        h2o_idx::Int, T::Float64, S::Float64, m_air::Float64) where {A}
+    p_v = saturation_vapor_pressure(T) * (1.0 + S)
+    delta = 0.0
+    for i in 1:sys.n_active
+        μ = get_particle(u, i, Val(A))
+        m_dry = zero(SVector{A, Float64})
+        for k in 1:A
+            if k != h2o_idx
+                m_dry = setindex(m_dry, μ[k], k)
+            end
+        end
+        Sc, D_crit = critical_point(m_dry, thermo, densities, T)
+        D_wet = 2.0 * particle_wet_radius(m_dry, μ[h2o_idx], densities)
+        if S <= Sc && D_wet <= D_crit
+            m_eq = equilibrium_water_mass(m_dry, thermo, densities, T, p_v)
+            delta += m_eq - μ[h2o_idx]
+            set_particle!(u, i, Val(A), setindex(μ, m_eq, h2o_idx))
+        end
+    end
+    u[sys.n_sim * A + 3] -= delta / m_air    # parcel qv tail: conserve water
+    return delta
+end
