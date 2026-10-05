@@ -89,3 +89,41 @@ function set_parcel_drift!(du::Vector{Float64}, drift::SVector{3, Float64},
     du[off + 3] = drift[3]
     nothing
 end
+
+# Val-form conveniences: make_ode_func holds the species count as Val{A}
+extract_parcel(u::Vector{Float64}, n_sim::Int, ::Val{A}) where {A} =
+    extract_parcel(u, n_sim, A)
+set_parcel_state!(u::Vector{Float64}, parcel::ParcelState, n_sim::Int, ::Val{A}) where {A} =
+    set_parcel_state!(u, parcel, n_sim, A)
+set_parcel_drift!(du::Vector{Float64}, drift::SVector{3, Float64}, n_sim::Int,
+        ::Val{A}) where {A} = set_parcel_drift!(du, drift, n_sim, A)
+
+"""
+    ParcelProcess(w, h2o_idx, m_air, thermo, T0, p0, qv0) <: PhysicsProcess
+
+Block-level parcel drift (spec §2.1): when present in the process tuple,
+`make_ode_func` appends the 3-slot tail `[T, p, qv]` to the state vector.
+Per-particle drift contribution is zero — the parcel block is written after
+the particle loop using the accumulated Σ dm_w at `h2o_idx`.
+
+Shares the `RefValue{ParcelState}` with the `ParcelCoupled` environment
+source, which is synced from `u` at the TOP of each RHS evaluation (before
+the particle loop — the flux layer reads it during the loop).
+"""
+struct ParcelProcess{P} <: PhysicsProcess
+    parcel::Base.RefValue{ParcelState}
+    w::Float64
+    h2o_idx::Int
+    m_air::Float64
+    thermo::P
+end
+
+function ParcelProcess(w::Float64, h2o_idx::Int, m_air::Float64,
+        thermo::ThermodynamicsParams, T0::Float64, p0::Float64, qv0::Float64)
+    return ParcelProcess(Ref(ParcelState(T0, p0, qv0)), w, h2o_idx, m_air, thermo)
+end
+
+# accepted by solve_split's drift filter; per-particle drift contribution is
+# zero (the parcel block is assembled by make_ode_func after the particle loop)
+provides_drift(::ParcelProcess) = true
+apply_drift(::ParcelProcess, μ::SVector{A, Float64}, sys, t) where {A} = zero(μ)

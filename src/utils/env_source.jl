@@ -48,3 +48,22 @@ function (src::PrescribedProfile)(t::Real)
     S = _interp_flat(Float64(t), src.times, src.S)
     return SVector{2, Float64}(T, saturation_vapor_pressure(T) * (1.0 + S))
 end
+
+"""
+    ParcelCoupled(ref) <: AbstractEnvSource
+
+Closed-loop environment source (blueprint contract ①, M3): reads the LIVE
+parcel state shared with a `ParcelProcess` via `RefValue{ParcelState}` and
+returns `SVector(T, p_sat(T)·(1+S))` with S diagnosed from (T, p, qv).
+Ignores `t` — the state is synced from `u` at the top of each RHS
+evaluation, so this source always sees the current solver stage.
+"""
+struct ParcelCoupled <: AbstractEnvSource
+    parcel::Base.RefValue{ParcelState}
+end
+
+function (src::ParcelCoupled)(t::Real)
+    pr = src.parcel[]
+    S = parcel_supersaturation(pr)
+    return SVector{2, Float64}(pr.T, saturation_vapor_pressure(pr.T) * (1.0 + S))
+end

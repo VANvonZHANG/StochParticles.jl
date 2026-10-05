@@ -18,25 +18,41 @@ end
 """
     make_ode_func(processes::Tuple)
 
-Create the ODE right-hand side function for SciML's ODEProblem.
-Iterates over active particles, applies drift from all drift-providing processes.
-The returned closure captures the concrete process tuple type for full specialization.
+RHS for SciML's ODEProblem. If the tuple contains a `ParcelProcess`, the
+state vector carries a 3-slot parcel tail: the live state is synced from
+`u` BEFORE the particle loop (the `ParcelCoupled` env source reads it
+during the loop), Σ dm_w is accumulated at `h2o_idx`, and the parcel block
+`[dT, dp, dqv]` is written AFTER the loop (spec §2.1 ordering).
 """
 function make_ode_func(processes::Tuple)
+    idx = findfirst(p -> p isa ParcelProcess, processes)
+    parcel_proc = idx === nothing ? nothing : processes[idx]
     return function (du, u, p, t)
         A = species_val(p)
         n = p.n_active
+        if parcel_proc !== nothing
+            parcel_proc.parcel[] = extract_parcel(u, p.n_sim, A)
+        end
+        total_cond = 0.0
         for i in 1:n
             μ = get_particle(u, i, A)
             dμ = apply_all_drifts!(zero(μ), μ, p, t, processes)
             set_particle!(du, i, A, dμ)
+            if parcel_proc !== nothing
+                total_cond += dμ[parcel_proc.h2o_idx]
+            end
         end
-        # Zero out inactive particle slots
+        # Zero out inactive particle slots (A-length writes; tail untouched)
         if n < p.n_sim && n > 0
             zero_μ = zero(get_particle(u, 1, A))
             for i in (n + 1):(p.n_sim)
                 set_particle!(du, i, A, zero_μ)
             end
+        end
+        if parcel_proc !== nothing
+            drift3 = parcel_drift(parcel_proc.parcel[], total_cond, parcel_proc.w,
+                parcel_proc.m_air; thermo = parcel_proc.thermo)
+            set_parcel_drift!(du, drift3, p.n_sim, A)
         end
         nothing
     end
@@ -83,6 +99,9 @@ Construct a SciML JumpProblem representing the PDMP for particle simulation.
 
 # Returns
 - `JumpProblem` ready for `solve(prob, Tsit5())`
+
+If the tuple contains a `ParcelProcess`, the state vector gains the 3-slot
+parcel tail `[T, p, qv]` (jump `affect!` functions only touch particle slots).
 """
 function ParticleProblem(
         particles::Vector{SVector{A, Float64}},
@@ -102,6 +121,13 @@ function ParticleProblem(
         u0 = u0_extended
     end
 
+    # M3: append the parcel tail when a ParcelProcess is present
+    p_idx = findfirst(p -> p isa ParcelProcess, processes)
+    if p_idx !== nothing
+        pc = processes[p_idx]
+        append!(u0, (pc.parcel[].T, pc.parcel[].p, pc.parcel[].qv))
+    end
+
     ode_func! = make_ode_func(processes)
     jumps = collect_all_jumps(processes, sys)
 
@@ -114,27 +140,36 @@ end
 """
     solve_split(particles, volume, gas_phase_fn, processes, solver;
                 tspan, n_sim, dt_split, saveat, record_func,
-                abstol = nothing, reltol = nothing) -> (sol, records)
+                abstol = nothing, reltol = nothing, reequil = nothing)
+            -> (sol, records)
 
 Lie-Trotter operator-splitting driver: per sub-step of length `dt_split`,
 solve the drift-only ODE on the interval, then advance the frozen-state
 coagulation SSA by the same interval (`step_coagulation!`). Requires
 `saveat` to be an integer multiple of `dt_split`; supports drift processes
-plus at most one coagulation process (`CoagulationProcess` /
-`NonCNMCCoagulationProcess`); Emission/Dilution processes are rejected.
-Records are taken at `tspan[1]` and at every `tspan[1] + k*saveat` boundary,
-after that sub-step's jump phase. Returns the final ODE solution and the
-records vector built from `record_func(t, u, sys)`.
+(including at most one `ParcelProcess`, which appends the 3-slot parcel tail
+`[T, p, qv]` to the state vector) plus at most one coagulation process
+(`CoagulationProcess` / `NonCNMCCoagulationProcess`); Emission/Dilution
+processes are rejected. Records are taken at `tspan[1]` and at every
+`tspan[1] + k*saveat` boundary, after that sub-step's jump phase. Returns
+the final ODE solution and the records vector built from
+`record_func(t, u, sys)`.
+
 Optional `abstol`/`reltol` are forwarded to each internal `solve` call. Set
 them explicitly for kilogram-scale particle states, where the solver defaults
 (abstol = 1e-6) exceed the state magnitudes by many orders of magnitude.
+
+`reequil::Function(u, sys, t)`, when supplied, is invoked after each
+sub-step's ODE segment (before the coagulation jump phase) — e.g. the
+water-conserving `reequilibrate_haze!` split-step hook (spec §3.2).
 """
 function solve_split(particles::Vector{SVector{A, Float64}},
         volume::Float64, gas_phase_fn, processes::Tuple{Vararg{PhysicsProcess}},
         solver;
         tspan = (0.0, 3600.0), n_sim = length(particles),
         dt_split::Real, saveat::Real, record_func,
-        abstol = nothing, reltol = nothing) where {A}
+        abstol = nothing, reltol = nothing,
+        reequil::Union{Nothing, Function} = nothing) where {A}
     dt_split > 0.0 || throw(ArgumentError("dt_split must be positive, got $dt_split"))
     saveat > 0.0 || throw(ArgumentError("saveat must be positive, got $saveat"))
     isapprox(rem(saveat, dt_split), 0.0; atol = 1.0e-9 * dt_split) ||
@@ -157,6 +192,12 @@ function solve_split(particles::Vector{SVector{A, Float64}},
         u_extended[1:length(u)] .= u
         u = u_extended
     end
+    # M3: append the parcel tail when a ParcelProcess is present
+    p_idx = findfirst(p -> p isa ParcelProcess, processes)
+    if p_idx !== nothing
+        pc = processes[p_idx]
+        append!(u, (pc.parcel[].T, pc.parcel[].p, pc.parcel[].qv))
+    end
     ode_func! = make_ode_func(drift_processes)
     records = Any[record_func(tspan[1], u, sys)]
     t0, t_end = tspan
@@ -171,6 +212,9 @@ function solve_split(particles::Vector{SVector{A, Float64}},
         oprob = ODEProblem(ode_func!, u, (t_prev, t_next), sys)
         sol = solve(oprob, solver; solver_opts...)
         u = copy(sol.u[end])
+        if reequil !== nothing
+            reequil(u, sys, t_next)
+        end
         if coag !== nothing
             step_coagulation!(u, sys, coag, t_next - t_prev)
         end

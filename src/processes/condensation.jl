@@ -74,14 +74,17 @@ struct H2OCondensationFlux{A}
     densities::SVector{A, Float64}
     w::Float64
     activation_gate::Symbol
-end
 
-function H2OCondensationFlux(thermo::ThermodynamicsParams{A}, h2o_idx::Int,
-        densities::SVector{A, Float64}, w::Float64 = 0.0,
-        activation_gate::Symbol = :sc_threshold) where {A}
-    activation_gate in (:sc_threshold, :branch_aware) ||
-        throw(ArgumentError("activation_gate must be :sc_threshold or :branch_aware, got $activation_gate"))
-    return H2OCondensationFlux{A}(thermo, h2o_idx, densities, w, activation_gate)
+    # explicit inner constructor with defaults: defining it suppresses the
+    # auto-generated constructors, so an outer convenience method would not
+    # collide during precompilation; validation lives at this single point
+    function H2OCondensationFlux(thermo::ThermodynamicsParams{A}, h2o_idx::Int,
+            densities::SVector{A, Float64}, w::Float64 = 0.0,
+            activation_gate::Symbol = :sc_threshold) where {A}
+        activation_gate in (:sc_threshold, :branch_aware) ||
+            throw(ArgumentError("activation_gate must be :sc_threshold or :branch_aware, got $activation_gate"))
+        return new{A}(thermo, h2o_idx, densities, w, activation_gate)
+    end
 end
 
 """
