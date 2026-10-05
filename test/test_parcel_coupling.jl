@@ -123,7 +123,7 @@ function _closed_loop_run(particles, n_sim, N_total; gate = :sc_threshold)
     )
     return solve_split(particles, V, ParcelCoupled(pp.parcel), (cond, pp), Tsit5();
         tspan = (0.0, 600.0), n_sim = n_sim, dt_split = 10.0, saveat = 60.0,
-        record_func = record, abstol = 1.0e-24, reltol = 1.0e-6)
+        record_func = record, abstol = 1.0e-24, reltol = 1.0e-5)
 end
 
 @testset "M3-3: water conservation (linear invariant, RK-exact)" begin
