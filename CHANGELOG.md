@@ -6,6 +6,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.11.0] - 2026-10-05
+
+Milestone release (M3 of the GCVI closure blueprint): closed-loop air-parcel
+coupling. No breaking API changes for existing open-loop users.
+
+### Added
+
+- Closed-loop parcel coupling: `ParcelProcess` (block-level drift appending
+  the 3-slot state-vector tail `[T, p, qv]`, Σ dm_w accumulation at
+  `h2o_idx`, live-state sync before the particle loop) and `ParcelCoupled`
+  environment source sharing the live parcel state via `Ref{ParcelState}`
+  (blueprint contract ① invariant `p_v = p_sat(T)·(1+S)` preserved).
+- `parcel_supersaturation` — diagnosed S = qv·p/(ε·p_sat(T)) − 1.
+- `critical_point` returning `(Sc, D_crit)` — single shared Köhler peak
+  search (`critical_supersaturation` is now a thin wrapper, values unchanged).
+- `activation_gate` keyword on `H2OCondensationProcess`/`H2OCondensationFlux`:
+  `:sc_threshold` (default, previous behavior — branch-blind gate that
+  freezes activated edge droplets when closed-loop S falls back below Sc) or
+  `:branch_aware` (past-peak droplets follow their branch equilibrium instead
+  of freezing; haze branch unchanged; flux continuous across D_crit).
+- `reequilibrate_haze!` — water-conserving split-step haze re-equilibration
+  helper; `solve_split` gains a `reequil` callback hook (default `nothing`).
+
+### Changed
+
+- `ParcelState` now carries 3 fields `(T, p, qv)`; supersaturation is
+  diagnosed, never prognostic. `parcel_drift` signature changed:
+  `(parcel, total_cond_rate, w, m_air; thermo, g)` returning
+  `SVector{3}(dT, dp, dqv)`, with air density diagnosed as `p/(R_d·T)`
+  (was a fixed constant argument) and `L_v` taken from `ThermodynamicsParams`.
+- `set_parcel!` (dead code) replaced by `set_parcel_state!` /
+  `set_parcel_drift!`.
 
 ## [0.10.0] - 2026-09-30
 
@@ -308,4 +340,5 @@ changes — the minor bump marks the milestone.
 [0.9.0]: https://github.com/VANvonZHANG/StochParticles.jl/releases/tag/v0.9.0
 [0.9.1]: https://github.com/VANvonZHANG/StochParticles.jl/releases/tag/v0.9.1
 [0.10.0]: https://github.com/VANvonZHANG/StochParticles.jl/compare/v0.9.1...v0.10.0
-[unreleased]: https://github.com/VANvonZHANG/StochParticles.jl/compare/v0.10.0...HEAD
+[0.11.0]: https://github.com/VANvonZHANG/StochParticles.jl/compare/v0.10.0...v0.11.0
+[unreleased]: https://github.com/VANvonZHANG/StochParticles.jl/compare/v0.11.0...HEAD
