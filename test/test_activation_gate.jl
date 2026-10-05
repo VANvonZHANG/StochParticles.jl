@@ -136,3 +136,27 @@ end
     @test f_ba(SVector(m_as, -1e-18), env, nothing, 0.0) == SVector(0.0, 0.0)
     @test f_ba(SVector(0.0, 0.0), env, nothing, 0.0) == SVector(0.0, 0.0)  # V_dry==0 case
 end
+
+@testset "activation_gate :kinetic — no gate, haze participates in budget" begin
+    T = 285.0
+    m_as = 4.0 / 3.0 * π * (50.0e-9)^3 * 1770.0
+    m_dry = SVector(m_as, 0.0)
+    p_sat = saturation_vapor_pressure(T)
+    f_ki = H2OCondensationFlux(THERMO2, 2, DENS2, 0.0, :kinetic)
+    f_sc = H2OCondensationFlux(THERMO2, 2, DENS2, 0.0, :sc_threshold)
+    Sc, _ = critical_point(m_dry, THERMO2, DENS2, T)
+    # haze at its S=-0.1% equilibrium, ambient S=+0.05% (< Sc): kinetic MUST
+    # grow (positive flux) — the legacy gate returns zero (the deleted buffer)
+    m_haze = equilibrium_water_mass(m_dry, THERMO2, DENS2, T, p_sat * 0.999)
+    μ_haze = SVector(m_as, m_haze)
+    env = SVector(T, p_sat * 1.0005)
+    @test f_ki(μ_haze, env, nothing, 0.0)[2] > 0.0
+    @test f_sc(μ_haze, env, nothing, 0.0) == zero(μ_haze)
+    # same ambient, haze above its equilibrium: evaporates under :kinetic
+    env_dry = SVector(T, p_sat * 0.995)
+    @test f_ki(μ_haze, env_dry, nothing, 0.0)[2] < 0.0
+    # S_env > Sc region: kinetic identical to legacy modes
+    μ_big = SVector(m_as, 4.0 / 3.0 * π * (2.0e-6)^3 * 1000.0 - m_as)
+    env_above = SVector(T, p_sat * (1.0 + Sc + 1e-4))
+    @test f_ki(μ_big, env_above, nothing, 0.0) == f_sc(μ_big, env_above, nothing, 0.0)
+end
