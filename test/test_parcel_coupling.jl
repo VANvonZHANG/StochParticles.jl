@@ -73,3 +73,87 @@ end
     @test du[6] ≈ -(p0 / (StochParticles.R_DRY_AIR * T0)) * 9.81 * w atol = 1e-9  # dp
     @test du[7] == 0.0                              # dqv（无凝结）
 end
+
+# ---- M3-3/M3-4: closed-loop physics integration (spec §4) ----
+
+const DENS5 = SVector(1770.0, 1720.0, 1400.0, 1800.0, 1000.0)
+const THERMO5 = ThermodynamicsParams(SVector(0.61, 0.67, 0.10, 0.0, 0.0),
+    0.072, 1000.0, 18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2)
+
+_m3_edges() = collect(10.0 .^ range(-8.3, -4.5; length = 96))
+
+function _m3_population(n_sim, seed, N_total)
+    tbl = lognormal_table(6.0e-8, 1.45, 8.0e11, _m3_edges()) +
+          lognormal_table(1.6e-7, 1.55, 3.2e11, _m3_edges())
+    fb = SizeResolvedComposition(tbl; anchors = [
+        (3.0e-8, SVector(0.18, 0.15, 0.57, 0.10)),
+        (3.0e-7, SVector(0.35, 0.20, 0.30, 0.15))])
+    spec = SyntheticPopulationSpec(n_sim = n_sim, spectrum = tbl, fbar = fb,
+        chi_target = 0.5, densities = DENS5, h2o_idx = 5, chi_species = [1, 2, 3],
+        T0 = 285.0, S0 = -0.002)
+    return synthesize_population(spec; seed = seed, thermo = THERMO5, nu = 5.0)
+end
+
+function _m3_mono_population(n_sim, seed, dg, sg, N)
+    tbl = lognormal_table(dg, sg, N, _m3_edges())
+    fb = SizeResolvedComposition(tbl; anchors = [
+        (3.0e-8, SVector(0.18, 0.15, 0.57, 0.10)),
+        (3.0e-7, SVector(0.35, 0.20, 0.30, 0.15))])
+    spec = SyntheticPopulationSpec(n_sim = n_sim, spectrum = tbl, fbar = fb,
+        chi_target = 0.5, densities = DENS5, h2o_idx = 5, chi_species = [1, 2, 3],
+        T0 = 285.0, S0 = -0.002)
+    return synthesize_population(spec; seed = seed, thermo = THERMO5, nu = 5.0)[1]
+end
+
+function _closed_loop_run(particles, n_sim, N_total; gate = :sc_threshold)
+    V = n_sim / N_total
+    T0, p0 = 285.0, 9.0e4
+    m_air = p0 / (StochParticles.R_DRY_AIR * T0) * V
+    qv0 = 0.998 * StochParticles.EPSILON_MA * saturation_vapor_pressure(T0) / p0
+    pp = ParcelProcess(0.5, 5, m_air, THERMO5, T0, p0, qv0)
+    cond = H2OCondensationProcess(THERMO5, DENS5; h2o_idx = 5, w = 0.0,
+        activation_gate = gate)
+    record = (t, u, sys) -> (
+        t = t,
+        L_water = sum(get_particle(u, i, Val(5))[5] for i in 1:sys.n_active) +
+                  m_air * u[sys.n_sim * 5 + 3],
+        act_frac = activation_fraction(u, sys, Val(5); mode = :radius_threshold,
+            threshold = 1.0e-6, densities = DENS5),
+        S = parcel_supersaturation(extract_parcel(u, sys.n_sim, 5)),
+    )
+    return solve_split(particles, V, ParcelCoupled(pp.parcel), (cond, pp), Tsit5();
+        tspan = (0.0, 600.0), n_sim = n_sim, dt_split = 10.0, saveat = 60.0,
+        record_func = record, abstol = 1.0e-24, reltol = 1.0e-6)
+end
+
+@testset "M3-3: water conservation (linear invariant, RK-exact)" begin
+    particles, _, _ = _m3_population(200, 101, 1.12e12)
+    sol, records = _closed_loop_run(particles, 200, 1.12e12)
+    @test sol.retcode == ReturnCode.Success
+    L0 = records[1].L_water
+    worst = maximum(abs(r.L_water - L0) / L0 for r in records)
+    @test worst < 1.0e-10   # L = Σm_w + m_air·qv 线性不变量；RHS 恒满足 → RK 精确保持
+    println("M3-3 worst relative drift = $worst")
+end
+
+@testset "M3-4: competition signature" begin
+    n_sim = 300
+    particles_bi, _, _ = _m3_population(n_sim, 202, 1.12e12)
+    _, rec_bi = _closed_loop_run(particles_bi, n_sim, 1.12e12)
+    _, rec_a = _closed_loop_run(
+        _m3_mono_population(n_sim, 203, 6.0e-8, 1.45, 8.0e11), n_sim, 8.0e11)
+    _, rec_c = _closed_loop_run(
+        _m3_mono_population(n_sim, 204, 1.6e-7, 1.55, 3.2e11), n_sim, 3.2e11)
+    Nd_bi = rec_bi[end].act_frac * 1.12e12
+    Nd_a = rec_a[end].act_frac * 8.0e11
+    Nd_c = rec_c[end].act_frac * 3.2e11
+    println("M3-4 Nd: bi=$Nd_bi a=$Nd_a c=$Nd_c (sum_mono=$(Nd_a + Nd_c))")
+    @test Nd_bi < Nd_a + Nd_c                       # 竞争：双模态 < 独立之和
+    @test (Nd_a + Nd_c - Nd_bi) / (Nd_a + Nd_c) > 0.01
+    S_max_bi = maximum(r.S for r in rec_bi)
+    S_max_a = maximum(r.S for r in rec_a)
+    S_max_c = maximum(r.S for r in rec_c)
+    println("M3-4 S_max: bi=$S_max_bi aitken_only=$S_max_a accum_only=$S_max_c")
+    @test S_max_bi < S_max_a   # 往 Aitken 里加大 CCN 积聚模 → 峰前汇增强 → S_max 压制
+                              #（bi vs 仅C 添加的是小 CCN：门冻结其 haze 吸湿、活化在 S_max 之后，压不了峰）
+end
