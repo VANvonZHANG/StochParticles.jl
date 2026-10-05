@@ -98,3 +98,30 @@ end
     μ = SVector(m_bc, 0.0)                           # 完全干 BC（水量恰零）
     @test f_ba(μ, SVector(T, p_sat * 1.0005), nothing, 0.0) == zero(μ)  # 永冻 haze
 end
+
+@testset "branch_aware hysteresis: open-loop S rise-fall" begin
+    T = 285.0
+    m_as = 4.0 / 3.0 * π * (50.0e-9)^3 * 1770.0   # 100nm AS → Sc ≈ 0.16%
+    particles = [SVector(m_as, 0.0)]
+    pre_equilibrate!(particles, THERMO2, DENS2, T,
+        saturation_vapor_pressure(T); h2o_idx = 2)
+    env = PrescribedProfile([0.0, 100.0, 600.0], [T, T, T],
+        [0.0, 0.005, -0.005])                      # 爬到 0.5% 再线性落到 −0.5%
+    wet_D(u) = 2.0 * particle_wet_radius(SVector(u[1], 0.0), u[2], DENS2)
+    results = Dict{Symbol, Vector{Float64}}()
+    for gate in (:sc_threshold, :branch_aware)
+        cond = H2OCondensationProcess(THERMO2, DENS2; h2o_idx = 2, w = 0.0,
+            activation_gate = gate)
+        _, recs = solve_split(deepcopy(particles), 1.0e-15, env, (cond,), Tsit5();
+            tspan = (0.0, 600.0), n_sim = 1, dt_split = 5.0, saveat = 30.0,
+            record_func = (t, u, sys) -> (t = t, D = wet_D(u)),
+            abstol = 1.0e-24, reltol = 1.0e-8)
+        results[gate] = [r.D for r in recs]
+    end
+    sc_path, ba_path = results[:sc_threshold], results[:branch_aware]
+    println("hysteresis: sc peak=$(round(maximum(sc_path)*1e9,digits=1))nm end=$(round(sc_path[end]*1e9,digits=1))nm | ba peak=$(round(maximum(ba_path)*1e9,digits=1))nm end=$(round(ba_path[end]*1e9,digits=1))nm")
+    @test maximum(ba_path) > 5.0e-7                # 两模式都活化（S_max=0.5% ≫ Sc）
+    @test maximum(sc_path) > 5.0e-7
+    @test ba_path[end] < maximum(ba_path)          # branch 版深落后蒸发（退回霾支）
+    @test sc_path[end] > ba_path[end]              # 冻结版停在高位、branch 版缩回
+end
