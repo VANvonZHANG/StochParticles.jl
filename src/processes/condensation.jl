@@ -132,6 +132,22 @@ function (flux::H2OCondensationFlux{A})(
         return zero(SVector{A, Float64})
     end
 
+    # numerical-ghost floor: Dirichlet corner draws in sparse-mixing regimes
+    # can carry dry cores down to ~1e-229 kg (D_dry << 1 nm). Their Kelvin
+    # term exp(A/R) overflows in p_eq and they can never hold meaningful
+    # water or activate — treat sub-nanometer cores as inert in all modes
+    # (the legacy gate happened to zero them anyway; :kinetic must too).
+    V_dry_min = 5.2e-28                  # m^3, sphere of D = 1 nm
+    V_dry = 0.0
+    for k in 1:A
+        if k != h2o_idx
+            V_dry += μ[k] / densities[k]
+        end
+    end
+    if V_dry < V_dry_min
+        return zero(SVector{A, Float64})
+    end
+
     # Activation gate (spec §3.1). Three modes:
     # - :sc_threshold (legacy): zero flux whenever S_env <= Sc — branch-blind;
     #   in a closed loop this deletes the entire haze swarm from the vapor
