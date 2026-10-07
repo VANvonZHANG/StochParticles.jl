@@ -16,10 +16,10 @@ Base.@kwdef struct GcviClosureConfig
     # synthetic "SMPS" spectrum: bimodal lognormal baked onto the table
     aitken_dg::Float64 = 6.0e-8
     aitken_sigma_g::Float64 = 1.45
-    aitken_concentration::Float64 = 8.0e11      # [m^-3]
+    aitken_concentration::Float64 = 8.0e9       # [m^-3] (C' 2026-10-05: /100 of M2 — mountain-cloud loading)
     accumulation_dg::Float64 = 1.6e-7
     accumulation_sigma_g::Float64 = 1.55
-    accumulation_concentration::Float64 = 3.2e11
+    accumulation_concentration::Float64 = 3.2e9  # (C' 2026-10-05: /100 of M2)
     bin_edges::Vector{Float64} = collect(10.0 .^ range(-8.3, -4.5; length = 96))
     # size-resolved fbar(D) anchors (AS, AN, OA, BC): small particles
     # OA-rich, large particles AS-rich; trend strength sized so that
@@ -42,7 +42,7 @@ Base.@kwdef struct GcviClosureConfig
     env_mode::Symbol = :open                 # :open (M2 legacy) | :parcel
     activation_gate::Symbol = :sc_threshold  # spec §3.1, default = adjudication output
     gate_tag::String = "sc"                  # filename suffix: "sc" | "ba"
-    w::Float64 = 0.5
+    w::Float64 = 1.0                            # (C' 2026-10-05: 0.5 -> 1.0 to feed GCVI)
     RH0::Float64 = 0.998                     # initial haze equilibrium RH
     parcel_T0::Float64 = 285.0
     parcel_P0::Float64 = 9.0e4
@@ -231,10 +231,12 @@ function main()
         n_sim = n_sim_env === nothing || n_sim_env <= 0 ? 1000 : n_sim_env,
         env_mode = Symbol(get(ENV, "M3_ENV_MODE", "open")),
         activation_gate = Symbol(get(ENV, "M3_GATE_MODE", "sc_threshold")),
-        gate_tag = get(ENV, "M3_GATE_MODE", "sc_threshold") == "branch_aware" ?
-                   "ba" : "sc",
+        gate_tag = get(ENV, "M3_GATE_MODE", "sc_threshold") == "branch_aware" ? "ba" :
+                   (get(ENV, "M3_GATE_MODE", "sc_threshold") == "kinetic" ? "ki" :
+                    (get(ENV, "M3_REEQUIL", "0") == "1" ? "sc_re" : "sc")),
+        reequilibrate_haze = get(ENV, "M3_REEQUIL", "0") == "1",
         probe = get(ENV, "M3_PROBE", "0") == "1")
-    cfg.activation_gate in (:sc_threshold, :branch_aware) ||
+    cfg.activation_gate in (:sc_threshold, :branch_aware, :kinetic) ||
         error("bad M3_GATE_MODE $(cfg.activation_gate)")
     cfg.env_mode in (:open, :parcel) || error("bad M3_ENV_MODE $(cfg.env_mode)")
     base = cfg.env_mode === :open ? GCVI_BASENAME :
