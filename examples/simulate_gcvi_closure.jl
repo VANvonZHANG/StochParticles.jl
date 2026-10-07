@@ -183,16 +183,18 @@ function solve_case(cfg::GcviClosureConfig, particles)
     # to reproduce M2 exactly
     rtol = cfg.env_mode === :parcel ? 1.0e-5 : 1.0e-6
     saveat = cfg.probe ? 1.0 : cfg.saveat
+    # probe samples S every 1 s -> sub-steps must match (saveat % dt_split == 0)
+    dt_split = cfg.probe ? 1.0 : cfg.dt_split
     if cfg.env_mode === :parcel
         return solve_split(particles, volume(cfg), ParcelCoupled(pp.parcel),
             (condensation, pp), Tsit5();
-            tspan = cfg.tspan, n_sim = cfg.n_sim, dt_split = cfg.dt_split,
+            tspan = cfg.tspan, n_sim = cfg.n_sim, dt_split = dt_split,
             saveat = saveat, record_func = record_func,
             abstol = 1.0e-24, reltol = rtol, reequil = reequil)
     end
     return solve_split(particles, volume(cfg), env_profile(cfg),
         (condensation,), Tsit5();
-        tspan = cfg.tspan, n_sim = cfg.n_sim, dt_split = cfg.dt_split,
+        tspan = cfg.tspan, n_sim = cfg.n_sim, dt_split = dt_split,
         saveat = saveat, record_func = record_func,
         abstol = 1.0e-24, reltol = rtol)
 end
@@ -224,7 +226,9 @@ function write_twin_obs(path, cfg::GcviClosureConfig, truth_records, chis_true)
 end
 
 function main()
+    n_sim_env = tryparse(Int, get(ENV, "M3_N_SIM", "0"))
     cfg = GcviClosureConfig(
+        n_sim = n_sim_env === nothing || n_sim_env <= 0 ? 1000 : n_sim_env,
         env_mode = Symbol(get(ENV, "M3_ENV_MODE", "open")),
         activation_gate = Symbol(get(ENV, "M3_GATE_MODE", "sc_threshold")),
         gate_tag = get(ENV, "M3_GATE_MODE", "sc_threshold") == "branch_aware" ?
