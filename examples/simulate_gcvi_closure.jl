@@ -241,6 +241,18 @@ function main()
     cfg.env_mode in (:open, :parcel) || error("bad M3_ENV_MODE $(cfg.env_mode)")
     base = cfg.env_mode === :open ? GCVI_BASENAME :
         (cfg.probe ? "gcvi_closure_probe" : "gcvi_closure_parcel_$(cfg.gate_tag)")
+    # shard mode (replicate-parallel campaign): run only the selected chi
+    # case(s) into a suffixed file; seeds keep their FULL-list case_idx so
+    # shards are bit-identical to the sequential run
+    all_cases = cfg.probe ? [cfg.chi_true] : vcat(cfg.chi_grid, cfg.chi_true)
+    case_iter = collect(enumerate(all_cases))
+    sel = get(ENV, "M3_CASE_SELECT", "")
+    if !isempty(sel)
+        vals = [parse(Float64, x) for x in split(sel, ",")]
+        case_iter = filter(p -> p[2] in vals, case_iter)
+        isempty(case_iter) && error("M3_CASE_SELECT matched no case: $sel")
+        base = base * "_shard" * join(replace(string(v), "." => "p") for v in vals)
+    end
     chi_inf = reachable_chi_max(spectrum(cfg), fbar(cfg);
         densities = cfg.densities, chi_species = DRY_SPECIES)
     @assert chi_inf > 0.85 "chi_inf = $chi_inf <= 0.85: weaken fbar anchors (spec §7)"
@@ -257,7 +269,7 @@ function main()
     truth_chis = Float64[]
     chis_realized = Dict{Int, Vector{Float64}}()
     h5open(h5_path, "r+") do file
-        for (case_idx, chi) in enumerate(chi_cases)
+        for (case_idx, chi) in case_iter
             truth = chi == cfg.chi_true
             case_group = ensure_case_group(file, "chi_$(chi)";
                 attrs_dict = Dict{String, Any}(
@@ -341,7 +353,7 @@ function main()
         end
     end
 
-    if !cfg.probe
+    if !cfg.probe && !isempty(truth_chis)   # non-truth shards skip obs write
         obs_name = cfg.env_mode === :open ? "twin_obs_v0.h5" :
                    "twin_obs_parcel_$(cfg.gate_tag).h5"
         obs_path = joinpath(example_data_dir(), "synthetic", obs_name)
