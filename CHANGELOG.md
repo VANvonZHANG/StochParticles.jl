@@ -29,6 +29,20 @@ coupling. No breaking API changes for existing open-loop users.
 - `reequilibrate_haze!` — water-conserving split-step haze re-equilibration
   helper; `solve_split` gains a `reequil` callback hook (default `nothing`).
 
+### Fixed
+
+- **H2O condensation flux was 55.5x too weak since inception**: the Mason
+  flux `dm/dt = 4πR·D′·Δp/(R_v·T)` was additionally multiplied by `M_w`,
+  but `Δp/(R_v·T)` with per-kg `R_v` is already a mass density. Masked in
+  all prescribed-S (open-loop) usage; exposed by the M3 closed-loop
+  comparison against pyrcel (S_max biased ~3.5x high). Verified by direct
+  unit test against the analytic Mason flux (ratio was exactly `M_w`).
+- Non-physical solver trial states no longer throw in the RHS: negative
+  particle masses, sub-nanometer dry cores (Dirichlet-corner ghosts, whose
+  Kelvin term overflows), and negative trial parcel temperatures/p_v all
+  return zero drift so the adaptive solver rejects the step; evaporation
+  overshoots are clamped at accepted sub-step boundaries.
+
 ### Changed
 
 - `ParcelState` now carries 3 fields `(T, p, qv)`; supersaturation is
