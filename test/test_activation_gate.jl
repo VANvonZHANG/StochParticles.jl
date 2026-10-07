@@ -160,3 +160,25 @@ end
     env_above = SVector(T, p_sat * (1.0 + Sc + 1e-4))
     @test f_ki(μ_big, env_above, nothing, 0.0) == f_sc(μ_big, env_above, nothing, 0.0)
 end
+
+@testset "accepted-state clamp: fast evaporation at loose tolerance" begin
+    # a big wet droplet under deep subsaturation evaporates fast; with loose
+    # rtol the integrator can accept a slightly-negative water endpoint —
+    # solve_split must clamp it instead of letting diagnostics DomainError
+    T = 285.0
+    m_as = 4.0 / 3.0 * π * (50.0e-9)^3 * 1770.0
+    m_w0 = 4.0 / 3.0 * π * (2.0e-6)^3 * 1000.0 - m_as
+    particles = [SVector(m_as, m_w0)]
+    pp = ParcelProcess(0.5, 2, 1.0e-10, THERMO2, T, 9.0e4, 0.0096)
+    cond = H2OCondensationProcess(THERMO2, DENS2; h2o_idx = 2, w = 0.0,
+        activation_gate = :branch_aware)
+    rec = (t, u, sys) -> (t = t,
+        w = get_particle(u, 1, Val(2))[2],
+        d = particle_wet_radius(SVector(u[1], 0.0), max(u[2], 0.0), DENS2))
+    sol, recs = solve_split(particles, 1.0e-12, ParcelCoupled(pp.parcel),
+        (cond, pp), Tsit5(); tspan = (0.0, 60.0), n_sim = 1,
+        dt_split = 1.0, saveat = 1.0, record_func = rec,
+        abstol = 1.0e-24, reltol = 1.0e-4)
+    @test all(r.w >= 0.0 for r in recs)      # clamped, never negative
+    @test sol.retcode == ReturnCode.Success
+end
