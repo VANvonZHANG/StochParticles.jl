@@ -169,7 +169,8 @@ function solve_split(particles::Vector{SVector{A, Float64}},
         tspan = (0.0, 3600.0), n_sim = length(particles),
         dt_split::Real, saveat::Real, record_func,
         abstol = nothing, reltol = nothing,
-        reequil::Union{Nothing, Function} = nothing) where {A}
+        reequil::Union{Nothing, Function} = nothing,
+        clamp_h2o_idx::Union{Nothing, Int} = nothing) where {A}
     dt_split > 0.0 || throw(ArgumentError("dt_split must be positive, got $dt_split"))
     saveat > 0.0 || throw(ArgumentError("saveat must be positive, got $saveat"))
     isapprox(rem(saveat, dt_split), 0.0; atol = 1.0e-9 * dt_split) ||
@@ -213,12 +214,15 @@ function solve_split(particles::Vector{SVector{A, Float64}},
         sol = solve(oprob, solver; solver_opts...)
         u = copy(sol.u[end])
         # clamp evaporation overshoots at the ACCEPTED sub-step boundary:
-        # branch-aware/kinetic modes can integrate a drying droplet slightly
-        # past zero water (magnitude ~1e-20 kg); the RHS trial-guard cannot
-        # see accepted states, and diagnostics would DomainError on them
-        if p_idx !== nothing
-            hi = processes[p_idx].h2o_idx
-            for i in 1:sys.n_active
+        # any mode with fast condensation/evaporation dynamics can integrate
+        # a particle slightly past zero water (magnitude ~1e-20 kg); the RHS
+        # trial-guard cannot see accepted states, and diagnostics would
+        # DomainError on them. Index comes from the ParcelProcess when
+        # present, else the explicit clamp_h2o_idx argument (open-loop runs)
+        hi = clamp_h2o_idx !== nothing ? clamp_h2o_idx :
+             (p_idx !== nothing ? processes[p_idx].h2o_idx : nothing)
+        if hi !== nothing
+            for i in 1:(sys.n_active)
                 μ = get_particle(u, i, Val(A))
                 if μ[hi] < 0.0
                     set_particle!(u, i, Val(A), setindex(μ, 0.0, hi))
