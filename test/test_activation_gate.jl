@@ -203,3 +203,15 @@ end
           fuchs_transition_factor(2e-8, T, Dv, Mw) /
           fuchs_transition_factor(1e-8, T, Dv, Mw) < 2.0
 end
+
+@testset "saturation_vapor_pressure: Buck-1996 vs reference points" begin
+    # Buck (1981, rev. 1996) coefficients {611.21, 18.678, 234.5, 257.14};
+    # audit 2026-10-08: replaces constant-L_v C-C form (which ran −0.6% at 285 K)
+    @test saturation_vapor_pressure(273.15) ≈ 611.2 atol = 0.5
+    @test saturation_vapor_pressure(285.0) ≈ 1388.6 rtol = 5e-4
+    @test saturation_vapor_pressure(290.0) ≈ 1919.3 rtol = 5e-4
+    # monotonic and convex in T
+    es = [saturation_vapor_pressure(T) for T in 270.0:5.0:300.0]
+    @test all(diff(es) .> 0)
+    @test all(diff(log.(es)) .> 0)
+end

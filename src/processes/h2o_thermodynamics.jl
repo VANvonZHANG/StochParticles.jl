@@ -27,16 +27,17 @@ end
 """
     saturation_vapor_pressure(T::Float64) -> Float64
 
-Saturation vapor pressure over liquid water using the Clausius-Clapeyron relation.
+Saturation vapor pressure over liquid water, Buck (1981) formulation:
 
-Reference: p_sat at T0 = 273.15 K is 611.2 Pa.
+    e_s = 611.21 · exp((18.678 − T_c/234.5) · T_c / (257.14 + T_c))
+
+Accuracy ±0.1% against Smithsonian/Goff-Gratch tables over cloud-physics
+temperatures (replaces the constant-L_v Clausius-Clapeyron form, which ran
+−0.6% low at 285 K — audit note 2026-10-08).
 """
 function saturation_vapor_pressure(T::Float64)
-    T0 = 273.15
-    p_sat_0 = 611.2
-    L_v = 2.5e6      # [J/kg]
-    R_v = 461.5      # [J/kg/K]
-    return p_sat_0 * exp((L_v / R_v) * (1.0 / T0 - 1.0 / T))
+    T_c = T - 273.15
+    return 611.21 * exp((18.678 - T_c / 234.5) * T_c / (257.14 + T_c))
 end
 
 """
