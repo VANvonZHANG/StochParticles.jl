@@ -32,7 +32,7 @@ export make_coagulation_jump, make_non_cnmc_coagulation_jump, make_emission_jump
 export dilution_death_affect!, dilution_birth_affect!, make_dilution_jumps
 export water_activity, ThermodynamicsParams, saturation_vapor_pressure,
        modified_diffusion_coefficient, particle_wet_radius, equilibrium_vapor_pressure,
-       critical_supersaturation, equilibrium_water_mass
+       critical_supersaturation, equilibrium_water_mass, fuchs_transition_factor
 export ParcelState, parcel_drift, parcel_supersaturation, ParcelProcess,
        ParcelCoupled, extract_parcel, set_parcel_state!, set_parcel_drift!,
        critical_point, reequilibrate_haze!

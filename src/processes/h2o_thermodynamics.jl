@@ -73,6 +73,29 @@ function modified_diffusion_coefficient(
 end
 
 """
+    fuchs_transition_factor(R, T, D_v, M_w; accom = 1.0) -> Float64
+
+Transition-regime (Fuchs) reduction of the continuum mass-transfer rate for
+a particle of radius `R` [m] at temperature `T` [K]:
+
+    D_eff = D_v / (1 + (D_v/(α·R))·√(2π·M_w/(R_u·T)))
+
+where `D_v` [m²/s] is the continuum diffusivity, `M_w` [kg/mol] the vapor's
+molar mass, and `α` the mass accommodation coefficient. λ-form (flux
+matching), identical to pyrcel `thermo.dv` with α=1.0 — see
+`docs/superpowers/notes/2026-10-08-fuchs-transition-primer.md`. Limits:
+R ≫ λ_v → 1 (continuum); R ≪ λ_v → free-molecular r² scaling.
+
+Returns the factor multiplying the continuum flux (1/(1+Kn'), Kn' =
+λ_v'/(αR) with λ_v' = D_v·√(2π·M_w/(R_u·T))).
+"""
+function fuchs_transition_factor(R::Float64, T::Float64, D_v::Float64,
+        M_w::Float64; accom::Float64 = 1.0)
+    kn = (D_v / (accom * R)) * sqrt(2.0 * pi * M_w / (8.314 * T))
+    return 1.0 / (1.0 + kn)
+end
+
+"""
     water_activity(m_dry, m_w, κ_values, densities) -> Float64
 
 Compute water activity using κ-Köhler theory (Petters & Kreidenweis, 2007).

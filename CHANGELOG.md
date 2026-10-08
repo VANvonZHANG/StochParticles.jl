@@ -43,6 +43,12 @@ coupling. No breaking API changes for existing open-loop users.
   return zero drift so the adaptive solver rejects the step; evaporation
   overshoots are clamped at accepted sub-step boundaries.
 
+- Missing **transition-regime (Fuchs) correction** added: the continuum
+  mass-transfer rate is now reduced per particle by the lambda-form factor
+  `fuchs_transition_factor` (pyrcel-aligned, mass accommodation α=1.0).
+  At haze radii (30–200 nm) the uptake rate is cut by ~0.15–0.55x —
+  previously the uncorrected continuum flux overstated the haze vapor sink.
+
 ### Changed
 
 - `ParcelState` now carries 3 fields `(T, p, qv)`; supersaturation is

@@ -172,13 +172,34 @@ end
     pp = ParcelProcess(0.5, 2, 1.0e-10, THERMO2, T, 9.0e4, 0.0096)
     cond = H2OCondensationProcess(THERMO2, DENS2; h2o_idx = 2, w = 0.0,
         activation_gate = :branch_aware)
-    rec = (t, u, sys) -> (t = t,
+    rec = (t,
+        u,
+        sys) -> (t = t,
         w = get_particle(u, 1, Val(2))[2],
         d = particle_wet_radius(SVector(u[1], 0.0), max(u[2], 0.0), DENS2))
-    sol, recs = solve_split(particles, 1.0e-12, ParcelCoupled(pp.parcel),
+    sol,
+    recs = solve_split(particles, 1.0e-12, ParcelCoupled(pp.parcel),
         (cond, pp), Tsit5(); tspan = (0.0, 60.0), n_sim = 1,
         dt_split = 1.0, saveat = 1.0, record_func = rec,
         abstol = 1.0e-24, reltol = 1.0e-4)
     @test all(r.w >= 0.0 for r in recs)      # clamped, never negative
     @test sol.retcode == ReturnCode.Success
+end
+
+@testset "fuchs transition factor: limits and pyrcel parity" begin
+    T = 285.0
+    Mw = 18.015e-3
+    Dv = 2.5e-5
+    lam = Dv * sqrt(2 * pi * Mw / (8.314 * T))   # primer convention
+    # continuum limit: huge droplet -> factor -> 1
+    @test fuchs_transition_factor(1.0e-3, T, Dv, Mw) > 0.99
+    # transition regime: 100nm radius -> Kn' ~ 1.74, factor ~ 0.365
+    f100 = fuchs_transition_factor(1.0e-7, T, Dv, Mw)
+    @test 0.30 < f100 < 0.45
+    # free-molecular scaling: factor ∝ R for small R
+    # free-molecular scaling approached: factor ∝ R at small R (Kn' ~ 17 and
+    # ~8.6 here still carry the +1 correction; exact ratio 2(1+Kn)/(1+2Kn))
+    @test 1.85 <
+          fuchs_transition_factor(2e-8, T, Dv, Mw) /
+          fuchs_transition_factor(1e-8, T, Dv, Mw) < 2.0
 end

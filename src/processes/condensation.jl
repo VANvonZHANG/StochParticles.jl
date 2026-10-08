@@ -187,12 +187,15 @@ function (flux::H2OCondensationFlux{A})(
     # Equilibrium vapor pressure over droplet
     p_eq = equilibrium_vapor_pressure(m_dry, m_w, thermo, densities, T)
 
-    # Modified diffusion coefficient
     p_sat = saturation_vapor_pressure(T)
-    D_v_prime = modified_diffusion_coefficient(thermo, T, p_sat)
-
     # Wet particle radius
     R = particle_wet_radius(m_dry, m_w, densities)
+
+    # Effective diffusivity: latent-heat (thermal) resistance x Fuchs
+    # transition-regime factor (per-particle, size-dependent; pyrcel-aligned
+    # lambda-form with alpha=1.0 — see the 2026-10-08 primer note)
+    D_v_prime = modified_diffusion_coefficient(thermo, T, p_sat) *
+                fuchs_transition_factor(R, T, thermo.D_v, thermo.M_w)
 
     # Condensation mass rate [kg/s] — Mason flux with the modified
     # (latent-heat-corrected) diffusivity:
