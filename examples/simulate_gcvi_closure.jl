@@ -256,16 +256,20 @@ function main()
             case_group = ensure_case_group(file, "chi_$(chi)";
                 attrs_dict = Dict{String, Any}(
                     "chi_target" => chi, "truth" => truth))
-            case_nu = nothing
+            # calibrate nu(χ) ONCE per case on a shared spec object (fresh
+            # spectrum/fbar objects per replicate would bust the objectid
+            # cache and re-pay the Monte-Carlo bisection every replicate)
+            case_spec = population_spec(cfg, chi)
+            case_nu = nu_for_chi(case_spec.spectrum, case_spec.fbar, chi;
+                densities = cfg.densities, chi_species = DRY_SPECIES)
             for replicate_idx in 1:n_replicates
                 # per-replicate population resampling: replicate spread IS the
                 # identifiability noise (chi fluctuation + J noise floor)
                 initial_seed = cfg.initial_seed_base + 100 * case_idx + replicate_idx
                 particles, dry0,
                 meta = synthesize_population(
-                    population_spec(cfg, chi);
-                    seed = initial_seed, thermo = thermo(cfg))
-                case_nu === nothing && (case_nu = meta.nu)
+                    case_spec;
+                    seed = initial_seed, thermo = thermo(cfg), nu = case_nu)
                 push!(get!(chis_realized, case_idx, Float64[]), meta.chi_realized)
                 attrs_dict = Dict{String, Any}(
                     "chi_target" => chi, "chi_realized" => meta.chi_realized,
