@@ -151,9 +151,10 @@ function record_extras(t, u, sys, cfg::GcviClosureConfig)
     )
     if length(u) == sys.n_sim * 5 + 3      # closed loop: record the parcel tail
         pr = extract_parcel(u, sys.n_sim, 5)
-        extras = merge(extras, (
-            parcel_T = pr.T, parcel_p = pr.p, parcel_qv = pr.qv,
-            parcel_S = parcel_supersaturation(pr)))
+        extras = merge(extras,
+            (
+                parcel_T = pr.T, parcel_p = pr.p, parcel_qv = pr.qv,
+                parcel_S = parcel_supersaturation(pr)))
     end
     return extras
 end
@@ -163,21 +164,27 @@ function solve_case(cfg::GcviClosureConfig, particles)
         h2o_idx = cfg.h2o_idx, w = 0.0, activation_gate = cfg.activation_gate)
     record_func = if cfg.probe
         # chatter probe: parcel S only (full records would be ~GB at saveat=1)
-        (t, u, sys) -> (
+        (t,
+            u,
+            sys) -> (
             t = t, parcel_S = parcel_supersaturation(extract_parcel(u, sys.n_sim, 5)))
     else
-        (t, u, sys) -> merge_record(
+        (t,
+            u,
+            sys) -> merge_record(
             base_diagnostic_record(t, u, sys, Val(A), cfg.densities, cfg.bin_edges),
             record_extras(t, u, sys, cfg))
     end
     pp = parcel_setup(cfg)
     reequil = cfg.env_mode === :parcel && cfg.reequilibrate_haze ?
-        (u, sys, t) -> begin
-            pr = extract_parcel(u, sys.n_sim, 5)
-            reequilibrate_haze!(u, sys, thermo(cfg), cfg.densities;
-                h2o_idx = cfg.h2o_idx, T = pr.T,
-                S = parcel_supersaturation(pr), m_air = pp.m_air)
-        end : nothing
+              (u,
+        sys,
+        t) -> begin
+        pr = extract_parcel(u, sys.n_sim, 5)
+        reequilibrate_haze!(u, sys, thermo(cfg), cfg.densities;
+            h2o_idx = cfg.h2o_idx, T = pr.T,
+            S = parcel_supersaturation(pr), m_air = pp.m_air)
+    end : nothing
     # closed-loop rtol 1e-5 (perf adjudication 2026-10-05: 11x speedup,
     # S_max bias 0.5%, activated fraction identical); open mode stays 1e-6
     # to reproduce M2 exactly
@@ -234,7 +241,7 @@ function main()
         error("bad M3_GATE_MODE $(cfg.activation_gate)")
     cfg.env_mode in (:open, :parcel) || error("bad M3_ENV_MODE $(cfg.env_mode)")
     base = cfg.env_mode === :open ? GCVI_BASENAME :
-        (cfg.probe ? "gcvi_closure_probe" : "gcvi_closure_parcel_$(cfg.gate_tag)")
+           (cfg.probe ? "gcvi_closure_probe" : "gcvi_closure_parcel_$(cfg.gate_tag)")
     chi_inf = reachable_chi_max(spectrum(cfg), fbar(cfg);
         densities = cfg.densities, chi_species = DRY_SPECIES)
     @assert chi_inf > 0.85 "chi_inf = $chi_inf <= 0.85: weaken fbar anchors (spec §7)"
@@ -270,7 +277,7 @@ function main()
                 attrs_dict = Dict{String, Any}(
                     "chi_target" => chi, "chi_realized" => meta.chi_realized,
                     "nu" => meta.nu, "seed" =>
-                    cfg.seed_base + 1000 * case_idx + replicate_idx,
+                        cfg.seed_base + 1000 * case_idx + replicate_idx,
                     "initial_seed" => initial_seed, "truth" => truth,
                     "env_mode" => string(cfg.env_mode),
                     "activation_gate" => string(cfg.activation_gate),

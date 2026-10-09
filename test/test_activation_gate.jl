@@ -172,10 +172,13 @@ end
     pp = ParcelProcess(0.5, 2, 1.0e-10, THERMO2, T, 9.0e4, 0.0096)
     cond = H2OCondensationProcess(THERMO2, DENS2; h2o_idx = 2, w = 0.0,
         activation_gate = :branch_aware)
-    rec = (t, u, sys) -> (t = t,
+    rec = (t,
+        u,
+        sys) -> (t = t,
         w = get_particle(u, 1, Val(2))[2],
         d = particle_wet_radius(SVector(u[1], 0.0), max(u[2], 0.0), DENS2))
-    sol, recs = solve_split(particles, 1.0e-12, ParcelCoupled(pp.parcel),
+    sol,
+    recs = solve_split(particles, 1.0e-12, ParcelCoupled(pp.parcel),
         (cond, pp), Tsit5(); tspan = (0.0, 60.0), n_sim = 1,
         dt_split = 1.0, saveat = 1.0, record_func = rec,
         abstol = 1.0e-24, reltol = 1.0e-4)

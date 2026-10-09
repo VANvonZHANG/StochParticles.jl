@@ -218,7 +218,7 @@ function solve_split(particles::Vector{SVector{A, Float64}},
         # see accepted states, and diagnostics would DomainError on them
         if p_idx !== nothing
             hi = processes[p_idx].h2o_idx
-            for i in 1:sys.n_active
+            for i in 1:(sys.n_active)
                 μ = get_particle(u, i, Val(A))
                 if μ[hi] < 0.0
                     set_particle!(u, i, Val(A), setindex(μ, 0.0, hi))
