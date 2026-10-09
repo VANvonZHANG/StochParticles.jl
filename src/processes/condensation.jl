@@ -81,8 +81,8 @@ struct H2OCondensationFlux{A}
     function H2OCondensationFlux(thermo::ThermodynamicsParams{A}, h2o_idx::Int,
             densities::SVector{A, Float64}, w::Float64 = 0.0,
             activation_gate::Symbol = :sc_threshold) where {A}
-        activation_gate in (:sc_threshold, :branch_aware) ||
-            throw(ArgumentError("activation_gate must be :sc_threshold or :branch_aware, got $activation_gate"))
+        activation_gate in (:sc_threshold, :branch_aware, :kinetic) ||
+            throw(ArgumentError("activation_gate must be :sc_threshold, :branch_aware or :kinetic, got $activation_gate"))
         return new{A}(thermo, h2o_idx, densities, w, activation_gate)
     end
 end
@@ -123,21 +123,55 @@ function (flux::H2OCondensationFlux{A})(
     end
     m_w = μ[h2o_idx]
 
-    # Activation gate (spec §3.1). The legacy gate is branch-blind: once a
-    # droplet is past the Köhler peak (D_wet > D_crit) its branch equilibrium
-    # sits BELOW Sc, so when S_env falls back below Sc the gate wrongly
-    # freezes it. :branch_aware keeps the haze-branch freeze (D_wet <= D_crit)
-    # but lets the p_eq-based flux take over on the droplet branch — flux is
-    # continuous across D_crit because p_eq(D_crit) = p_sat·(1+Sc).
-    Sc, D_crit = critical_point(m_dry, thermo, densities, T)
-    S_env = p_v / saturation_vapor_pressure(T) - 1.0
-    if S_env <= Sc
-        if flux.activation_gate === :sc_threshold
-            return zero(SVector{A, Float64})
+    # Non-physical solver TRIAL state (negative mass): adaptive solvers
+    # evaluate the RHS at rejected candidate points; return zero drift there
+    # instead of throwing in the Kohler search (sqrt of a negative argument).
+    # Accepted states are physical — the water-conservation invariant guards
+    # this at record time.
+    if m_w < 0.0 || any(k != h2o_idx && μ[k] <= 0.0 for k in 1:A)
+        return zero(SVector{A, Float64})
+    end
+
+    # numerical-ghost floor: Dirichlet corner draws in sparse-mixing regimes
+    # can carry dry cores down to ~1e-229 kg (D_dry << 1 nm). Their Kelvin
+    # term exp(A/R) overflows in p_eq and they can never hold meaningful
+    # water or activate — treat sub-nanometer cores as inert in all modes
+    # (the legacy gate happened to zero them anyway; :kinetic must too).
+    V_dry_min = 5.2e-28                  # m^3, sphere of D = 1 nm
+    V_dry = 0.0
+    for k in 1:A
+        if k != h2o_idx
+            V_dry += μ[k] / densities[k]
         end
-        D_wet = 2.0 * particle_wet_radius(m_dry, m_w, densities)
-        if D_wet <= D_crit
-            return zero(SVector{A, Float64})
+    end
+    if V_dry < V_dry_min
+        return zero(SVector{A, Float64})
+    end
+
+    # Activation gate (spec §3.1). Three modes:
+    # - :sc_threshold (legacy): zero flux whenever S_env <= Sc — branch-blind;
+    #   in a closed loop this deletes the entire haze swarm from the vapor
+    #   budget (measured 2026-10-05: S_max biased ~5x high, GCVI starved).
+    # - :branch_aware: keeps the haze-branch freeze (D_wet <= D_crit) but lets
+    #   the p_eq-based flux take over on the droplet branch; fixes the
+    #   activated-droplet (edge-freezing) half only.
+    # - :kinetic (fundamental fix): NO gate — every particle, haze or droplet,
+    #   relaxes kinetically toward its Köhler equilibrium via the same Mason
+    #   flux below. The haze population then participates in the vapor budget
+    #   (the physical buffer, pyrcel-equivalent physics class); Sc/D_crit are
+    #   left to diagnostics. Flux is continuous in state — no discontinuity
+    #   surface for the solver.
+    if flux.activation_gate !== :kinetic
+        Sc, D_crit = critical_point(m_dry, thermo, densities, T)
+        S_env = p_v / saturation_vapor_pressure(T) - 1.0
+        if S_env <= Sc
+            if flux.activation_gate === :sc_threshold
+                return zero(SVector{A, Float64})
+            end
+            D_wet = 2.0 * particle_wet_radius(m_dry, m_w, densities)
+            if D_wet <= D_crit
+                return zero(SVector{A, Float64})
+            end
         end
     end
 
