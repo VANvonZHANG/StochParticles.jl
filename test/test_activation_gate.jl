@@ -126,3 +126,62 @@ end
     @test ba_path[end] < maximum(ba_path)          # branch 版深落后蒸发（退回霾支）
     @test sc_path[end] > ba_path[end]              # 冻结版停在高位、branch 版缩回
 end
+
+@testset "flux guard: non-physical trial state returns zero" begin
+    f_ba = H2OCondensationFlux(THERMO2, 2, DENS2, 0.0, :branch_aware)
+    m_as = 4.0 / 3.0 * π * (50.0e-9)^3 * 1770.0
+    p_sat = saturation_vapor_pressure(285.0)
+    env = SVector(285.0, p_sat * 1.004)
+    @test f_ba(SVector(-1e-18, 1e-19), env, nothing, 0.0) == SVector(0.0, 0.0)
+    @test f_ba(SVector(m_as, -1e-18), env, nothing, 0.0) == SVector(0.0, 0.0)
+    @test f_ba(SVector(0.0, 0.0), env, nothing, 0.0) == SVector(0.0, 0.0)  # V_dry==0 case
+end
+
+@testset "activation_gate :kinetic — no gate, haze participates in budget" begin
+    T = 285.0
+    m_as = 4.0 / 3.0 * π * (50.0e-9)^3 * 1770.0
+    m_dry = SVector(m_as, 0.0)
+    p_sat = saturation_vapor_pressure(T)
+    f_ki = H2OCondensationFlux(THERMO2, 2, DENS2, 0.0, :kinetic)
+    f_sc = H2OCondensationFlux(THERMO2, 2, DENS2, 0.0, :sc_threshold)
+    Sc, _ = critical_point(m_dry, THERMO2, DENS2, T)
+    # haze at its S=-0.1% equilibrium, ambient S=+0.05% (< Sc): kinetic MUST
+    # grow (positive flux) — the legacy gate returns zero (the deleted buffer)
+    m_haze = equilibrium_water_mass(m_dry, THERMO2, DENS2, T, p_sat * 0.999)
+    μ_haze = SVector(m_as, m_haze)
+    env = SVector(T, p_sat * 1.0005)
+    @test f_ki(μ_haze, env, nothing, 0.0)[2] > 0.0
+    @test f_sc(μ_haze, env, nothing, 0.0) == zero(μ_haze)
+    # same ambient, haze above its equilibrium: evaporates under :kinetic
+    env_dry = SVector(T, p_sat * 0.995)
+    @test f_ki(μ_haze, env_dry, nothing, 0.0)[2] < 0.0
+    # S_env > Sc region: kinetic identical to legacy modes
+    μ_big = SVector(m_as, 4.0 / 3.0 * π * (2.0e-6)^3 * 1000.0 - m_as)
+    env_above = SVector(T, p_sat * (1.0 + Sc + 1e-4))
+    @test f_ki(μ_big, env_above, nothing, 0.0) == f_sc(μ_big, env_above, nothing, 0.0)
+end
+
+@testset "accepted-state clamp: fast evaporation at loose tolerance" begin
+    # a big wet droplet under deep subsaturation evaporates fast; with loose
+    # rtol the integrator can accept a slightly-negative water endpoint —
+    # solve_split must clamp it instead of letting diagnostics DomainError
+    T = 285.0
+    m_as = 4.0 / 3.0 * π * (50.0e-9)^3 * 1770.0
+    m_w0 = 4.0 / 3.0 * π * (2.0e-6)^3 * 1000.0 - m_as
+    particles = [SVector(m_as, m_w0)]
+    pp = ParcelProcess(0.5, 2, 1.0e-10, THERMO2, T, 9.0e4, 0.0096)
+    cond = H2OCondensationProcess(THERMO2, DENS2; h2o_idx = 2, w = 0.0,
+        activation_gate = :branch_aware)
+    rec = (t,
+        u,
+        sys) -> (t = t,
+        w = get_particle(u, 1, Val(2))[2],
+        d = particle_wet_radius(SVector(u[1], 0.0), max(u[2], 0.0), DENS2))
+    sol,
+    recs = solve_split(particles, 1.0e-12, ParcelCoupled(pp.parcel),
+        (cond, pp), Tsit5(); tspan = (0.0, 60.0), n_sim = 1,
+        dt_split = 1.0, saveat = 1.0, record_func = rec,
+        abstol = 1.0e-24, reltol = 1.0e-4)
+    @test all(r.w >= 0.0 for r in recs)      # clamped, never negative
+    @test sol.retcode == ReturnCode.Success
+end

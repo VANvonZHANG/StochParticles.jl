@@ -212,6 +212,19 @@ function solve_split(particles::Vector{SVector{A, Float64}},
         oprob = ODEProblem(ode_func!, u, (t_prev, t_next), sys)
         sol = solve(oprob, solver; solver_opts...)
         u = copy(sol.u[end])
+        # clamp evaporation overshoots at the ACCEPTED sub-step boundary:
+        # branch-aware/kinetic modes can integrate a drying droplet slightly
+        # past zero water (magnitude ~1e-20 kg); the RHS trial-guard cannot
+        # see accepted states, and diagnostics would DomainError on them
+        if p_idx !== nothing
+            hi = processes[p_idx].h2o_idx
+            for i in 1:(sys.n_active)
+                μ = get_particle(u, i, Val(A))
+                if μ[hi] < 0.0
+                    set_particle!(u, i, Val(A), setindex(μ, 0.0, hi))
+                end
+            end
+        end
         if reequil !== nothing
             reequil(u, sys, t_next)
         end
