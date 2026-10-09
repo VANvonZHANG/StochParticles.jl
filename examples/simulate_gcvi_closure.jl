@@ -109,6 +109,7 @@ function record_extras(t, u, sys, cfg::GcviClosureConfig)
         cr_chemistry = collect(acsm.cr),
         ci_chemistry = collect(acsm.ci)
     )
+<<<<<<< HEAD
 end
 
 function solve_case(cfg::GcviClosureConfig, particles)
@@ -122,6 +123,58 @@ function solve_case(cfg::GcviClosureConfig, particles)
     # kg-scale states need explicit tolerances: solver defaults (abstol = 1e-6)
     # exceed particle masses (~1e-16 kg) by ~10 orders, letting water mass go
     # negative within accepted steps
+=======
+    if length(u) == sys.n_sim * 5 + 3      # closed loop: record the parcel tail
+        pr = extract_parcel(u, sys.n_sim, 5)
+        extras = merge(extras,
+            (
+                parcel_T = pr.T, parcel_p = pr.p, parcel_qv = pr.qv,
+                parcel_S = parcel_supersaturation(pr)))
+    end
+    return extras
+end
+
+function solve_case(cfg::GcviClosureConfig, particles)
+    condensation = H2OCondensationProcess(thermo(cfg), cfg.densities;
+        h2o_idx = cfg.h2o_idx, w = 0.0, activation_gate = cfg.activation_gate)
+    record_func = if cfg.probe
+        # chatter probe: parcel S only (full records would be ~GB at saveat=1)
+        (t,
+            u,
+            sys) -> (
+            t = t, parcel_S = parcel_supersaturation(extract_parcel(u, sys.n_sim, 5)))
+    else
+        (t,
+            u,
+            sys) -> merge_record(
+            base_diagnostic_record(t, u, sys, Val(A), cfg.densities, cfg.bin_edges),
+            record_extras(t, u, sys, cfg))
+    end
+    pp = parcel_setup(cfg)
+    reequil = cfg.env_mode === :parcel && cfg.reequilibrate_haze ?
+              (u,
+        sys,
+        t) -> begin
+        pr = extract_parcel(u, sys.n_sim, 5)
+        reequilibrate_haze!(u, sys, thermo(cfg), cfg.densities;
+            h2o_idx = cfg.h2o_idx, T = pr.T,
+            S = parcel_supersaturation(pr), m_air = pp.m_air)
+    end : nothing
+    # closed-loop rtol 1e-5 (perf adjudication 2026-10-05: 11x speedup,
+    # S_max bias 0.5%, activated fraction identical); open mode stays 1e-6
+    # to reproduce M2 exactly
+    rtol = cfg.env_mode === :parcel ? 1.0e-5 : 1.0e-6
+    saveat = cfg.probe ? 1.0 : cfg.saveat
+    # probe samples S every 1 s -> sub-steps must match (saveat % dt_split == 0)
+    dt_split = cfg.probe ? 1.0 : cfg.dt_split
+    if cfg.env_mode === :parcel
+        return solve_split(particles, volume(cfg), ParcelCoupled(pp.parcel),
+            (condensation, pp), Tsit5();
+            tspan = cfg.tspan, n_sim = cfg.n_sim, dt_split = dt_split,
+            saveat = saveat, record_func = record_func,
+            abstol = 1.0e-24, reltol = rtol, reequil = reequil)
+    end
+>>>>>>> df207bb (style: JuliaFormatter fix (parcel_test line breaks))
     return solve_split(particles, volume(cfg), env_profile(cfg),
         (condensation,), Tsit5();
         tspan = cfg.tspan, n_sim = cfg.n_sim, dt_split = cfg.dt_split,
@@ -156,7 +209,37 @@ function write_twin_obs(path, cfg::GcviClosureConfig, truth_records, chis_true)
 end
 
 function main()
+<<<<<<< HEAD
     cfg = GcviClosureConfig()
+=======
+    n_sim_env = tryparse(Int, get(ENV, "M3_N_SIM", "0"))
+    cfg = GcviClosureConfig(
+        n_sim = n_sim_env === nothing || n_sim_env <= 0 ? 1000 : n_sim_env,
+        env_mode = Symbol(get(ENV, "M3_ENV_MODE", "open")),
+        activation_gate = Symbol(get(ENV, "M3_GATE_MODE", "sc_threshold")),
+        gate_tag = get(ENV, "M3_GATE_MODE", "sc_threshold") == "branch_aware" ? "ba" :
+                   (get(ENV, "M3_GATE_MODE", "sc_threshold") == "kinetic" ? "ki" :
+                    (get(ENV, "M3_REEQUIL", "0") == "1" ? "sc_re" : "sc")),
+        reequilibrate_haze = get(ENV, "M3_REEQUIL", "0") == "1",
+        probe = get(ENV, "M3_PROBE", "0") == "1")
+    cfg.activation_gate in (:sc_threshold, :branch_aware, :kinetic) ||
+        error("bad M3_GATE_MODE $(cfg.activation_gate)")
+    cfg.env_mode in (:open, :parcel) || error("bad M3_ENV_MODE $(cfg.env_mode)")
+    base = cfg.env_mode === :open ? GCVI_BASENAME :
+           (cfg.probe ? "gcvi_closure_probe" : "gcvi_closure_parcel_$(cfg.gate_tag)")
+    # shard mode (replicate-parallel campaign): run only the selected chi
+    # case(s) into a suffixed file; seeds keep their FULL-list case_idx so
+    # shards are bit-identical to the sequential run
+    all_cases = cfg.probe ? [cfg.chi_true] : vcat(cfg.chi_grid, cfg.chi_true)
+    case_iter = collect(enumerate(all_cases))
+    sel = get(ENV, "M3_CASE_SELECT", "")
+    if !isempty(sel)
+        vals = [parse(Float64, x) for x in split(sel, ",")]
+        case_iter = filter(p -> p[2] in vals, case_iter)
+        isempty(case_iter) && error("M3_CASE_SELECT matched no case: $sel")
+        base = base * "_shard" * join(replace(string(v), "." => "p") for v in vals)
+    end
+>>>>>>> df207bb (style: JuliaFormatter fix (parcel_test line breaks))
     chi_inf = reachable_chi_max(spectrum(cfg), fbar(cfg);
         densities = cfg.densities, chi_species = DRY_SPECIES)
     @assert chi_inf > 0.85 "chi_inf = $chi_inf <= 0.85: weaken fbar anchors (spec §7)"
@@ -192,7 +275,16 @@ function main()
                     "chi_target" => chi, "chi_realized" => meta.chi_realized,
                     "nu" => meta.nu, "seed" =>
                         cfg.seed_base + 1000 * case_idx + replicate_idx,
+<<<<<<< HEAD
                     "initial_seed" => initial_seed, "truth" => truth)
+=======
+                    "initial_seed" => initial_seed, "truth" => truth,
+                    "env_mode" => string(cfg.env_mode),
+                    "activation_gate" => string(cfg.activation_gate),
+                    "w" => cfg.w, "parcel_T0" => cfg.parcel_T0,
+                    "parcel_P0" => cfg.parcel_P0, "RH0" => cfg.RH0,
+                    "reequilibrate_haze" => cfg.reequilibrate_haze)
+>>>>>>> df207bb (style: JuliaFormatter fix (parcel_test line breaks))
                 Random.seed!(cfg.seed_base + 1000 * case_idx + replicate_idx)
                 sol, records = solve_case(cfg, particles)
                 @assert sol.retcode == ReturnCode.Success

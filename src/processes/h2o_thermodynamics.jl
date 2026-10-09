@@ -177,7 +177,7 @@ Evaluate the exact Köhler supersaturation S at droplet radius R.
 
     S(R) = a_w(R) · exp(2σ / (R_v · T · ρ_w · R)) - 1
 
-Private helper for `critical_supersaturation`.
+Private helper for `critical_point`.
 """
 function _kohler_supersaturation(
         R::Float64,
@@ -196,30 +196,14 @@ function _kohler_supersaturation(
 end
 
 """
-    critical_supersaturation(m_dry, thermo, densities, T) -> Float64
+    critical_point(m_dry, thermo, densities, T) -> (Sc, D_crit)
 
-Compute the critical supersaturation Sc by numerically maximizing
-the exact κ-Köhler curve.
-
-Uses golden section search to find the maximum of:
-    S(R) = a_w(R) · exp(2σ / (R_v · T · ρ_w · R)) - 1
-
-where a_w = V_w / (V_w + κ_mix · V_dry) and V_w = (4/3)πR³ - V_dry.
-
-# Arguments
-- `m_dry::SVector{A}` — dry species masses [kg]
-- `thermo::ThermodynamicsParams` — thermodynamic parameters
-- `densities::SVector{A}` — per-species densities [kg/m³]
-- `T::Float64` — temperature [K]
-
-# Returns
-- Critical supersaturation Sc (dimensionless, e.g., 0.0015 = 0.15%)
-
-# Reference
-Petters & Kreidenweis (2007), ACP. Numerical maximum of exact Köhler curve
-replaces the approximate analytical formula.
+Numerically maximize the exact κ-Köhler curve; return the critical
+supersaturation Sc and the critical wet diameter D_crit [m] at the peak.
+Shared golden-section search — `critical_supersaturation` is a thin wrapper
+(both `activation_gate` modes consult this single search, spec §3.1).
 """
-function critical_supersaturation(
+function critical_point(
         m_dry::SVector{A, Float64},
         thermo::ThermodynamicsParams{A},
         densities::SVector{A, Float64},
@@ -235,7 +219,7 @@ function critical_supersaturation(
     end
 
     if V_dry ≈ 0.0
-        return 0.0
+        return (0.0, 0.0)
     end
 
     κ_mix /= V_dry
@@ -277,7 +261,33 @@ function critical_supersaturation(
     end
 
     R_opt = (a + b) / 2.0
-    return max(_kohler_supersaturation(R_opt, V_dry, κ_mix, thermo, T), 0.0)
+    Sc = max(_kohler_supersaturation(R_opt, V_dry, κ_mix, thermo, T), 0.0)
+    return (Sc, 2.0 * R_opt)
+end
+
+"""
+    critical_supersaturation(m_dry, thermo, densities, T) -> Float64
+
+Thin wrapper over `critical_point` returning only Sc. Behavior identical to
+pre-M3 (same search, same values) — existing tests are the regression gate.
+
+# Arguments
+- `m_dry::SVector{A}` — dry species masses [kg]
+- `thermo::ThermodynamicsParams` — thermodynamic parameters
+- `densities::SVector{A}` — per-species densities [kg/m³]
+- `T::Float64` — temperature [K]
+
+# Returns
+- Critical supersaturation Sc (dimensionless, e.g., 0.0015 = 0.15%)
+
+# Reference
+Petters & Kreidenweis (2007), ACP. Numerical maximum of exact Köhler curve
+replaces the approximate analytical formula.
+"""
+function critical_supersaturation(
+        m_dry::SVector{A, Float64}, thermo::ThermodynamicsParams{A},
+        densities::SVector{A, Float64}, T::Float64) where {A}
+    critical_point(m_dry, thermo, densities, T)[1]
 end
 
 """
@@ -305,7 +315,7 @@ function equilibrium_water_mass(
 ) where {A}
     lo = 1e-25
     hi = 1e-15
-    for _ in 1:60
+    for _ in range(1, 60)
         mid = sqrt(lo * hi)
         p_eq = equilibrium_vapor_pressure(m_dry, mid, thermo, densities, T)
         if p_eq < p_v
