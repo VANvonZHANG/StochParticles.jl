@@ -68,6 +68,8 @@ def case_table(scene: dict) -> dict:
 
 
 def flip_rate(scene_a, scene_b, name) -> float:
+    if name not in scene_a or name not in scene_b:
+        return float("nan")
     rates = []
     for ra, rb in zip(scene_a[name], scene_b[name]):
         fa, fb = cr_flags_final(ra), cr_flags_final(rb)
@@ -167,18 +169,27 @@ def main() -> None:
         print(f"pyrcel {name}: S_max={ref[name]['S_max']:.5f} "
               f"N_act={ref[name]['N_act']:.4f}")
 
+    # arms may cover only part of the case grid (ki: ultrafine stiffness in
+    # sparse-chi regimes limits coverage — validation arm, not a scan arm)
     d = {arm: {n: abs(tabs[arm][n]["N_act"] - ref[n]["N_act"]) /
-                   max(ref[n]["N_act"], 1e-12) for n in ref}
+                   max(ref[n]["N_act"], 1e-12)
+               for n in ref if n in tabs[arm]}
          for arm in tabs}
+    coverage = {arm: len(d[arm]) for arm in d}
+    full_arms = [a for a in d if coverage[a] == len(ref)]
     med_d = {arm: float(np.median(list(d[arm].values()))) for arm in d}
     max_d = {arm: float(max(d[arm].values())) for arm in d}
-    best = min(med_d, key=med_d.get)
+    best = min([a for a in full_arms], key=lambda a: med_d[a]) if full_arms else min(med_d, key=med_d.get)
     t1_pass = [arm for arm in d if max_d[arm] < 0.05]
     t1 = best in t1_pass
 
     mean_flip = float(np.mean([flip_rate(scenes["sc"], scenes["ba"], n)
                                for n in ref]))
     typical_noise = float(np.median([cr_noise(scenes["sc"], n) for n in ref]))
+    flips = [flip_rate(scenes["sc"], scenes["ba"], n) for n in ref]
+    noises = [cr_noise(scenes["sc"], n) for n in ref]
+    mean_flip = float(np.nanmean(flips))
+    typical_noise = float(np.median(noises))
     t2 = bool(mean_flip > typical_noise)
     t3 = chatter_verdict()
 
@@ -194,11 +205,12 @@ def main() -> None:
              "",
              "| case | chi | " + " | ".join(f"N_act({a})" for a in tabs) +
              " | N_act(pyrcel) |",
-             "|---|---|---|---|---|---|---|"]
+             "|---|---|" + "---|" * (len(tabs) + 1)]
     for n in ref:
         lines.append(
             f"| {n} | {tabs['sc'][n]['chi_target']:.2f} | " +
-            " | ".join(f"{tabs[a][n]['N_act']:.4f}" for a in tabs) +
+            " | ".join(f"{tabs[a][n]['N_act']:.4f}" if n in tabs[a] else "—"
+                      for a in tabs) +
             f" | {ref[n]['N_act']:.4f} |")
     lines += ["",
               "S_max means: " + " ".join(f"{a}={np.mean([tabs[a][n]['S_max'] for n in ref]):.5f}"
