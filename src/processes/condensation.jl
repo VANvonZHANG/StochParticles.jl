@@ -114,6 +114,15 @@ function (flux::H2OCondensationFlux{A})(
     T = env[1]
     p_v = env[2]
 
+    # non-physical trial environment: with the corrected (55x stronger)
+    # latent-heat feedback, a solver trial step can drive the coupled parcel
+    # temperature below zero; a negative T makes A_kelvin (and thus the
+    # critical-point search domain) negative. Zero drift lets the solver
+    # reject the step.
+    if T <= 0.0 || p_v < 0.0
+        return zero(SVector{A, Float64})
+    end
+
     # Extract dry masses and water mass
     m_dry = zero(SVector{A, Float64})
     for k in 1:A
@@ -178,19 +187,24 @@ function (flux::H2OCondensationFlux{A})(
     # Equilibrium vapor pressure over droplet
     p_eq = equilibrium_vapor_pressure(m_dry, m_w, thermo, densities, T)
 
-    # Modified diffusion coefficient
     p_sat = saturation_vapor_pressure(T)
-    D_v_prime = modified_diffusion_coefficient(thermo, T, p_sat)
-
     # Wet particle radius
     R = particle_wet_radius(m_dry, m_w, densities)
 
-    # Condensation rate (moles/s)
-    # dm_w/dt = 4πR · D_v' · (p_v - p_eq) / (R_v · T)
-    dNw_dt = 4.0 * π * R * D_v_prime * (p_v - p_eq) / (thermo.R_v * T)
+    # Effective diffusivity: latent-heat (thermal) resistance x Fuchs
+    # transition-regime factor (per-particle, size-dependent; pyrcel-aligned
+    # lambda-form with alpha=1.0 — see the 2026-10-08 primer note)
+    D_v_prime = modified_diffusion_coefficient(thermo, T, p_sat) *
+                fuchs_transition_factor(R, T, thermo.D_v, thermo.M_w)
 
-    # Convert to mass rate
-    dm_w_dt = dNw_dt * thermo.M_w
+    # Condensation mass rate [kg/s] — Mason flux with the modified
+    # (latent-heat-corrected) diffusivity:
+    #   dm_w/dt = 4πR · D_v' · (p_v - p_eq) / (R_v · T)
+    # Δp/(R_v·T) is already a vapor MASS density difference [kg/m³] because
+    # R_v is per-kg — do NOT multiply by M_w again (that bug, present since
+    # inception, weakened the flux 55.5x; masked under prescribed-S open
+    # loops, exposed by the closed-loop pyrcel comparison, 2026-10-07)
+    dm_w_dt = 4.0 * π * R * D_v_prime * (p_v - p_eq) / (thermo.R_v * T)
 
     # Build dμ/dt: only H2O changes
     dμ = zero(SVector{A, Float64})

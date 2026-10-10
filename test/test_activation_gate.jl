@@ -185,3 +185,33 @@ end
     @test all(r.w >= 0.0 for r in recs)      # clamped, never negative
     @test sol.retcode == ReturnCode.Success
 end
+
+@testset "fuchs transition factor: limits and pyrcel parity" begin
+    T = 285.0
+    Mw = 18.015e-3
+    Dv = 2.5e-5
+    lam = Dv * sqrt(2 * pi * Mw / (8.314 * T))   # primer convention
+    # continuum limit: huge droplet -> factor -> 1
+    @test fuchs_transition_factor(1.0e-3, T, Dv, Mw) > 0.99
+    # transition regime: 100nm radius -> Kn' ~ 1.74, factor ~ 0.365
+    f100 = fuchs_transition_factor(1.0e-7, T, Dv, Mw)
+    @test 0.30 < f100 < 0.45
+    # free-molecular scaling: factor ∝ R for small R
+    # free-molecular scaling approached: factor ∝ R at small R (Kn' ~ 17 and
+    # ~8.6 here still carry the +1 correction; exact ratio 2(1+Kn)/(1+2Kn))
+    @test 1.85 <
+          fuchs_transition_factor(2e-8, T, Dv, Mw) /
+          fuchs_transition_factor(1e-8, T, Dv, Mw) < 2.0
+end
+
+@testset "saturation_vapor_pressure: Buck-1996 vs reference points" begin
+    # Buck (1981, rev. 1996) coefficients {611.21, 18.678, 234.5, 257.14};
+    # audit 2026-10-08: replaces constant-L_v C-C form (which ran −0.6% at 285 K)
+    @test saturation_vapor_pressure(273.15) ≈ 611.2 atol = 0.5
+    @test saturation_vapor_pressure(285.0) ≈ 1388.6 rtol = 5e-4
+    @test saturation_vapor_pressure(290.0) ≈ 1919.3 rtol = 5e-4
+    # monotonic and convex in T
+    es = [saturation_vapor_pressure(T) for T in 270.0:5.0:300.0]
+    @test all(diff(es) .> 0)
+    @test all(diff(log.(es)) .> 0)
+end
