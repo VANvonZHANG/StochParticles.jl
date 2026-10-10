@@ -156,7 +156,12 @@ def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     import pyrcel as pm
 
-    scenes = {k: read_scene(p) for k, p in SCENES.items()}
+    scenes = {}
+    for k, p in SCENES.items():
+        try:
+            scenes[k] = read_scene(p)
+        except FileNotFoundError:
+            print(f"NOTE: arm '{k}' has no data file — skipping")
     tabs = {k: case_table(s) for k, s in scenes.items()}
 
     # pyrcel reference per case (from the sc arm's first PYRCEL_REPS replicates
@@ -193,7 +198,11 @@ def main() -> None:
     t2 = bool(mean_flip > typical_noise)
     t3 = chatter_verdict()
 
-    kinetic_validation(scenes["sc_re"], scenes["ki"])
+    if "ki" in scenes:
+        kinetic_validation(scenes["sc_re"], scenes["ki"])
+    else:
+        print("\nNOTE: kinetic arm absent — sc_re-vs-pyrcel closeness is the "
+              "only haze validation for now")
 
     lines = ["# M3 quantification decision — C-prime scenario (spec §5 stage C)",
              "",
@@ -213,8 +222,9 @@ def main() -> None:
                       for a in tabs) +
             f" | {ref[n]['N_act']:.4f} |")
     lines += ["",
-              "S_max means: " + " ".join(f"{a}={np.mean([tabs[a][n]['S_max'] for n in ref]):.5f}"
-                                         for a in tabs) +
+              "S_max means (per-arm over covered cases): " +
+              " ".join(f"{a}={np.mean([tabs[a][n]['S_max'] for n in tabs[a]]):.5f}"
+                       for a in tabs) +
               f" pyrcel={np.mean([ref[n]['S_max'] for n in ref]):.5f}",
               "",
               "d vs pyrcel (per-arm): " +

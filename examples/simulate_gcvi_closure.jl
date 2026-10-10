@@ -46,7 +46,7 @@ Base.@kwdef struct GcviClosureConfig
     RH0::Float64 = 0.998                     # initial haze equilibrium RH
     parcel_T0::Float64 = 285.0
     parcel_P0::Float64 = 9.0e4
-    reequilibrate_haze::Bool = false
+    reequilibrate_haze::Bool = true    # default per M3 three-trigger adjudication (trigger-3 chatter; ki~re validated 3-5%)
     probe::Bool = false                      # chatter probe: chi_true only, saveat=1
     # physics
     densities::SVector{5, Float64} = SVector(1770.0, 1720.0, 1400.0, 1800.0, 1000.0)
@@ -60,8 +60,12 @@ Base.@kwdef struct GcviClosureConfig
 end
 
 function thermo(cfg::GcviClosureConfig)
+    # L_v T-dependent approx (2500.8-2.36*Tc+... kJ/kg) at parcel_T0 —
+    # audit 2026-10-08: truth ~2473 kJ/kg at 285 K (NOT pyrcel's 2.25e3,
+    # which is the 100°C value and biases its reference by ~9%)
+    L_v = 2500.8 - 2.36 * (cfg.parcel_T0 - 273.15)
     ThermodynamicsParams(
-        cfg.kappas, 0.072, 1000.0, 18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2)
+        cfg.kappas, 0.072, 1000.0, 18.015e-3, L_v * 1e3, 461.5, 2.5e-5, 2.4e-2)
 end
 
 function env_profile(cfg::GcviClosureConfig)
@@ -188,7 +192,10 @@ function solve_case(cfg::GcviClosureConfig, particles)
     # closed-loop rtol 1e-5 (perf adjudication 2026-10-05: 11x speedup,
     # S_max bias 0.5%, activated fraction identical); open mode stays 1e-6
     # to reproduce M2 exactly
-    rtol = cfg.env_mode === :parcel ? 1.0e-5 : 1.0e-6
+    # open mode used 1e-6 to reproduce M2 bit-for-bit; the flux fix
+    # (8816321) changed open-loop physics anyway, so 1e-5 is fine for all
+    # modes — and 1e-6 makes the corrected fast dynamics crawl
+    rtol = 1.0e-5
     saveat = cfg.probe ? 1.0 : cfg.saveat
     # probe samples S every 1 s -> sub-steps must match (saveat % dt_split == 0)
     dt_split = cfg.probe ? 1.0 : cfg.dt_split
@@ -197,13 +204,14 @@ function solve_case(cfg::GcviClosureConfig, particles)
             (condensation, pp), Tsit5();
             tspan = cfg.tspan, n_sim = cfg.n_sim, dt_split = dt_split,
             saveat = saveat, record_func = record_func,
-            abstol = 1.0e-24, reltol = rtol, reequil = reequil)
+            abstol = 1.0e-24, reltol = rtol, reequil = reequil,
+            clamp_h2o_idx = cfg.h2o_idx)
     end
     return solve_split(particles, volume(cfg), env_profile(cfg),
         (condensation,), Tsit5();
         tspan = cfg.tspan, n_sim = cfg.n_sim, dt_split = dt_split,
         saveat = saveat, record_func = record_func,
-        abstol = 1.0e-24, reltol = rtol)
+        abstol = 1.0e-24, reltol = rtol, clamp_h2o_idx = cfg.h2o_idx)
 end
 
 function write_twin_obs(path, cfg::GcviClosureConfig, truth_records, chis_true)
@@ -240,8 +248,17 @@ function main()
         activation_gate = Symbol(get(ENV, "M3_GATE_MODE", "sc_threshold")),
         gate_tag = get(ENV, "M3_GATE_MODE", "sc_threshold") == "branch_aware" ? "ba" :
                    (get(ENV, "M3_GATE_MODE", "sc_threshold") == "kinetic" ? "ki" :
-                    (get(ENV, "M3_REEQUIL", "0") == "1" ? "sc_re" : "sc")),
-        reequilibrate_haze = get(ENV, "M3_REEQUIL", "0") == "1",
+                    (get(ENV, "M3_REEQUIL", "1") == "1" ? "sc_re" : "sc")),
+        reequilibrate_haze = get(ENV, "M3_REEQUIL", "1") == "1",
+        w = (w_env = tryparse(Float64, get(ENV, "M3_W", "0"));
+            w_env === nothing || w_env <= 0 ? 2.0 : w_env),
+        aitken_concentration = (ns = tryparse(Float64, get(ENV, "M3_N_SCALE", "1"));
+            ns === nothing ? 8.0e9 : 8.0e9 * ns),
+        accumulation_concentration = (ns2 = tryparse(Float64, get(ENV, "M3_N_SCALE", "1"));
+            ns2 === nothing ? 3.2e9 : 3.2e9 * ns2),
+        gcvi = (d50 = tryparse(Float64, get(ENV, "M3_D50_UM", "7.0"));
+            GCVIResponse(D50 = (d50 === nothing ? 7.0 : d50) * 1.0e-6,
+                width = 0.1 * (d50 === nothing ? 7.0 : d50) * 1.0e-6)),
         probe = get(ENV, "M3_PROBE", "0") == "1")
     cfg.activation_gate in (:sc_threshold, :branch_aware, :kinetic) ||
         error("bad M3_GATE_MODE $(cfg.activation_gate)")
