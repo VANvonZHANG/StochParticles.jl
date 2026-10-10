@@ -16,10 +16,10 @@ Base.@kwdef struct GcviClosureConfig
     # synthetic "SMPS" spectrum: bimodal lognormal baked onto the table
     aitken_dg::Float64 = 6.0e-8
     aitken_sigma_g::Float64 = 1.45
-    aitken_concentration::Float64 = 8.0e11      # [m^-3]
+    aitken_concentration::Float64 = 8.0e9       # [m^-3] (C' 2026-10-05: /100 of M2 — mountain-cloud loading)
     accumulation_dg::Float64 = 1.6e-7
     accumulation_sigma_g::Float64 = 1.55
-    accumulation_concentration::Float64 = 3.2e11
+    accumulation_concentration::Float64 = 3.2e9  # (C' 2026-10-05: /100 of M2)
     bin_edges::Vector{Float64} = collect(10.0 .^ range(-8.3, -4.5; length = 96))
     # size-resolved fbar(D) anchors (AS, AN, OA, BC): small particles
     # OA-rich, large particles AS-rich; trend strength sized so that
@@ -42,7 +42,7 @@ Base.@kwdef struct GcviClosureConfig
     env_mode::Symbol = :open                 # :open (M2 legacy) | :parcel
     activation_gate::Symbol = :sc_threshold  # spec §3.1, default = adjudication output
     gate_tag::String = "sc"                  # filename suffix: "sc" | "ba"
-    w::Float64 = 0.5
+    w::Float64 = 1.0                            # (C' 2026-10-05: 0.5 -> 1.0 to feed GCVI)
     RH0::Float64 = 0.998                     # initial haze equilibrium RH
     parcel_T0::Float64 = 285.0
     parcel_P0::Float64 = 9.0e4
@@ -151,10 +151,9 @@ function record_extras(t, u, sys, cfg::GcviClosureConfig)
     )
     if length(u) == sys.n_sim * 5 + 3      # closed loop: record the parcel tail
         pr = extract_parcel(u, sys.n_sim, 5)
-        extras = merge(extras,
-            (
-                parcel_T = pr.T, parcel_p = pr.p, parcel_qv = pr.qv,
-                parcel_S = parcel_supersaturation(pr)))
+        extras = merge(extras, (
+            parcel_T = pr.T, parcel_p = pr.p, parcel_qv = pr.qv,
+            parcel_S = parcel_supersaturation(pr)))
     end
     return extras
 end
@@ -164,42 +163,38 @@ function solve_case(cfg::GcviClosureConfig, particles)
         h2o_idx = cfg.h2o_idx, w = 0.0, activation_gate = cfg.activation_gate)
     record_func = if cfg.probe
         # chatter probe: parcel S only (full records would be ~GB at saveat=1)
-        (t,
-            u,
-            sys) -> (
+        (t, u, sys) -> (
             t = t, parcel_S = parcel_supersaturation(extract_parcel(u, sys.n_sim, 5)))
     else
-        (t,
-            u,
-            sys) -> merge_record(
+        (t, u, sys) -> merge_record(
             base_diagnostic_record(t, u, sys, Val(A), cfg.densities, cfg.bin_edges),
             record_extras(t, u, sys, cfg))
     end
     pp = parcel_setup(cfg)
     reequil = cfg.env_mode === :parcel && cfg.reequilibrate_haze ?
-              (u,
-        sys,
-        t) -> begin
-        pr = extract_parcel(u, sys.n_sim, 5)
-        reequilibrate_haze!(u, sys, thermo(cfg), cfg.densities;
-            h2o_idx = cfg.h2o_idx, T = pr.T,
-            S = parcel_supersaturation(pr), m_air = pp.m_air)
-    end : nothing
+        (u, sys, t) -> begin
+            pr = extract_parcel(u, sys.n_sim, 5)
+            reequilibrate_haze!(u, sys, thermo(cfg), cfg.densities;
+                h2o_idx = cfg.h2o_idx, T = pr.T,
+                S = parcel_supersaturation(pr), m_air = pp.m_air)
+        end : nothing
     # closed-loop rtol 1e-5 (perf adjudication 2026-10-05: 11x speedup,
     # S_max bias 0.5%, activated fraction identical); open mode stays 1e-6
     # to reproduce M2 exactly
     rtol = cfg.env_mode === :parcel ? 1.0e-5 : 1.0e-6
     saveat = cfg.probe ? 1.0 : cfg.saveat
+    # probe samples S every 1 s -> sub-steps must match (saveat % dt_split == 0)
+    dt_split = cfg.probe ? 1.0 : cfg.dt_split
     if cfg.env_mode === :parcel
         return solve_split(particles, volume(cfg), ParcelCoupled(pp.parcel),
             (condensation, pp), Tsit5();
-            tspan = cfg.tspan, n_sim = cfg.n_sim, dt_split = cfg.dt_split,
+            tspan = cfg.tspan, n_sim = cfg.n_sim, dt_split = dt_split,
             saveat = saveat, record_func = record_func,
             abstol = 1.0e-24, reltol = rtol, reequil = reequil)
     end
     return solve_split(particles, volume(cfg), env_profile(cfg),
         (condensation,), Tsit5();
-        tspan = cfg.tspan, n_sim = cfg.n_sim, dt_split = cfg.dt_split,
+        tspan = cfg.tspan, n_sim = cfg.n_sim, dt_split = dt_split,
         saveat = saveat, record_func = record_func,
         abstol = 1.0e-24, reltol = rtol)
 end
@@ -231,17 +226,33 @@ function write_twin_obs(path, cfg::GcviClosureConfig, truth_records, chis_true)
 end
 
 function main()
+    n_sim_env = tryparse(Int, get(ENV, "M3_N_SIM", "0"))
     cfg = GcviClosureConfig(
+        n_sim = n_sim_env === nothing || n_sim_env <= 0 ? 1000 : n_sim_env,
         env_mode = Symbol(get(ENV, "M3_ENV_MODE", "open")),
         activation_gate = Symbol(get(ENV, "M3_GATE_MODE", "sc_threshold")),
-        gate_tag = get(ENV, "M3_GATE_MODE", "sc_threshold") == "branch_aware" ?
-                   "ba" : "sc",
+        gate_tag = get(ENV, "M3_GATE_MODE", "sc_threshold") == "branch_aware" ? "ba" :
+                   (get(ENV, "M3_GATE_MODE", "sc_threshold") == "kinetic" ? "ki" :
+                    (get(ENV, "M3_REEQUIL", "0") == "1" ? "sc_re" : "sc")),
+        reequilibrate_haze = get(ENV, "M3_REEQUIL", "0") == "1",
         probe = get(ENV, "M3_PROBE", "0") == "1")
-    cfg.activation_gate in (:sc_threshold, :branch_aware) ||
+    cfg.activation_gate in (:sc_threshold, :branch_aware, :kinetic) ||
         error("bad M3_GATE_MODE $(cfg.activation_gate)")
     cfg.env_mode in (:open, :parcel) || error("bad M3_ENV_MODE $(cfg.env_mode)")
     base = cfg.env_mode === :open ? GCVI_BASENAME :
-           (cfg.probe ? "gcvi_closure_probe" : "gcvi_closure_parcel_$(cfg.gate_tag)")
+        (cfg.probe ? "gcvi_closure_probe" : "gcvi_closure_parcel_$(cfg.gate_tag)")
+    # shard mode (replicate-parallel campaign): run only the selected chi
+    # case(s) into a suffixed file; seeds keep their FULL-list case_idx so
+    # shards are bit-identical to the sequential run
+    all_cases = cfg.probe ? [cfg.chi_true] : vcat(cfg.chi_grid, cfg.chi_true)
+    case_iter = collect(enumerate(all_cases))
+    sel = get(ENV, "M3_CASE_SELECT", "")
+    if !isempty(sel)
+        vals = [parse(Float64, x) for x in split(sel, ",")]
+        case_iter = filter(p -> p[2] in vals, case_iter)
+        isempty(case_iter) && error("M3_CASE_SELECT matched no case: $sel")
+        base = base * "_shard" * join(replace(string(v), "." => "p") for v in vals)
+    end
     chi_inf = reachable_chi_max(spectrum(cfg), fbar(cfg);
         densities = cfg.densities, chi_species = DRY_SPECIES)
     @assert chi_inf > 0.85 "chi_inf = $chi_inf <= 0.85: weaken fbar anchors (spec §7)"
@@ -258,26 +269,30 @@ function main()
     truth_chis = Float64[]
     chis_realized = Dict{Int, Vector{Float64}}()
     h5open(h5_path, "r+") do file
-        for (case_idx, chi) in enumerate(chi_cases)
+        for (case_idx, chi) in case_iter
             truth = chi == cfg.chi_true
             case_group = ensure_case_group(file, "chi_$(chi)";
                 attrs_dict = Dict{String, Any}(
                     "chi_target" => chi, "truth" => truth))
-            case_nu = nothing
+            # calibrate nu(χ) ONCE per case on a shared spec object (fresh
+            # spectrum/fbar objects per replicate would bust the objectid
+            # cache and re-pay the Monte-Carlo bisection every replicate)
+            case_spec = population_spec(cfg, chi)
+            case_nu = nu_for_chi(case_spec.spectrum, case_spec.fbar, chi;
+                densities = cfg.densities, chi_species = DRY_SPECIES)
             for replicate_idx in 1:n_replicates
                 # per-replicate population resampling: replicate spread IS the
                 # identifiability noise (chi fluctuation + J noise floor)
                 initial_seed = cfg.initial_seed_base + 100 * case_idx + replicate_idx
                 particles, dry0,
                 meta = synthesize_population(
-                    population_spec(cfg, chi);
-                    seed = initial_seed, thermo = thermo(cfg))
-                case_nu === nothing && (case_nu = meta.nu)
+                    case_spec;
+                    seed = initial_seed, thermo = thermo(cfg), nu = case_nu)
                 push!(get!(chis_realized, case_idx, Float64[]), meta.chi_realized)
                 attrs_dict = Dict{String, Any}(
                     "chi_target" => chi, "chi_realized" => meta.chi_realized,
                     "nu" => meta.nu, "seed" =>
-                        cfg.seed_base + 1000 * case_idx + replicate_idx,
+                    cfg.seed_base + 1000 * case_idx + replicate_idx,
                     "initial_seed" => initial_seed, "truth" => truth,
                     "env_mode" => string(cfg.env_mode),
                     "activation_gate" => string(cfg.activation_gate),
@@ -317,8 +332,12 @@ function main()
                 # (measured 5/64 seeds beyond 0.02), and single-replicate
                 # excursions ARE the resampling noise this experiment must
                 # quantify (sigma_J). Gate the calibration accuracy at case level.
-                mean_dev = abs(mean(chis_realized[case_idx]) - chi)
-                @assert mean_dev < 0.02 "case-level chi deviation $mean_dev >= 0.02 for chi=$chi"
+                # mean gate likewise needs >= 2 replicates (single-draw
+                # excursions ~8% at sd 0.011 — 1-rep smokes check nothing)
+                if length(chis_realized[case_idx]) > 1
+                    mean_dev = abs(mean(chis_realized[case_idx]) - chi)
+                    @assert mean_dev < 0.02 "case-level chi deviation $mean_dev >= 0.02 for chi=$chi"
+                end
                 # sigma gate needs >= 2 replicates (std of one sample is NaN);
                 # single-replicate smoke runs check the mean gate only
                 if length(chis_realized[case_idx]) > 1
@@ -334,7 +353,7 @@ function main()
         end
     end
 
-    if !cfg.probe
+    if !cfg.probe && !isempty(truth_chis)   # non-truth shards skip obs write
         obs_name = cfg.env_mode === :open ? "twin_obs_v0.h5" :
                    "twin_obs_parcel_$(cfg.gate_tag).h5"
         obs_path = joinpath(example_data_dir(), "synthetic", obs_name)
