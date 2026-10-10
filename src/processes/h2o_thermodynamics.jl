@@ -27,16 +27,17 @@ end
 """
     saturation_vapor_pressure(T::Float64) -> Float64
 
-Saturation vapor pressure over liquid water using the Clausius-Clapeyron relation.
+Saturation vapor pressure over liquid water, Buck (1981) formulation:
 
-Reference: p_sat at T0 = 273.15 K is 611.2 Pa.
+    e_s = 611.21 · exp((18.678 − T_c/234.5) · T_c / (257.14 + T_c))
+
+Accuracy ±0.1% against Smithsonian/Goff-Gratch tables over cloud-physics
+temperatures (replaces the constant-L_v Clausius-Clapeyron form, which ran
+−0.6% low at 285 K — audit note 2026-10-08).
 """
 function saturation_vapor_pressure(T::Float64)
-    T0 = 273.15
-    p_sat_0 = 611.2
-    L_v = 2.5e6      # [J/kg]
-    R_v = 461.5      # [J/kg/K]
-    return p_sat_0 * exp((L_v / R_v) * (1.0 / T0 - 1.0 / T))
+    T_c = T - 273.15
+    return 611.21 * exp((18.678 - T_c / 234.5) * T_c / (257.14 + T_c))
 end
 
 """
@@ -70,6 +71,29 @@ function modified_diffusion_coefficient(
     total_resistance = 1.0 / D_v + thermal_resistance * (p_sat / p_atm)
 
     return 1.0 / total_resistance
+end
+
+"""
+    fuchs_transition_factor(R, T, D_v, M_w; accom = 1.0) -> Float64
+
+Transition-regime (Fuchs) reduction of the continuum mass-transfer rate for
+a particle of radius `R` [m] at temperature `T` [K]:
+
+    D_eff = D_v / (1 + (D_v/(α·R))·√(2π·M_w/(R_u·T)))
+
+where `D_v` [m²/s] is the continuum diffusivity, `M_w` [kg/mol] the vapor's
+molar mass, and `α` the mass accommodation coefficient. λ-form (flux
+matching), identical to pyrcel `thermo.dv` with α=1.0 — see
+`docs/superpowers/notes/2026-10-08-fuchs-transition-primer.md`. Limits:
+R ≫ λ_v → 1 (continuum); R ≪ λ_v → free-molecular r² scaling.
+
+Returns the factor multiplying the continuum flux (1/(1+Kn'), Kn' =
+λ_v'/(αR) with λ_v' = D_v·√(2π·M_w/(R_u·T))).
+"""
+function fuchs_transition_factor(R::Float64, T::Float64, D_v::Float64,
+        M_w::Float64; accom::Float64 = 1.0)
+    kn = (D_v / (accom * R)) * sqrt(2.0 * pi * M_w / (8.314 * T))
+    return 1.0 / (1.0 + kn)
 end
 
 """
