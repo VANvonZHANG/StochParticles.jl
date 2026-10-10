@@ -51,6 +51,13 @@ coupling. No breaking API changes for existing open-loop users.
 
 ### Changed
 
+- Driver default `reequilibrate_haze` flipped to `true` (config:
+  `:sc_threshold` gate + per-split-step haze re-equilibration) by the M3
+  three-trigger adjudication: trigger 3 (chatter — 78-158 monotonicity
+  violations per replicate on the bare gate under corrected flux) fired;
+  the re-equilibrated arm validated against the fully-kinetic mode within
+  3-5% (S_max) / 1.4% (N_act) at 1/20 the cost. `M3_REEQUIL=0` restores
+  the bare gate.
 - `ParcelState` now carries 3 fields `(T, p, qv)`; supersaturation is
   diagnosed, never prognostic. `parcel_drift` signature changed:
   `(parcel, total_cond_rate, w, m_air; thermo, g)` returning
