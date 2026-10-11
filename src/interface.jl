@@ -10,18 +10,25 @@
 # ---- PhysicsProcess interface ----
 
 """
-    apply_drift(proc::PhysicsProcess, μ, sys, t) -> SVector
+    apply_drift(proc::PhysicsProcess, μ, g, t) -> SVector
 
-Compute the ODE drift contribution from `proc` for particle state `μ`
-at time `t`, given the particle system `sys`.
+Direct form — compute the ODE drift contribution from `proc` for particle
+state `μ` at time `t` given a PRECOMPUTED environment `g`.
 
-Only called when `provides_drift(proc) == true`.
+Only called when `provides_drift(proc) == true`. This is the form the RHS
+loop uses: `g` is evaluated once per RHS evaluation (per particle it would
+mean 1000 redundant `gas_phase` calls, and under automatic differentiation
+every redundant call site is a place where derivative information can be
+truncated).
 
 # Implementation contract
 Concrete subtypes of `PhysicsProcess` that declare `provides_drift`
-must implement this method.
+must implement this method. (A legacy `(proc, μ, sys, t)` convenience
+that evaluated `g = sys.gas_phase(t)` internally was removed: against
+per-process g-form methods it created dispatch ambiguities, and under AD
+every internal env evaluation is a derivative-truncation risk.)
 """
-function apply_drift(proc::PhysicsProcess, μ, sys, t)
+function apply_drift(proc::PhysicsProcess, μ, g, t)
     error("$(typeof(proc)) must implement `apply_drift`")
 end
 

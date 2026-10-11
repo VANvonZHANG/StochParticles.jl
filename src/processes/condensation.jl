@@ -16,12 +16,13 @@ end
 provides_drift(::CondensationProcess) = true
 
 """
-    apply_drift(proc::CondensationProcess, μ, sys, t) -> SVector
+    apply_drift(proc::CondensationProcess, μ, g, t) -> SVector
 
-Compute the condensation drift for particle state μ.
+Compute the condensation drift for particle state μ given the precomputed
+environment `g` (see `interface.jl` — the RHS evaluates `g` once per
+evaluation and passes it through).
 """
-function apply_drift(proc::CondensationProcess, μ::SVector{A, <:Real}, sys::ParticleSystem{A}, t) where {A}
-    g = sys.gas_phase(t)
+function apply_drift(proc::CondensationProcess, μ::SVector{A, <:Real}, g, t) where {A}
     return proc.flux(μ, g, t)
 end
 
@@ -44,7 +45,7 @@ provides_drift(::SpeciesDependentCondensation) = true
 
 function apply_drift(
         proc::SpeciesDependentCondensation{A}, μ::SVector{A, <:Real},
-        sys::ParticleSystem{A}, t) where {A}
+        g, t) where {A}
     return proc.rates
 end
 

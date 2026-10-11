@@ -117,9 +117,11 @@ end
 # --- solve_split ---
 
 # Minimal custom drift for the degenerate-ODE equivalence test (1%/s mass growth)
+# g-form of the drift interface (the RHS loop passes the precomputed env; the
+# legacy (μ, sys, t) form is now a convenience wrapper in assembly.jl)
 struct ConstDrift <: StochParticles.PhysicsProcess end
 StochParticles.provides_drift(::ConstDrift) = true
-StochParticles.apply_drift(::ConstDrift, μ, sys, t) = μ .* 0.01
+StochParticles.apply_drift(::ConstDrift, μ, g, t) = μ .* 0.01
 
 # Constant-kernel coagulation for the Smoluchowski analytic test (K0 = 1.0e-12)
 struct ConstKernel <: StochParticles.CoagulationKernel{1} end

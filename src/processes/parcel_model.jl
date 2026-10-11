@@ -33,6 +33,22 @@ function parcel_supersaturation(parcel::ParcelState)
 end
 
 """
+    parcel_env(T, p, qv) -> SVector{2}
+
+Environment pair `(T, p_v)` diagnosed from the parcel state — blueprint
+contract ①: `p_v = p_sat(T)·(1+S)` with S = qv·p/(ε·p_sat(T)) − 1 (the same
+formulas `ParcelCoupled` applies). Pure function of scalars: the RHS
+evaluates it once per evaluation straight from the state-vector tail, and
+the eltype follows the inputs so Dual seeds flow through during Jacobian
+assembly (the `Ref{ParcelState}` indirection would truncate them).
+"""
+function parcel_env(T::Real, p::Real, qv::Real)
+    p_sat = saturation_vapor_pressure(T)
+    S = qv * p / (EPSILON_MA * p_sat) - 1.0
+    return SVector(T, p_sat * (1.0 + S))
+end
+
+"""
     parcel_drift(parcel, total_cond_rate, w, m_air; thermo, g = 9.81) -> SVector{3}
 
 Parcel tendencies `[dT, dp, dqv]` (spec §2.2):
@@ -112,8 +128,10 @@ Per-particle drift contribution is zero — the parcel block is written after
 the particle loop using the accumulated Σ dm_w at `h2o_idx`.
 
 Shares the `RefValue{ParcelState}` with the `ParcelCoupled` environment
-source, which is synced from `u` at the TOP of each RHS evaluation (before
-the particle loop — the flux layer reads it during the loop).
+source. The ref is synced from `u` at the TOP of each RHS evaluation to
+feed `parcel_drift` after the particle loop; the particle flux itself
+reads the live tail directly via `parcel_env` (once per evaluation —
+dual-transparent, unlike the box indirection).
 """
 struct ParcelProcess{P} <: PhysicsProcess
     parcel::Base.RefValue{ParcelState}
@@ -131,4 +149,4 @@ end
 # accepted by solve_split's drift filter; per-particle drift contribution is
 # zero (the parcel block is assembled by make_ode_func after the particle loop)
 provides_drift(::ParcelProcess) = true
-apply_drift(::ParcelProcess, μ::SVector{A, <:Real}, sys, t) where {A} = zero(μ)
+apply_drift(::ParcelProcess, μ::SVector{A, <:Real}, g, t) where {A} = zero(μ)

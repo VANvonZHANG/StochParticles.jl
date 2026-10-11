@@ -1,15 +1,16 @@
 # src/core/assembly.jl
 
 """
-    apply_all_drifts!(dμ, μ, sys, t, processes::Tuple)
+    apply_all_drifts!(dμ, μ, g, t, processes::Tuple)
 
-Apply drift from all drift-providing processes. Type-stable because tuple
-element types are known at compile time (concrete NTuple).
+Apply drift from all drift-providing processes given the precomputed
+environment `g`. Type-stable because tuple element types are known at
+compile time (concrete NTuple).
 """
-function apply_all_drifts!(dμ, μ, sys, t, processes::Tuple)
+function apply_all_drifts!(dμ, μ, g, t, processes::Tuple)
     for proc in processes
         if provides_drift(proc)
-            dμ = dμ + apply_drift(proc, μ, sys, t)
+            dμ = dμ + apply_drift(proc, μ, g, t)
         end
     end
     return dμ
@@ -19,10 +20,12 @@ end
     make_ode_func(processes::Tuple)
 
 RHS for SciML's ODEProblem. If the tuple contains a `ParcelProcess`, the
-state vector carries a 3-slot parcel tail: the live state is synced from
-`u` BEFORE the particle loop (the `ParcelCoupled` env source reads it
-during the loop), Σ dm_w is accumulated at `h2o_idx`, and the parcel block
-`[dT, dp, dqv]` is written AFTER the loop (spec §2.1 ordering).
+state vector carries a 3-slot parcel tail: the environment `g` is
+diagnosed from the tail via `parcel_env` ONCE per evaluation (straight
+from `u` — dual-transparent), Σ dm_w is accumulated at `h2o_idx`, and the
+parcel block `[dT, dp, dqv]` is written AFTER the loop (spec §2.1
+ordering). Without a parcel process, `g = sys.gas_phase(t)` is evaluated
+once per evaluation (previously redundantly per particle).
 """
 function make_ode_func(processes::Tuple)
     idx = findfirst(p -> p isa ParcelProcess, processes)
@@ -32,11 +35,14 @@ function make_ode_func(processes::Tuple)
         n = p.n_active
         if parcel_proc !== nothing
             parcel_proc.parcel[] = extract_parcel(u, p.n_sim, A)
+            g = parcel_env(u[end - 2], u[end - 1], u[end])   # tail = last 3 slots
+        else
+            g = p.gas_phase(t)
         end
         total_cond = 0.0
         for i in 1:n
             μ = get_particle(u, i, A)
-            dμ = apply_all_drifts!(zero(μ), μ, p, t, processes)
+            dμ = apply_all_drifts!(zero(μ), μ, g, t, processes)
             set_particle!(du, i, A, dμ)
             if parcel_proc !== nothing
                 total_cond += dμ[parcel_proc.h2o_idx]

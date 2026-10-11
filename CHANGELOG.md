@@ -17,6 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - AD-vs-finite-difference tests for the flux functor and thermo helpers
   (`test/ad_flux_test.jl`; `ForwardDiff` added to the test deps).
+- `parcel_env(T, p, qv)` — pure eltype-generic `(T, p_v)` diagnosis
+  (blueprint contract ①); the RHS now evaluates the environment ONCE per
+  evaluation straight from the parcel tail instead of routing it through
+  the `Ref{ParcelState}` box via `ParcelCoupled` (also removes ~1000
+  redundant `gas_phase` calls per evaluation in open-loop runs).
+- `apply_drift` interface: processes implement the direct
+  `(proc, μ, g, t)` form with a precomputed environment. The legacy
+  `(proc, μ, sys, t)` form is REMOVED — against per-process g-form
+  methods it created dispatch ambiguities (Aqua), and under AD every
+  internal env evaluation is a derivative-truncation risk. Callers hold
+  `sys` evaluate `g = sys.gas_phase(t)` themselves. `ParcelCoupled`
+  remains as a public open-loop env source.
 ## [0.11.0] - 2026-10-10
 
 Milestone release (M3 of the GCVI closure blueprint): closed-loop air-parcel
