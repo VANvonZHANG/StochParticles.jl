@@ -25,7 +25,7 @@ struct ThermodynamicsParams{A}
 end
 
 """
-    saturation_vapor_pressure(T::Float64) -> Float64
+    saturation_vapor_pressure(T::Real) -> Real
 
 Saturation vapor pressure over liquid water, Buck (1981) formulation:
 
@@ -35,7 +35,7 @@ Accuracy ±0.1% against Smithsonian/Goff-Gratch tables over cloud-physics
 temperatures (replaces the constant-L_v Clausius-Clapeyron form, which ran
 −0.6% low at 285 K — audit note 2026-10-08).
 """
-function saturation_vapor_pressure(T::Float64)
+function saturation_vapor_pressure(T::Real)
     T_c = T - 273.15
     return 611.21 * exp((18.678 - T_c / 234.5) * T_c / (257.14 + T_c))
 end
@@ -52,8 +52,8 @@ For the limit p_v → p_sat (near equilibrium), we use p_v ≈ p_sat.
 """
 function modified_diffusion_coefficient(
         thermo::ThermodynamicsParams,
-        T::Float64,
-        p_sat::Float64
+        T::Real,
+        p_sat::Real
 )
     D_v = thermo.D_v
     L_v = thermo.L_v
@@ -90,8 +90,8 @@ R ≫ λ_v → 1 (continuum); R ≪ λ_v → free-molecular r² scaling.
 Returns the factor multiplying the continuum flux (1/(1+Kn'), Kn' =
 λ_v'/(αR) with λ_v' = D_v·√(2π·M_w/(R_u·T))).
 """
-function fuchs_transition_factor(R::Float64, T::Float64, D_v::Float64,
-        M_w::Float64; accom::Float64 = 1.0)
+function fuchs_transition_factor(R::Real, T::Real, D_v::Real,
+        M_w::Real; accom::Real = 1.0)
     kn = (D_v / (accom * R)) * sqrt(2.0 * pi * M_w / (8.314 * T))
     return 1.0 / (1.0 + kn)
 end
@@ -103,7 +103,7 @@ Compute water activity using κ-Köhler theory (Petters & Kreidenweis, 2007).
 
 # Arguments
 - `m_dry::SVector{A}` — dry mass of each species [kg]
-- `m_w::Float64` — water mass [kg]
+- `m_w` — water mass [kg]
 - `κ_values::SVector{A}` — hygroscopicity parameter κ for each species
 - `densities::SVector{A}` — density of each species [kg/m³]
 
@@ -117,10 +117,10 @@ where V_w = m_w / ρ_w, V_dry = Σ m_k / ρ_k, and κ_mix = Σ ε_k · κ_k
 with ε_k = V_k / V_dry.
 """
 function water_activity(
-        m_dry::SVector{A, Float64},
-        m_w::Float64,
-        κ_values::SVector{A, Float64},
-        densities::SVector{A, Float64}
+        m_dry::SVector{A, <:Real},
+        m_w::Real,
+        κ_values::SVector{A, <:Real},
+        densities::SVector{A, <:Real}
 ) where {A}
     ρ_w = densities[end]  # last species is water
     V_w = m_w / ρ_w
@@ -151,9 +151,9 @@ Compute wet particle radius from dry masses and water mass.
 Assumes volume-additive mixing.
 """
 function particle_wet_radius(
-        m_dry::SVector{A, Float64},
-        m_w::Float64,
-        densities::SVector{A, Float64}
+        m_dry::SVector{A, <:Real},
+        m_w::Real,
+        densities::SVector{A, <:Real}
 ) where {A}
     # Total volume = dry volume + water volume
     V_total = m_w / densities[end]  # water volume
@@ -178,11 +178,11 @@ p_eq = p_sat(T) · a_w · exp(2σ / (R_v · T · ρ_w · R))
 - `T` — temperature [K]
 """
 function equilibrium_vapor_pressure(
-        m_dry::SVector{A, Float64},
-        m_w::Float64,
+        m_dry::SVector{A, <:Real},
+        m_w::Real,
         thermo::ThermodynamicsParams{A},
-        densities::SVector{A, Float64},
-        T::Float64
+        densities::SVector{A, <:Real},
+        T::Real
 ) where {A}
     p_sat = saturation_vapor_pressure(T)
     a_w = water_activity(m_dry, m_w, thermo.κ_values, densities)
@@ -204,11 +204,11 @@ Evaluate the exact Köhler supersaturation S at droplet radius R.
 Private helper for `critical_point`.
 """
 function _kohler_supersaturation(
-        R::Float64,
-        V_dry::Float64,
-        κ_mix::Float64,
+        R::Real,
+        V_dry::Real,
+        κ_mix::Real,
         thermo::ThermodynamicsParams,
-        T::Float64
+        T::Real
 )
     V_w = (4.0 / 3.0) * π * R^3 - V_dry
     if V_w <= 0.0
@@ -228,10 +228,10 @@ Shared golden-section search — `critical_supersaturation` is a thin wrapper
 (both `activation_gate` modes consult this single search, spec §3.1).
 """
 function critical_point(
-        m_dry::SVector{A, Float64},
+        m_dry::SVector{A, <:Real},
         thermo::ThermodynamicsParams{A},
-        densities::SVector{A, Float64},
-        T::Float64
+        densities::SVector{A, <:Real},
+        T::Real
 ) where {A}
     # Compute dry volume and volume-weighted κ
     V_dry = 0.0
@@ -309,8 +309,8 @@ Petters & Kreidenweis (2007), ACP. Numerical maximum of exact Köhler curve
 replaces the approximate analytical formula.
 """
 function critical_supersaturation(
-        m_dry::SVector{A, Float64}, thermo::ThermodynamicsParams{A},
-        densities::SVector{A, Float64}, T::Float64) where {A}
+        m_dry::SVector{A, <:Real}, thermo::ThermodynamicsParams{A},
+        densities::SVector{A, <:Real}, T::Real) where {A}
     critical_point(m_dry, thermo, densities, T)[1]
 end
 
@@ -331,11 +331,11 @@ p_eq(m_w) = p_v via binary search.
 - Equilibrium water mass m_w [kg]
 """
 function equilibrium_water_mass(
-        m_dry::SVector{A, Float64},
+        m_dry::SVector{A, <:Real},
         thermo::ThermodynamicsParams{A},
-        densities::SVector{A, Float64},
-        T::Float64,
-        p_v::Float64
+        densities::SVector{A, <:Real},
+        T::Real,
+        p_v::Real
 ) where {A}
     lo = 1e-25
     hi = 1e-15
