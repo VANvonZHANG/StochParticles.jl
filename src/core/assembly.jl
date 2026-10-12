@@ -1,5 +1,7 @@
 # src/core/assembly.jl
 
+using SparseArrays: sparse, SparseMatrixCSC
+
 """
     apply_all_drifts!(dμ, μ, g, t, processes::Tuple)
 
@@ -20,12 +22,13 @@ end
     make_ode_func(processes::Tuple)
 
 RHS for SciML's ODEProblem. If the tuple contains a `ParcelProcess`, the
-state vector carries a 3-slot parcel tail: the environment `g` is
-diagnosed from the tail via `parcel_env` ONCE per evaluation (straight
-from `u` — dual-transparent), Σ dm_w is accumulated at `h2o_idx`, and the
-parcel block `[dT, dp, dqv]` is written AFTER the loop (spec §2.1
-ordering). Without a parcel process, `g = sys.gas_phase(t)` is evaluated
-once per evaluation (previously redundantly per particle).
+state vector carries a 3-slot parcel tail `[T, p, qv]`: the environment
+`g` is diagnosed from the tail via `parcel_env` ONCE per evaluation and
+`parcel_drift` is fed the tail scalars directly after the particle loop —
+no intermediate state, so the whole RHS is transparent to automatic
+differentiation (implicit solvers with ForwardDiff Jacobians work).
+Σ dm_w is accumulated at `h2o_idx`. Without a parcel process,
+`g = sys.gas_phase(t)` is evaluated once per evaluation.
 """
 function make_ode_func(processes::Tuple)
     idx = findfirst(p -> p isa ParcelProcess, processes)
@@ -33,13 +36,16 @@ function make_ode_func(processes::Tuple)
     return function (du, u, p, t)
         A = species_val(p)
         n = p.n_active
+        # parcel tail placeholders (overwritten in the parcel branch — keeps
+        # the locals type-stable in both the Float64 and the Dual world)
+        T_p = p_p = qv_p = zero(eltype(u))
+        total_cond = zero(eltype(u))
         if parcel_proc !== nothing
-            parcel_proc.parcel[] = extract_parcel(u, p.n_sim, A)
-            g = parcel_env(u[end - 2], u[end - 1], u[end])   # tail = last 3 slots
+            T_p, p_p, qv_p = u[end - 2], u[end - 1], u[end]   # last 3 slots
+            g = parcel_env(T_p, p_p, qv_p)
         else
             g = p.gas_phase(t)
         end
-        total_cond = 0.0
         for i in 1:n
             μ = get_particle(u, i, A)
             dμ = apply_all_drifts!(zero(μ), μ, g, t, processes)
@@ -56,12 +62,54 @@ function make_ode_func(processes::Tuple)
             end
         end
         if parcel_proc !== nothing
-            drift3 = parcel_drift(parcel_proc.parcel[], total_cond, parcel_proc.w,
+            drift3 = parcel_drift(T_p, p_p, total_cond, parcel_proc.w,
                 parcel_proc.m_air; thermo = parcel_proc.thermo)
             set_parcel_drift!(du, drift3, p.n_sim, A)
         end
         nothing
     end
+end
+
+"""
+    rhs_jac_prototype(n_sim, A) -> SparseMatrixCSC{Bool}
+
+Sparsity prototype of the parcel-coupled RHS Jacobian ∂(du)/∂u for
+`solve_split(...; jac_prototype = rhs_jac_prototype(n_sim, A))` with an
+implicit solver (Rodas5/QNDF/FBDF): particle `i`'s drift depends only on
+its own A state slots and the 3-slot parcel tail; the tail rows depend on
+everything (Σ dm_w). Block-diagonal + arrowhead — with the prototype,
+sparse-coloring AD needs ~(A+3) RHS evaluations per Jacobian instead of
+`n_sim·A+3` (dense), the difference between minutes and days at n=1000.
+"""
+function rhs_jac_prototype(n_sim::Int, A::Int)
+    N = n_sim * A + 3
+    rows = Int[]
+    cols = Int[]
+    cap = n_sim * A * (A + 3) + 3 * N
+    sizehint!(rows, cap)
+    sizehint!(cols, cap)
+    for i in 1:n_sim
+        base = (i - 1) * A
+        tail = (N - 2):N
+        for r in (base + 1):(base + A)
+            for c in (base + 1):(base + A)
+                push!(rows, r)
+                push!(cols, c)
+            end
+            for c in tail
+                push!(rows, r)
+                push!(cols, c)
+            end
+        end
+    end
+    for r in (N - 2):N, c in 1:N
+
+        push!(rows, r)
+        push!(cols, c)
+    end
+    # store `true` at structural positions — the sparsity PATTERN is the
+    # deliverable (values are never used by the solver)
+    return sparse(rows, cols, trues(length(rows)), N, N)
 end
 
 # ---- Per-process jump collection ----
@@ -168,6 +216,12 @@ them explicitly for kilogram-scale particle states, where the solver defaults
 `reequil::Function(u, sys, t)`, when supplied, is invoked after each
 sub-step's ODE segment (before the coagulation jump phase) — e.g. the
 water-conserving `reequilibrate_haze!` split-step hook (spec §3.2).
+
+`jac_prototype` (e.g. `rhs_jac_prototype(n_sim, A)`), when supplied, is
+attached to the internal `ODEFunction` — REQUIRED for implicit solvers
+(Rodas5/QNDF/FBDF) at realistic `n_sim`: with the sparse prototype,
+coloring-aware AD costs ~(A+3) RHS evaluations per Jacobian instead of
+the dense N = n_sim·A+3.
 """
 function solve_split(particles::Vector{SVector{A, Float64}},
         volume::Float64, gas_phase_fn, processes::Tuple{Vararg{PhysicsProcess}},
@@ -176,7 +230,8 @@ function solve_split(particles::Vector{SVector{A, Float64}},
         dt_split::Real, saveat::Real, record_func,
         abstol = nothing, reltol = nothing,
         reequil::Union{Nothing, Function} = nothing,
-        clamp_h2o_idx::Union{Nothing, Int} = nothing) where {A}
+        clamp_h2o_idx::Union{Nothing, Int} = nothing,
+        jac_prototype = nothing) where {A}
     dt_split > 0.0 || throw(ArgumentError("dt_split must be positive, got $dt_split"))
     saveat > 0.0 || throw(ArgumentError("saveat must be positive, got $saveat"))
     isapprox(rem(saveat, dt_split), 0.0; atol = 1.0e-9 * dt_split) ||
@@ -206,6 +261,8 @@ function solve_split(particles::Vector{SVector{A, Float64}},
         append!(u, (pc.parcel[].T, pc.parcel[].p, pc.parcel[].qv))
     end
     ode_func! = make_ode_func(drift_processes)
+    ode_rhs = jac_prototype === nothing ? ode_func! :
+              ODEFunction(ode_func!; jac_prototype = jac_prototype)
     records = Any[record_func(tspan[1], u, sys)]
     t0, t_end = tspan
     n_steps = ceil(Int, (t_end - t0) / dt_split - 1.0e-12)
@@ -216,9 +273,14 @@ function solve_split(particles::Vector{SVector{A, Float64}},
     t_prev = t0
     for k in 1:n_steps
         t_next = min(t0 + k * dt_split, t_end)
-        oprob = ODEProblem(ode_func!, u, (t_prev, t_next), sys)
+        oprob = ODEProblem(ode_rhs, u, (t_prev, t_next), sys)
         sol = solve(oprob, solver; solver_opts...)
         u = copy(sol.u[end])
+        # mirror the accepted parcel state into the driver-facing box
+        # (the RHS itself reads the tail directly — no in-solver box access)
+        if p_idx !== nothing
+            processes[p_idx].parcel[] = extract_parcel(u, sys.n_sim, Val(A))
+        end
         # clamp evaporation overshoots at the ACCEPTED sub-step boundary:
         # any mode with fast condensation/evaporation dynamics can integrate
         # a particle slightly past zero water (magnitude ~1e-20 kg); the RHS

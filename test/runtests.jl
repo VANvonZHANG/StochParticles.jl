@@ -39,4 +39,5 @@ end
     include("parcel_test.jl")
     include("activation_diagnostics_test.jl")
     include("ad_flux_test.jl")
+    include("ad_rhs_test.jl")
 end
