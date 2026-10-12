@@ -20,7 +20,7 @@ provides_drift(::CondensationProcess) = true
 
 Compute the condensation drift for particle state μ.
 """
-function apply_drift(proc::CondensationProcess, μ::SVector{A, Float64}, sys::ParticleSystem{A}, t) where {A}
+function apply_drift(proc::CondensationProcess, μ::SVector{A, <:Real}, sys::ParticleSystem{A}, t) where {A}
     g = sys.gas_phase(t)
     return proc.flux(μ, g, t)
 end
@@ -43,7 +43,7 @@ end
 provides_drift(::SpeciesDependentCondensation) = true
 
 function apply_drift(
-        proc::SpeciesDependentCondensation{A}, μ::SVector{A, Float64},
+        proc::SpeciesDependentCondensation{A}, μ::SVector{A, <:Real},
         sys::ParticleSystem{A}, t) where {A}
     return proc.rates
 end
@@ -102,8 +102,8 @@ Compute H2O condensation flux for particle with composition μ.
 - `dμ/dt::SVector{A}` — mass change rates [kg/s], only H2O species is non-zero
 """
 function (flux::H2OCondensationFlux{A})(
-        μ::SVector{A, Float64},
-        env::SVector{2, Float64},
+        μ::SVector{A, <:Real},
+        env::SVector{2, <:Real},
         sys,
         t
 ) where {A}
@@ -114,17 +114,22 @@ function (flux::H2OCondensationFlux{A})(
     T = env[1]
     p_v = env[2]
 
+    # output eltype: μ and env can carry independent Dual seeds (∂/∂state vs
+    # ∂/∂env probing); every output path must use the promoted type or the
+    # final setindex silently truncates derivatives (Float64(Dual) error)
+    zero_out = zero(SVector{A, promote_type(eltype(μ), eltype(env))})
+
     # non-physical trial environment: with the corrected (55x stronger)
     # latent-heat feedback, a solver trial step can drive the coupled parcel
     # temperature below zero; a negative T makes A_kelvin (and thus the
     # critical-point search domain) negative. Zero drift lets the solver
     # reject the step.
     if T <= 0.0 || p_v < 0.0
-        return zero(SVector{A, Float64})
+        return zero_out
     end
 
     # Extract dry masses and water mass
-    m_dry = zero(SVector{A, Float64})
+    m_dry = zero(μ)
     for k in 1:A
         if k != h2o_idx
             m_dry = setindex(m_dry, μ[k], k)
@@ -138,7 +143,7 @@ function (flux::H2OCondensationFlux{A})(
     # Accepted states are physical — the water-conservation invariant guards
     # this at record time.
     if m_w < 0.0 || any(k != h2o_idx && μ[k] <= 0.0 for k in 1:A)
-        return zero(SVector{A, Float64})
+        return zero_out
     end
 
     # numerical-ghost floor: Dirichlet corner draws in sparse-mixing regimes
@@ -154,7 +159,7 @@ function (flux::H2OCondensationFlux{A})(
         end
     end
     if V_dry < V_dry_min
-        return zero(SVector{A, Float64})
+        return zero_out
     end
 
     # Activation gate (spec §3.1). Three modes:
@@ -175,11 +180,11 @@ function (flux::H2OCondensationFlux{A})(
         S_env = p_v / saturation_vapor_pressure(T) - 1.0
         if S_env <= Sc
             if flux.activation_gate === :sc_threshold
-                return zero(SVector{A, Float64})
+                return zero_out
             end
             D_wet = 2.0 * particle_wet_radius(m_dry, m_w, densities)
             if D_wet <= D_crit
-                return zero(SVector{A, Float64})
+                return zero_out
             end
         end
     end
@@ -207,7 +212,7 @@ function (flux::H2OCondensationFlux{A})(
     dm_w_dt = 4.0 * π * R * D_v_prime * (p_v - p_eq) / (thermo.R_v * T)
 
     # Build dμ/dt: only H2O changes
-    dμ = zero(SVector{A, Float64})
+    dμ = zero_out
     dμ = setindex(dμ, dm_w_dt, h2o_idx)
 
     return dμ
@@ -272,7 +277,7 @@ function pre_equilibrate!(
 ) where {A}
     for i in eachindex(particles)
         μ = particles[i]
-        m_dry = zero(SVector{A, Float64})
+        m_dry = zero(μ)
         for k in 1:A
             if k != h2o_idx
                 m_dry = setindex(m_dry, μ[k], k)
@@ -307,7 +312,7 @@ function reequilibrate_haze!(u::Vector{Float64}, sys::ParticleSystem{A},
     delta = 0.0
     for i in 1:(sys.n_active)
         μ = get_particle(u, i, Val(A))
-        m_dry = zero(SVector{A, Float64})
+        m_dry = zero(μ)
         for k in 1:A
             if k != h2o_idx
                 m_dry = setindex(m_dry, μ[k], k)

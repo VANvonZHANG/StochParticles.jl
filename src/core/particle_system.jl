@@ -47,23 +47,26 @@ Return the compile-time species count as a Val type.
 species_val(::ParticleSystem{A}) where {A} = Val(A)
 
 """
-    get_particle(u, i, ::Val{A}) -> SVector{A, Float64}
+    get_particle(u, i, ::Val{A}) -> SVector{A, <:Real}
 
 Extract particle i's composition from flat ODE state vector `u`.
-Type-stable: SVector is constructed via ntuple, compiler optimizes to direct load.
+Type-stable: SVector is constructed via ntuple, compiler optimizes to direct
+load. Eltype follows `u` — automatic differentiation probes the RHS with
+`Vector{Dual}` states and must be able to pull particles out unchanged.
 """
-@inline function get_particle(u::Vector{Float64}, i::Int, ::Val{A}) where {A}
+@inline function get_particle(u::Vector{<:Real}, i::Int, ::Val{A}) where {A}
     offset = (i - 1) * A
     @inbounds SVector(ntuple(k -> u[offset + k], Val(A)))
 end
 
 """
-    set_particle!(u, i, ::Val{A}, μ::SVector{A, Float64})
+    set_particle!(u, i, ::Val{A}, μ::SVector{A, <:Real})
 
-Write particle i's composition into flat ODE state vector `u`.
+Write particle i's composition into flat ODE state vector `u`. Eltype of `μ`
+follows the differentiated state (Dual during Jacobian assembly).
 """
-@inline function set_particle!(u::Vector{Float64}, i::Int, ::Val{A}, μ::SVector{
-        A, Float64}) where {A}
+@inline function set_particle!(u::Vector{<:Real}, i::Int, ::Val{A},
+        μ::SVector{A, <:Real}) where {A}
     offset = (i - 1) * A
     @inbounds for k in 1:A
         u[offset + k] = μ[k]

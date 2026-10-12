@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- RHS-path signatures loosened from `::Float64` to `::Real` /
+  `SVector{A,<:Real}` / `Vector{<:Real}` (`get_particle`/`set_particle!`,
+  the H2O condensation flux functor and all thermodynamic helpers,
+  `apply_drift` methods, `parcel_drift`). Values are unchanged for
+  `Float64` callers (per-type specialization); automatic differentiation
+  can now penetrate the flux layer — prerequisite for implicit solvers
+  on the `:kinetic` arm (M4).
+### Added
+- AD-vs-finite-difference tests for the flux functor and thermo helpers
+  (`test/ad_flux_test.jl`; `ForwardDiff` added to the test deps).
 ## [0.11.0] - 2026-10-10
 
 Milestone release (M3 of the GCVI closure blueprint): closed-loop air-parcel

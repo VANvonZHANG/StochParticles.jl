@@ -45,13 +45,13 @@ invariant of a Lagrangian parcel); `total_cond_rate` is the summed H2O
 condensation rate [kg/s] over all active particles (positive = condensation
 onto particles).
 """
-function parcel_drift(parcel::ParcelState, total_cond_rate::Float64, w::Float64,
-        m_air::Float64; thermo::ThermodynamicsParams, g::Float64 = 9.81)
+function parcel_drift(parcel::ParcelState, total_cond_rate::Real, w::Real,
+        m_air::Real; thermo::ThermodynamicsParams, g::Real = 9.81)
     rho_a = parcel.p / (R_DRY_AIR * parcel.T)
     dT = -g / CP_DRY_AIR * w + thermo.L_v * total_cond_rate / (m_air * CP_DRY_AIR)
     dp = -rho_a * g * w
     dqv = -total_cond_rate / m_air
-    return SVector{3, Float64}(dT, dp, dqv)
+    return SVector{3}(dT, dp, dqv)
 end
 
 """
@@ -82,7 +82,7 @@ end
 
 Write parcel DERIVATIVES `[dT, dp, dqv]` into the tail of `du`.
 """
-function set_parcel_drift!(du::Vector{Float64}, drift::SVector{3, Float64},
+function set_parcel_drift!(du::Vector{<:Real}, drift::SVector{3, <:Real},
         n_sim::Int, A::Int)
     off = n_sim * A
     du[off + 1] = drift[1]
@@ -98,7 +98,7 @@ end
 function set_parcel_state!(u::Vector{Float64}, parcel::ParcelState, n_sim::Int, ::Val{A}) where {A}
     set_parcel_state!(u, parcel, n_sim, A)
 end
-function set_parcel_drift!(du::Vector{Float64}, drift::SVector{3, Float64}, n_sim::Int,
+function set_parcel_drift!(du::Vector{<:Real}, drift::SVector{3, <:Real}, n_sim::Int,
         ::Val{A}) where {A}
     set_parcel_drift!(du, drift, n_sim, A)
 end
@@ -131,4 +131,4 @@ end
 # accepted by solve_split's drift filter; per-particle drift contribution is
 # zero (the parcel block is assembled by make_ode_func after the particle loop)
 provides_drift(::ParcelProcess) = true
-apply_drift(::ParcelProcess, μ::SVector{A, Float64}, sys, t) where {A} = zero(μ)
+apply_drift(::ParcelProcess, μ::SVector{A, <:Real}, sys, t) where {A} = zero(μ)
