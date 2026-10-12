@@ -6,44 +6,54 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.12.0] - 2026-10-12
+
+M4 ki-enabler: AD-transparent parcel RHS — implicit solvers (Rodas5/QNDF)
+unlocked for the `:kinetic` arm, which runs a full n=1000/600-s campaign
+window in ~1 minute (was 20 h+/OOM at M3). Breaking for custom drift
+processes: the legacy `apply_drift(proc, μ, sys, t)` form is removed
+(see Changed).
+
 ### Added
-- Implicit-solver support for the parcel-coupled RHS (M4 ki-enabler): the
-  RHS is now AD-transparent end to end — `parcel_drift` takes the tail
-  scalars directly and the `Ref{ParcelState}` box is out of the evaluation
-  path — so `Rodas5`/`QNDF` with ForwardDiff Jacobians reproduce `Tsit5`
-  to ~1e-9 on the `:kinetic` scenario. `solve_split` gains a
+
+- Implicit-solver support for the parcel-coupled RHS: the RHS is now
+  AD-transparent end to end — `parcel_drift` takes the tail scalars
+  directly and the `Ref{ParcelState}` box is out of the evaluation path —
+  so `Rodas5`/`QNDF` with ForwardDiff Jacobians reproduce `Tsit5` to
+  ~1e-9 on the `:kinetic` scenario. `solve_split` gains a
   `jac_prototype` kwarg; `rhs_jac_prototype(n_sim, A)` returns the
   block-diagonal + arrowhead sparsity pattern (sparse-coloring Jacobian:
   ~(A+3) RHS evaluations per update instead of dense N). Benchmark:
-  `examples/bench_ki_implicit.jl` — at n=1000/120 s kinetic: Tsit5 137.9 s,
-  Rodas5-dense 919.9 s (dense-Jacobian blow-up, as predicted),
-  Rodas5-sparse 109.8 s, QNDF-sparse 21.3 s (**6.5× vs explicit**, all four
-  agreeing on S_max/Σm_w to ~1e-9). At the full 600-s campaign window:
-  **QNDF-sparse 78.6 s** (Rodas5-sparse 3860 s, same S_max to 4 digits) —
-  the `:kinetic` arm that was 20 h+/OOM at M3 now runs in ~1 min.
+  `examples/bench_ki_implicit.jl` — at n=1000/120 s kinetic: Tsit5
+  137.9 s, Rodas5-dense 919.9 s (dense-Jacobian blow-up, as predicted),
+  Rodas5-sparse 109.8 s, QNDF-sparse 21.3 s (**6.5× vs explicit**, all
+  four agreeing on S_max/Σm_w to ~1e-9). At the full 600-s campaign
+  window: **QNDF-sparse 78.6 s** (Rodas5-sparse 3860 s, same S_max to 4
+  digits).
+- `parcel_env(T, p, qv)` — pure eltype-generic `(T, p_v)` diagnosis
+  (blueprint contract ①); the RHS evaluates the environment ONCE per
+  evaluation straight from the parcel tail instead of routing it through
+  the `Ref{ParcelState}` box via `ParcelCoupled` (also removes ~1000
+  redundant `gas_phase` calls per evaluation in open-loop runs).
+- AD-vs-finite-difference tests for the flux functor, thermo helpers and
+  the full parcel-coupled Jacobian (`test/ad_flux_test.jl`,
+  `test/ad_rhs_test.jl`; `ForwardDiff` added to the test deps).
+
 ### Changed
+
 - RHS-path signatures loosened from `::Float64` to `::Real` /
   `SVector{A,<:Real}` / `Vector{<:Real}` (`get_particle`/`set_particle!`,
   the H2O condensation flux functor and all thermodynamic helpers,
   `apply_drift` methods, `parcel_drift`). Values are unchanged for
   `Float64` callers (per-type specialization); automatic differentiation
-  can now penetrate the flux layer — prerequisite for implicit solvers
-  on the `:kinetic` arm (M4).
-### Added
-- AD-vs-finite-difference tests for the flux functor and thermo helpers
-  (`test/ad_flux_test.jl`; `ForwardDiff` added to the test deps).
-- `parcel_env(T, p, qv)` — pure eltype-generic `(T, p_v)` diagnosis
-  (blueprint contract ①); the RHS now evaluates the environment ONCE per
-  evaluation straight from the parcel tail instead of routing it through
-  the `Ref{ParcelState}` box via `ParcelCoupled` (also removes ~1000
-  redundant `gas_phase` calls per evaluation in open-loop runs).
+  can now penetrate the flux layer.
 - `apply_drift` interface: processes implement the direct
   `(proc, μ, g, t)` form with a precomputed environment. The legacy
-  `(proc, μ, sys, t)` form is REMOVED — against per-process g-form
-  methods it created dispatch ambiguities (Aqua), and under AD every
-  internal env evaluation is a derivative-truncation risk. Callers hold
-  `sys` evaluate `g = sys.gas_phase(t)` themselves. `ParcelCoupled`
-  remains as a public open-loop env source.
+  `(proc, μ, sys, t)` form is REMOVED — kept as a wrapper it is
+  dispatch-ambiguous against per-process g-form methods (Aqua), and under
+  AD every internal env evaluation is a derivative-truncation risk.
+  Callers holding a `sys` evaluate `g = sys.gas_phase(t)` themselves.
+  `ParcelCoupled` remains as a public open-loop env source.
 ## [0.11.0] - 2026-10-10
 
 Milestone release (M3 of the GCVI closure blueprint): closed-loop air-parcel
@@ -406,4 +416,5 @@ changes — the minor bump marks the milestone.
 [0.9.1]: https://github.com/VANvonZHANG/StochParticles.jl/releases/tag/v0.9.1
 [0.10.0]: https://github.com/VANvonZHANG/StochParticles.jl/compare/v0.9.1...v0.10.0
 [0.11.0]: https://github.com/VANvonZHANG/StochParticles.jl/compare/v0.10.0...v0.11.0
-[unreleased]: https://github.com/VANvonZHANG/StochParticles.jl/compare/v0.11.0...HEAD
+[0.12.0]: https://github.com/VANvonZHANG/StochParticles.jl/compare/v0.11.0...v0.12.0
+[unreleased]: https://github.com/VANvonZHANG/StochParticles.jl/compare/v0.12.0...HEAD
