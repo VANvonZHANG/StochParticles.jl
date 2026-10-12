@@ -69,9 +69,9 @@ end
         activation_gate = :kinetic)
     sys = ParticleSystem(Val(2), 1, 1.0, t -> env)
     μ0 = SVector(M_AS_AD, M_W_AD)
-    @inferred apply_drift(cond, μ0, sys, 0.0)          # type-stable on Float64
+    @inferred apply_drift(cond, μ0, sys.gas_phase(0.0), 0.0)  # type-stable
     via_drift = ForwardDiff.derivative(
-        mw -> apply_drift(cond, SVector(M_AS_AD, mw), sys, 0.0)[2], M_W_AD)
+        mw -> apply_drift(cond, SVector(M_AS_AD, mw), env, 0.0)[2], M_W_AD)
     f_ki = H2OCondensationFlux(THERMO_AD, 2, DENS_AD, 0.0, :kinetic)
     direct = ForwardDiff.derivative(
         mw -> f_ki(SVector(M_AS_AD, mw), env, nothing, 0.0)[2], M_W_AD)

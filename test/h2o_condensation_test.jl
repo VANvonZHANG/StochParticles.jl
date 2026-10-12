@@ -72,7 +72,7 @@ end
     # Test that it produces flux
     sys = ParticleSystem(Val(2), 10, 1.0e-6, t -> SVector(293.15, 1000.0))
     μ = SVector(1e-18, 1e-18)
-    dμ = apply_drift(proc, μ, sys, 0.0)
+    dμ = apply_drift(proc, μ, sys.gas_phase(0.0), 0.0)
     @test dμ isa SVector{2, Float64}
 end
 
