@@ -49,9 +49,11 @@ function parcel_env(T::Real, p::Real, qv::Real)
 end
 
 """
-    parcel_drift(parcel, total_cond_rate, w, m_air; thermo, g = 9.81) -> SVector{3}
+    parcel_drift(T, p, total_cond_rate, w, m_air; thermo, g = 9.81) -> SVector{3}
 
-Parcel tendencies `[dT, dp, dqv]` (spec §2.2):
+Parcel tendencies `[dT, dp, dqv]` (spec §2.2) as a PURE function of
+scalars — the RHS reads the tail values straight from the state vector,
+so Dual seeds flow through during Jacobian assembly:
 - `dT = −g·w/c_p + L_v·Σṁ_w / (m_air·c_p)` (adiabatic cooling + latent heat)
 - `dp = −ρ_a·g·w` with **diagnosed** ρ_a = p/(R_d·T) (live density, not fixed)
 - `dqv = −Σṁ_w / m_air`
@@ -61,13 +63,25 @@ invariant of a Lagrangian parcel); `total_cond_rate` is the summed H2O
 condensation rate [kg/s] over all active particles (positive = condensation
 onto particles).
 """
-function parcel_drift(parcel::ParcelState, total_cond_rate::Real, w::Real,
+function parcel_drift(T::Real, p::Real, total_cond_rate::Real, w::Real,
         m_air::Real; thermo::ThermodynamicsParams, g::Real = 9.81)
-    rho_a = parcel.p / (R_DRY_AIR * parcel.T)
+    rho_a = p / (R_DRY_AIR * T)
     dT = -g / CP_DRY_AIR * w + thermo.L_v * total_cond_rate / (m_air * CP_DRY_AIR)
     dp = -rho_a * g * w
     dqv = -total_cond_rate / m_air
     return SVector{3}(dT, dp, dqv)
+end
+
+"""
+    parcel_drift(parcel::ParcelState, total_cond_rate, w, m_air; thermo, g) -> SVector{3}
+
+Convenience form over a `ParcelState` (driver-side; values identical to
+the scalar form).
+"""
+function parcel_drift(parcel::ParcelState, total_cond_rate::Real, w::Real,
+        m_air::Real; thermo::ThermodynamicsParams, g::Real = 9.81)
+    return parcel_drift(parcel.T, parcel.p, total_cond_rate, w, m_air;
+        thermo = thermo, g = g)
 end
 
 """

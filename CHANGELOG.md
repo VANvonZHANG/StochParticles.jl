@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Implicit-solver support for the parcel-coupled RHS (M4 ki-enabler): the
+  RHS is now AD-transparent end to end — `parcel_drift` takes the tail
+  scalars directly and the `Ref{ParcelState}` box is out of the evaluation
+  path — so `Rodas5`/`QNDF` with ForwardDiff Jacobians reproduce `Tsit5`
+  to ~1e-9 on the `:kinetic` scenario. `solve_split` gains a
+  `jac_prototype` kwarg; `rhs_jac_prototype(n_sim, A)` returns the
+  block-diagonal + arrowhead sparsity pattern (sparse-coloring Jacobian:
+  ~(A+3) RHS evaluations per update instead of dense N). Benchmark:
+  `examples/bench_ki_implicit.jl` — at n=1000/120 s kinetic: Tsit5 137.9 s,
+  Rodas5-dense 919.9 s (dense-Jacobian blow-up, as predicted),
+  Rodas5-sparse 109.8 s, QNDF-sparse 21.3 s (**6.5× vs explicit**, all four
+  agreeing on S_max/Σm_w to ~1e-9). At the full 600-s campaign window:
+  **QNDF-sparse 78.6 s** (Rodas5-sparse 3860 s, same S_max to 4 digits) —
+  the `:kinetic` arm that was 20 h+/OOM at M3 now runs in ~1 min.
 ### Changed
 - RHS-path signatures loosened from `::Float64` to `::Real` /
   `SVector{A,<:Real}` / `Vector{<:Real}` (`get_particle`/`set_particle!`,
