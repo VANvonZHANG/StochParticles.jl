@@ -199,19 +199,30 @@ function solve_case(cfg::GcviClosureConfig, particles)
     saveat = cfg.probe ? 1.0 : cfg.saveat
     # probe samples S every 1 s -> sub-steps must match (saveat % dt_split == 0)
     dt_split = cfg.probe ? 1.0 : cfg.dt_split
+    # M4: solver selection for the closed loop (ki-arm stiffness). tsit5
+    # (default) = M0-M3 behavior; qndf/rodas5 wire the sparse Jacobian
+    # prototype — see examples/bench_ki_implicit.jl for the trade-offs
+    solver_tag = get(ENV, "M3_SOLVER", "tsit5")
+    solver_tag in ("tsit5", "qndf", "rodas5") ||
+        error("bad M3_SOLVER $solver_tag (tsit5|qndf|rodas5)")
+    solver_obj = solver_tag == "qndf" ? QNDF() :
+        (solver_tag == "rodas5" ? Rodas5() : Tsit5())
+    jac = solver_tag == "tsit5" ? nothing :
+        rhs_jac_prototype(cfg.n_sim, length(cfg.densities))
     if cfg.env_mode === :parcel
         return solve_split(particles, volume(cfg), ParcelCoupled(pp.parcel),
-            (condensation, pp), Tsit5();
+            (condensation, pp), solver_obj;
             tspan = cfg.tspan, n_sim = cfg.n_sim, dt_split = dt_split,
             saveat = saveat, record_func = record_func,
             abstol = 1.0e-24, reltol = rtol, reequil = reequil,
-            clamp_h2o_idx = cfg.h2o_idx)
+            clamp_h2o_idx = cfg.h2o_idx, jac_prototype = jac)
     end
     return solve_split(particles, volume(cfg), env_profile(cfg),
-        (condensation,), Tsit5();
+        (condensation,), solver_obj;
         tspan = cfg.tspan, n_sim = cfg.n_sim, dt_split = dt_split,
         saveat = saveat, record_func = record_func,
-        abstol = 1.0e-24, reltol = rtol, clamp_h2o_idx = cfg.h2o_idx)
+        abstol = 1.0e-24, reltol = rtol, clamp_h2o_idx = cfg.h2o_idx,
+        jac_prototype = jac)
 end
 
 function write_twin_obs(path, cfg::GcviClosureConfig, truth_records, chis_true)
@@ -287,6 +298,7 @@ function main()
     recreate_h5(h5_path; scene_name = base, n_replicates = n_replicates,
         notes = "GCVI closure M3: env_mode=$(cfg.env_mode) gate=$(cfg.activation_gate)" *
                 " w=$(cfg.w), T0=$(cfg.parcel_T0), P0=$(cfg.parcel_P0), RH0=$(cfg.RH0)" *
+                ", solver=$(get(ENV, "M3_SOLVER", "tsit5"))" *
                 (cfg.probe ? ", chatter probe (chi_true only, saveat=1)" : ""))
 
     truth_records = []

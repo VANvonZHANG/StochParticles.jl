@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- `M3_SOLVER` knob (tsit5|qndf|rodas5) in the GCVI campaign driver —
+  implicit options wire the sparse Jacobian prototype. Real-spectrum ki
+  campaign (n=1000, 6 cases × 5 reps, w=1.0) completed in ~60 min across
+  6 parallel processes (chi=0.1 stiffest, ~12 min/rep) — the M3-era
+  20 h+/OOM barrier is cleared. Verdict analysis
+  `examples/analysis/m4_ki_verdict.py`: metric-matched pyrcel comparison
+  — end-state liquid water agrees to **1.3%**; S_max carries a uniform
+  ~2x structural offset (simple `parcel_drift` vs Ghan-2011 form).
+### Fixed
+- `m3_quantification.py` pointed `sc_re` at the canonical file the w=2.0
+  twin rerun had overwritten (2026-10-09) — regenerating the decision
+  table would have silently mixed w=2.0 data into the w=1.0 comparison;
+  now reads the seed-identical `_w1` backup. pyrcel note recorded: its
+  `output_dt` doubles as the SOLVER step — values ≥ 30 s go numerically
+  unstable on the stiff condensation and inflate S_max ~2.5x.
+### Changed
+- `OrdinaryDiffEq` compat capped at 6.x — v7 reorganized solver exports
+  (`Rodas5`/`QNDF` no longer top-level), which breaks repo tests and
+  the driver that name them directly.
 ## [0.12.0] - 2026-10-12
 
 M4 ki-enabler: AD-transparent parcel RHS — implicit solvers (Rodas5/QNDF)

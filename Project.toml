@@ -32,7 +32,9 @@ Interpolations = "0.15, 0.16"
 JLD2 = "0.6"
 KernelDensity = "0.6"
 JumpProcesses = "9"
-OrdinaryDiffEq = "6.78, 7"
+# v7 reorganized solver exports (Rodas5/QNDF no longer top-level) —
+# repo tests/examples name them directly, so cap at 6.x
+OrdinaryDiffEq = "6.78"
 Plots = "1"
 Random = "1.10"
 SpecialFunctions = "2"

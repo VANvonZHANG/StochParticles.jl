@@ -29,7 +29,9 @@ from .stochparticles_io import DATA_DIR, read_scene
 SCENES = {
     "sc": DATA_DIR / "gcvi_closure_parcel_sc.h5",
     "ba": DATA_DIR / "gcvi_closure_parcel_ba.h5",
-    "sc_re": DATA_DIR / "gcvi_closure_parcel_sc_re.h5",
+    # sc_re canonical file was overwritten by the w=2.0 twin rerun
+    # (2026-10-09) — the w=1.0 backup is seed-identical to this campaign
+    "sc_re": DATA_DIR / "gcvi_closure_parcel_sc_re_w1.h5",
     "ki": DATA_DIR / "gcvi_closure_parcel_ki.h5",
 }
 PROBE = DATA_DIR / "gcvi_closure_probe.h5"
