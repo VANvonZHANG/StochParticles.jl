@@ -55,26 +55,26 @@ end
     H2OCondensationFlux
 
 Physically rigorous H2O condensation flux implementing κ-Köhler theory.
+Gate-free (kinetic): every particle, haze or droplet, relaxes toward its
+Köhler equilibrium via the Mason flux — the pyrcel-equivalent physics
+class. Sc/D_crit are diagnostics-only (`critical_point`).
 
 # Constructor
-    H2OCondensationFlux(thermo, h2o_idx, densities, w, activation_gate)
+    H2OCondensationFlux(thermo, h2o_idx, densities, w, accom_c, accom_T)
 
 # Fields
 - `thermo::ThermodynamicsParams` — thermodynamic parameters
 - `h2o_idx::Int` — index of H2O in the species vector
 - `densities::SVector{A,Float64}` — per-species densities
 - `w::Float64` — updraft velocity `m/s` (used when parcel model is active)
-- `activation_gate::Symbol` — `:sc_threshold` (default, legacy: zero flux
-  whenever S_env ≤ Sc — branch-blind) or `:branch_aware` (past-peak droplets
-  follow their branch equilibrium instead of freezing when S falls back
-  below Sc; haze branch unchanged)
+- `accom_c::Float64` — mass condensation coefficient (vapor-side Fuchs, Ghan A2)
+- `accom_T::Float64` — thermal accommodation coefficient (heat-side Fuchs, Ghan A3)
 """
 struct H2OCondensationFlux{A}
     thermo::ThermodynamicsParams{A}
     h2o_idx::Int
     densities::SVector{A, Float64}
     w::Float64
-    activation_gate::Symbol
     accom_c::Float64   # mass condensation coefficient (vapor-side Fuchs, Ghan A2)
     accom_T::Float64   # thermal accommodation coefficient (heat-side Fuchs, Ghan A3)
 
@@ -83,15 +83,12 @@ struct H2OCondensationFlux{A}
     # collide during precompilation; validation lives at this single point
     function H2OCondensationFlux(thermo::ThermodynamicsParams{A}, h2o_idx::Int,
             densities::SVector{A, Float64}, w::Float64 = 0.0,
-            activation_gate::Symbol = :sc_threshold,
             accom_c::Float64 = 1.0, accom_T::Float64 = 1.0) where {A}
-        activation_gate in (:sc_threshold, :branch_aware, :kinetic) ||
-            throw(ArgumentError("activation_gate must be :sc_threshold, :branch_aware or :kinetic, got $activation_gate"))
         0.0 < accom_c <= 1.0 ||
             throw(ArgumentError("accom_c must be in (0, 1], got $accom_c"))
         0.0 < accom_T <= 1.0 ||
             throw(ArgumentError("accom_T must be in (0, 1], got $accom_T"))
-        return new{A}(thermo, h2o_idx, densities, w, activation_gate, accom_c, accom_T)
+        return new{A}(thermo, h2o_idx, densities, w, accom_c, accom_T)
     end
 end
 
@@ -173,33 +170,10 @@ function (flux::H2OCondensationFlux{A})(
         return zero_out
     end
 
-    # Activation gate (spec §3.1). Three modes:
-    # - :sc_threshold (legacy): zero flux whenever S_env <= Sc — branch-blind;
-    #   in a closed loop this deletes the entire haze swarm from the vapor
-    #   budget (measured 2026-10-05: S_max biased ~5x high, GCVI starved).
-    # - :branch_aware: keeps the haze-branch freeze (D_wet <= D_crit) but lets
-    #   the p_eq-based flux take over on the droplet branch; fixes the
-    #   activated-droplet (edge-freezing) half only.
-    # - :kinetic (fundamental fix): NO gate — every particle, haze or droplet,
-    #   relaxes kinetically toward its Köhler equilibrium via the same Mason
-    #   flux below. The haze population then participates in the vapor budget
-    #   (the physical buffer, pyrcel-equivalent physics class); Sc/D_crit are
-    #   left to diagnostics. Flux is continuous in state — no discontinuity
-    #   surface for the solver.
-    if flux.activation_gate !== :kinetic
-        Sc, D_crit = critical_point(m_dry, thermo, densities, T)
-        S_env = p_v / saturation_vapor_pressure(T) - 1.0
-        if S_env <= Sc
-            if flux.activation_gate === :sc_threshold
-                return zero_out
-            end
-            D_wet = 2.0 * particle_wet_radius(m_dry, m_w, densities)
-            if D_wet <= D_crit
-                return zero_out
-            end
-        end
-    end
-
+    # Kinetic (spec §3.1, four-arm retirement 2026-10-14): no gate — every
+    # particle, haze or droplet, relaxes toward its Köhler equilibrium; the
+    # haze population participates in the vapor budget. Flux is continuous
+    # in state (no discontinuity surface for the solver).
     # Equilibrium vapor pressure over droplet
     p_eq = equilibrium_vapor_pressure(m_dry, m_w, thermo, densities, T)
 
@@ -232,7 +206,7 @@ function (flux::H2OCondensationFlux{A})(
 end
 
 """
-    H2OCondensationProcess(thermo, densities; h2o_idx, w, activation_gate)
+    H2OCondensationProcess(thermo, densities; h2o_idx, w, accom_c, accom_T)
 
 Convenience constructor for a `CondensationProcess` with physically rigorous H2O flux.
 
@@ -241,7 +215,6 @@ Convenience constructor for a `CondensationProcess` with physically rigorous H2O
 - `densities::SVector{A,Float64}` — per-species densities
 - `h2o_idx::Int` — index of H2O in species vector (default: last species)
 - `w::Float64` — updraft velocity `m/s` (default: 1.0)
-- `activation_gate::Symbol` — `:sc_threshold` (default) or `:branch_aware`
 
 # Returns
 - `CondensationProcess` with `H2OCondensationFlux`
@@ -258,12 +231,10 @@ function H2OCondensationProcess(
         densities::SVector{A, Float64};
         h2o_idx::Int = A,
         w::Float64 = 1.0,
-        activation_gate::Symbol = :sc_threshold,
         accom_c::Float64 = 1.0,
         accom_T::Float64 = 1.0
 ) where {A}
-    flux = H2OCondensationFlux(thermo, h2o_idx, densities, w, activation_gate,
-        accom_c, accom_T)
+    flux = H2OCondensationFlux(thermo, h2o_idx, densities, w, accom_c, accom_T)
     return CondensationProcess((μ, g, t) -> flux(μ, g, nothing, t))
 end
 
@@ -307,41 +278,4 @@ function pre_equilibrate!(
         end
     end
     return particles
-end
-
-"""
-    reequilibrate_haze!(u, sys, thermo, densities; h2o_idx, T, S, m_air) -> ΔΣm_w
-
-Split-step haze re-equilibration (spec §3.2, blueprint §4.3 precision
-switch, default OFF). For every NON-ACTIVATED particle — haze branch under
-BOTH gate modes, i.e. `S <= Sc && D_wet <= D_crit` — reset `m_w` to the
-Köhler equilibrium at the supplied `(T, S)`. Particles with `S > Sc` are
-skipped (they activate and grow via the ODE; their lower-branch root does
-not exist at S > Sc). Returns the total particle-water change ΔΣm_w [kg]
-and enforces water conservation by adjusting the parcel tail:
-`qv -= ΔΣ/m_air`.
-"""
-function reequilibrate_haze!(u::Vector{Float64}, sys::ParticleSystem{A},
-        thermo::ThermodynamicsParams{A}, densities::SVector{A, Float64};
-        h2o_idx::Int, T::Float64, S::Float64, m_air::Float64) where {A}
-    p_v = saturation_vapor_pressure(T) * (1.0 + S)
-    delta = 0.0
-    for i in 1:(sys.n_active)
-        μ = get_particle(u, i, Val(A))
-        m_dry = zero(μ)
-        for k in 1:A
-            if k != h2o_idx
-                m_dry = setindex(m_dry, μ[k], k)
-            end
-        end
-        Sc, D_crit = critical_point(m_dry, thermo, densities, T)
-        D_wet = 2.0 * particle_wet_radius(m_dry, μ[h2o_idx], densities)
-        if S <= Sc && D_wet <= D_crit
-            m_eq = equilibrium_water_mass(m_dry, thermo, densities, T, p_v)
-            delta += m_eq - μ[h2o_idx]
-            set_particle!(u, i, Val(A), setindex(μ, m_eq, h2o_idx))
-        end
-    end
-    u[sys.n_sim * A + 3] -= delta / m_air    # parcel qv tail: conserve water
-    return delta
 end

@@ -40,8 +40,7 @@ rec = (t,
 
 function run_arm(solver, tag; jac = nothing)
     pp = ParcelProcess(W_UP, 2, M_AIR, thermo, T0, P0, qv0)
-    cond = H2OCondensationProcess(thermo, dens; h2o_idx = 2, w = W_UP,
-        activation_gate = :kinetic)
+    cond = H2OCondensationProcess(thermo, dens; h2o_idx = 2, w = W_UP)
     parts = deepcopy(particles)
     t0 = time()
     sol,
