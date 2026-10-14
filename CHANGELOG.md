@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.14.0] - 2026-10-14
+
+### Removed
+- `activation_gate` from `H2OCondensationFlux` / `H2OCondensationProcess`:
+  the gate-free kinetic flux is the only physics (every particle relaxes
+  toward its Köhler equilibrium via the Mason flux, pyrcel-equivalent
+  class). The `:sc_threshold`/`:branch_aware` arms were the M3
+  adjudication's cheap surrogates for ki (3-5% at 1/20 cost); QNDF
+  economics (70.5 s/replica vs >=4.3 h explicit, PR #45) retired the
+  rationale. `critical_point`/`critical_supersaturation` stay
+  (diagnostics-only); `pre_equilibrate!` unchanged. **Breaking** — the
+  5-argument positional form is gone.
+- `reequilibrate_haze!` and the `solve_split(...; reequil=)` split-step
+  hook (was the `sc_re` crutch compensating the gate's haze freeze; a
+  near-no-op under the kinetic flux, same-seed A/B revalidated in the PR).
+- Driver env knobs `M3_GATE_MODE` / `M3_REEQUIL`; campaign output is
+  always `gcvi_closure_parcel_ki*.h5`. Retired sc/ba/sc_re campaign
+  shards purged from `examples/data/` (archived outside the repo).
+- Tracked `__pycache__/` bytecode from `examples/` (now ignored).
 
 ## [0.13.0] - 2026-10-14
 
