@@ -96,7 +96,7 @@ using Random
         S_target = 0.003
         p_sat_0 = saturation_vapor_pressure(T0)
         p_v0 = p_sat_0 * (1.0 + S_target)
-        gas_fn = t -> SVector(T0, p_v0)
+        gas_fn = t -> SVector(T0, p_v0, 101325.0)
 
         avg_thermo = ThermodynamicsParams(
             SVector(0.455, 0.0), 0.072, 1000.0, 18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2)

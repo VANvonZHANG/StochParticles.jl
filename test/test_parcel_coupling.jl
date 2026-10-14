@@ -48,9 +48,10 @@ end
     env = ParcelCoupled(Ref(pr))
     g0 = env(0.0)
     @test g0 == env(123.0)                          # 忽略 t
-    @test g0 isa SVector{2, Float64}
+    @test g0 isa SVector{3, Float64}
     @test g0[1] == T
     @test g0[2] ≈ p_sat * (1.0 + parcel_supersaturation(pr)) rtol = 1e-12
+    @test g0[3] == pr.p                             # 3rd slot: p_air reads the live parcel pressure
     pr.T = 280.0                                    # 活状态随 Ref 变化
     @test env(0.0)[1] == 280.0
 end
@@ -167,7 +168,7 @@ end
 
 @testset "reequilibrate_haze! adjusts haze and conserves water" begin
     n_sim, A = 2, 2
-    sys = ParticleSystem(Val(A), n_sim, 1.0e-12, t -> SVector(285.0, 1000.0))
+    sys = ParticleSystem(Val(A), n_sim, 1.0e-12, t -> SVector(285.0, 1000.0, 9.0e4))
     T, p_sat = 285.0, saturation_vapor_pressure(285.0)
     m_as = 4.0 / 3.0 * π * (50.0e-9)^3 * 1770.0
     m_dry = SVector(m_as, 0.0)                   # 100nm AS → Sc ≈ 0.16%

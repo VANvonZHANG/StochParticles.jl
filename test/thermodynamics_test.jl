@@ -77,6 +77,58 @@ end
     @test D_285 ≈ 9.13e-6 rtol = 0.05
 end
 
+@testset "Split-Fuchs modified diffusivity (Ghan A1-A3)" begin
+    thermo = ThermodynamicsParams(SVector(0.61, 0.0), 0.072, 1000.0,
+        18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2)
+    T, p_air = 285.0, 9.0e4
+    p_sat = saturation_vapor_pressure(T)
+
+    # continuum limit: R → ∞ recovers the 3-argument form. R = Inf is
+    # bit-exact (ℓ/R = 0); finite R carries the real transition-regime
+    # correction (~1.8e-7 at 1 m, ~1.2e-3 at 100 µm) — tolerances bracket it
+    D_cont = modified_diffusion_coefficient(thermo, T, p_sat)
+    @test modified_diffusion_coefficient(thermo, T, p_sat, Inf, p_air) == D_cont
+    @test modified_diffusion_coefficient(thermo, T, p_sat, 1.0, p_air) ≈ D_cont rtol = 1e-6
+    @test modified_diffusion_coefficient(thermo, T, p_sat, 100.0e-6, p_air) ≈ D_cont rtol = 5e-3
+
+    # independent algebra (mirror of the implementation)
+    R_u = thermo.R_v * thermo.M_w
+    ρ_sat = p_sat * thermo.M_w / (R_u * T)
+    dρ_dT = ρ_sat * (thermo.L_v * thermo.M_w / (R_u * T) - 1.0) / T
+    ρ_a = p_air / (287.05 * T)
+    ℓ_v = thermo.D_v * sqrt(2π * thermo.M_w / (R_u * T))
+    ℓ_t = (thermo.k_a / (ρ_a * 1005.0)) * sqrt(2π * 0.02897 / (R_u * T))
+    for R in (0.05e-6, 0.2e-6, 1.0e-6)
+        expected = 1.0 / ((1.0 + ℓ_v / R) / thermo.D_v +
+                    (1.0 + ℓ_t / R) * thermo.L_v * dρ_dT / thermo.k_a)
+        @test modified_diffusion_coefficient(thermo, T, p_sat, R, p_air) ≈ expected rtol = 1e-12
+    end
+
+    # at a_c = a_T = 1 the split vs the legacy single-factor form differ
+    # ≤3-5% in the transition regime (ℓ_v ≈ 0.17 µm vs ℓ_t ≈ 0.19 µm @285 K)
+    single(R) = D_cont * fuchs_transition_factor(R, T, thermo.D_v, thermo.M_w)
+    for R in (0.05e-6, 0.2e-6, 1.0e-6)
+        ratio = modified_diffusion_coefficient(thermo, T, p_sat, R, p_air) / single(R)
+        @test 0.95 < ratio < 1.05
+    end
+
+    # a_c ≠ 1 inflates ONLY the vapor branch, a_T only the heat branch —
+    # they are no longer interchangeable (the single-factor pathology).
+    # With the thermal branch the larger base resistance, a_T = 0.06 cuts
+    # D′ deeper than a_c = 0.06 at R ≈ ℓ_v.
+    R = 0.17e-6
+    D_ac = modified_diffusion_coefficient(thermo, T, p_sat, R, p_air; accom_c = 0.06)
+    D_aT = modified_diffusion_coefficient(thermo, T, p_sat, R, p_air; accom_T = 0.06)
+    D_base = modified_diffusion_coefficient(thermo, T, p_sat, R, p_air)
+    @test D_aT < D_ac < D_base
+
+    # heat-branch correction responds to p_air: lower pressure → smaller
+    # ρ_a → longer ℓ_t → more resistance → smaller D̃′ (the p_air gradient
+    # the ad_flux test differentiates)
+    @test modified_diffusion_coefficient(thermo, T, p_sat, R, 7.0e4) <
+          modified_diffusion_coefficient(thermo, T, p_sat, R, 9.0e4)
+end
+
 @testset "Equilibrium vapor pressure" begin
     thermo = ThermodynamicsParams(
         SVector(0.61, 0.0, 0.0),

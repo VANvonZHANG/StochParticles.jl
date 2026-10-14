@@ -22,6 +22,7 @@ end
 const R_DRY_AIR = 287.05
 const CP_DRY_AIR = 1005.0
 const EPSILON_MA = 0.622
+const M_DRY_AIR = 0.02897  # dry-air molar mass [kg/mol] — heat-side Fuchs (Ghan A3)
 
 """
     parcel_supersaturation(parcel) -> Float64
@@ -33,19 +34,21 @@ function parcel_supersaturation(parcel::ParcelState)
 end
 
 """
-    parcel_env(T, p, qv) -> SVector{2}
+    parcel_env(T, p, qv) -> SVector{3}
 
-Environment pair `(T, p_v)` diagnosed from the parcel state — blueprint
-contract ①: `p_v = p_sat(T)·(1+S)` with S = qv·p/(ε·p_sat(T)) − 1 (the same
-formulas `ParcelCoupled` applies). Pure function of scalars: the RHS
-evaluates it once per evaluation straight from the state-vector tail, and
-the eltype follows the inputs so Dual seeds flow through during Jacobian
-assembly (the `Ref{ParcelState}` indirection would truncate them).
+Environment triple `(T, p_v, p_air)` diagnosed from the parcel state —
+blueprint contract ① (3-slot form, split-Fuchs): `p_v = p_sat(T)·(1+S)`
+with S = qv·p/(ε·p_sat(T)) − 1; `p_air` is the parcel total pressure (the
+H2O flux needs it for the air density in the heat-side transition-regime
+correction). Pure function of scalars: the RHS evaluates it once per
+evaluation straight from the state-vector tail, and the eltype follows
+the inputs so Dual seeds flow through during Jacobian assembly (the
+`Ref{ParcelState}` indirection would truncate them).
 """
 function parcel_env(T::Real, p::Real, qv::Real)
     p_sat = saturation_vapor_pressure(T)
     S = qv * p / (EPSILON_MA * p_sat) - 1.0
-    return SVector(T, p_sat * (1.0 + S))
+    return SVector(T, p_sat * (1.0 + S), p)
 end
 
 """

@@ -101,7 +101,9 @@ function vapor_pressure(cfg::ActivationComparisonConfig)
     saturation_vapor_pressure(cfg.T) * (1.0 + cfg.supersaturation)
 end
 
-gas_fn(cfg::ActivationComparisonConfig) = _t -> SVector(cfg.T, vapor_pressure(cfg))
+function gas_fn(cfg::ActivationComparisonConfig)
+    _t -> SVector(cfg.T, vapor_pressure(cfg), 101325.0)
+end
 
 function dry_diameter_from_so4_mass(mass::Real, density::Real)
     return (6.0 * max(Float64(mass), 0.0) / (pi * Float64(density)))^(1.0 / 3.0)

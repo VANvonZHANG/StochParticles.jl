@@ -41,7 +41,7 @@ end
     # 情形1：S_env ∈ (S_eq(D_wet), Sc) —— 过峰滴应继续生长
     S_eq = equilibrium_vapor_pressure(m_dry, m_w, THERMO2, DENS2, T) / p_sat - 1.0
     S_mid = 0.5 * (S_eq + Sc)
-    env = SVector(T, p_sat * (1.0 + S_mid))
+    env = SVector(T, p_sat * (1.0 + S_mid), 9.0e4)
     f_sc = H2OCondensationFlux(THERMO2, 2, DENS2, 0.0, :sc_threshold)
     f_ba = H2OCondensationFlux(THERMO2, 2, DENS2, 0.0, :branch_aware)
     @test f_sc(μ, env, nothing, 0.0) == zero(μ)              # 门冻结
@@ -49,7 +49,7 @@ end
 
     # 情形2：S_env < S_eq(D_wet) —— 过峰滴应蒸发（branch 版负通量）
     S_low = S_eq - 0.5 * (S_eq + 1.0e-3)                     # 深落
-    env2 = SVector(T, p_sat * (1.0 + S_low))
+    env2 = SVector(T, p_sat * (1.0 + S_low), 9.0e4)
     @test f_ba(μ, env2, nothing, 0.0)[2] < 0.0
     @test f_sc(μ, env2, nothing, 0.0) == zero(μ)
 
@@ -71,13 +71,13 @@ end
     μ = SVector(m_as, m_w)
     f_sc = H2OCondensationFlux(THERMO2, 2, DENS2, 0.0, :sc_threshold)
     f_ba = H2OCondensationFlux(THERMO2, 2, DENS2, 0.0, :branch_aware)
-    env_above = SVector(T, p_sat * (1.0 + Sc + 1.0e-4))
+    env_above = SVector(T, p_sat * (1.0 + Sc + 1.0e-4), 9.0e4)
     @test f_sc(μ, env_above, nothing, 0.0) == f_ba(μ, env_above, nothing, 0.0)
     # 穿峰连续性：D_wet 跨 D_crit（S_env 恰在 Sc 之上），两模式输出连续且无 NaN
     for scale in (0.98, 1.02)
         R = scale * 0.5 * D_crit
         mw = 4.0 / 3.0 * π * R^3 * 1000.0 - m_as
-        v = f_ba(SVector(m_as, mw), SVector(T, p_sat * (1.0 + Sc + 1.0e-6)),
+        v = f_ba(SVector(m_as, mw), SVector(T, p_sat * (1.0 + Sc + 1.0e-6), 9.0e4),
             nothing, 0.0)
         @test !isnan(v[2]) && !isinf(v[2])
     end
@@ -96,7 +96,7 @@ end
     f_ba = H2OCondensationFlux(thermo_bc, 2, dens_bc, 0.0, :branch_aware)
     p_sat = saturation_vapor_pressure(T)
     μ = SVector(m_bc, 0.0)                           # 完全干 BC（水量恰零）
-    @test f_ba(μ, SVector(T, p_sat * 1.0005), nothing, 0.0) == zero(μ)  # 永冻 haze
+    @test f_ba(μ, SVector(T, p_sat * 1.0005, 9.0e4), nothing, 0.0) == zero(μ)  # permanently frozen haze
 end
 
 @testset "branch_aware hysteresis: open-loop S rise-fall" begin
@@ -131,7 +131,7 @@ end
     f_ba = H2OCondensationFlux(THERMO2, 2, DENS2, 0.0, :branch_aware)
     m_as = 4.0 / 3.0 * π * (50.0e-9)^3 * 1770.0
     p_sat = saturation_vapor_pressure(285.0)
-    env = SVector(285.0, p_sat * 1.004)
+    env = SVector(285.0, p_sat * 1.004, 9.0e4)
     @test f_ba(SVector(-1e-18, 1e-19), env, nothing, 0.0) == SVector(0.0, 0.0)
     @test f_ba(SVector(m_as, -1e-18), env, nothing, 0.0) == SVector(0.0, 0.0)
     @test f_ba(SVector(0.0, 0.0), env, nothing, 0.0) == SVector(0.0, 0.0)  # V_dry==0 case
@@ -149,15 +149,15 @@ end
     # grow (positive flux) — the legacy gate returns zero (the deleted buffer)
     m_haze = equilibrium_water_mass(m_dry, THERMO2, DENS2, T, p_sat * 0.999)
     μ_haze = SVector(m_as, m_haze)
-    env = SVector(T, p_sat * 1.0005)
+    env = SVector(T, p_sat * 1.0005, 9.0e4)
     @test f_ki(μ_haze, env, nothing, 0.0)[2] > 0.0
     @test f_sc(μ_haze, env, nothing, 0.0) == zero(μ_haze)
     # same ambient, haze above its equilibrium: evaporates under :kinetic
-    env_dry = SVector(T, p_sat * 0.995)
+    env_dry = SVector(T, p_sat * 0.995, 9.0e4)
     @test f_ki(μ_haze, env_dry, nothing, 0.0)[2] < 0.0
     # S_env > Sc region: kinetic identical to legacy modes
     μ_big = SVector(m_as, 4.0 / 3.0 * π * (2.0e-6)^3 * 1000.0 - m_as)
-    env_above = SVector(T, p_sat * (1.0 + Sc + 1e-4))
+    env_above = SVector(T, p_sat * (1.0 + Sc + 1e-4), 9.0e4)
     @test f_ki(μ_big, env_above, nothing, 0.0) == f_sc(μ_big, env_above, nothing, 0.0)
 end
 

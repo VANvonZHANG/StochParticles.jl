@@ -19,12 +19,16 @@ using ForwardDiff
     @test src(-10.0)[2] ≈ saturation_vapor_pressure(288.15)
     @test src(1.0e4)[2] ≈ saturation_vapor_pressure(288.15) * 1.004
 
-    # p_v 单点定义不变量 + 返回类型
-    T, p_v = src(60.0)
+    # p_v single-point-definition invariant + return type (3 slots: T, p_v, p_air)
+    T, p_v, p_air = src(60.0)
     @test p_v ≈ saturation_vapor_pressure(T) * (1.0 + 0.002)
-    @test src(60.0) isa SVector{2, Float64}
+    @test p_air == 101325.0
+    @test src(60.0) isa SVector{3, Float64}
 
-    # 构造校验
+    # p_air pass-through + constructor validation
+    src_p = PrescribedProfile([0.0], [288.15], [0.0], 9.0e4)
+    @test src_p(0.0)[3] == 9.0e4
+    @test_throws ArgumentError PrescribedProfile([0.0], [288.0], [0.0], -1.0)
     @test_throws ArgumentError PrescribedProfile([0.0, 0.0], [288.0, 288.0], [0.0, 0.0])
     @test_throws ArgumentError PrescribedProfile([0.0], [288.0, 288.0], [0.0])
 end
@@ -52,7 +56,7 @@ end
     # per-process g-form methods — see interface.jl)
     T = 285.0
     p_sat = saturation_vapor_pressure(T)
-    env = SVector(T, p_sat * 1.0004)
+    env = SVector(T, p_sat * 1.0004, 9.0e4)
     thermo = ThermodynamicsParams(SVector(0.61, 0.0), 0.072, 1000.0,
         18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2)
     cond = H2OCondensationProcess(thermo, SVector(1770.0, 1000.0);
