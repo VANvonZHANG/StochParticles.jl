@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `modified_diffusion_coefficient(thermo, T, p_sat, R, p_air; accom_c, accom_T)`:
+  the full Ghan (2011) split transition-regime assembly — the vapor branch
+  carries its own kinetic correction (condensation coefficient `a_c`,
+  `ℓ_v = D_v·√(2πM_w/(R_uT))`) and the heat branch its own (thermal
+  accommodation `a_T`, `ℓ_t = (k_a/(ρ_a·c_p))·√(2πM_a/(R_uT))` with
+  `ρ_a = p_air/(R_d·T)`). The H2O flux now uses this form. The legacy
+  single-factor form (continuum D′ × one vapor-side Fuchs) agreed to ≲3%
+  at `a_c = a_T = 1` (`ℓ_v ≈ 0.17 µm` vs `ℓ_t ≈ 0.19 µm` at 285 K) but
+  could not express `a_c ≠ 1` — one vapor-side factor wrongly scaled the
+  thermal branch too. `H2OCondensationProcess`/`H2OCondensationFlux` gain
+  `accom_c`/`accom_T` kwargs (default 1.0): the `a_c` sensitivity axis
+  for M4 identifiability scans (literature: `a_c` ∈ [0.002, 0.06] moves
+  predicted CDNC by ±30%).
+
+### Changed
+
+- **Breaking**: the H2O flux environment is now `SVector{3}(T, p_v, p_air)`
+  — the third slot (total air pressure) feeds the heat-branch correction's
+  air density. `parcel_env` and `ParcelCoupled` return the parcel pressure
+  directly; `PrescribedProfile(times, T, S, p_air = 101325.0)` gains a
+  constant-pressure fourth argument (existing 3-argument call sites are
+  unchanged). `rhs_jac_prototype` already marked particle×tail-pressure
+  structural entries, so sparse-coloring Jacobians pick up the new p_air
+  coupling with no pattern change. Flux gradient tests gain the
+  ∂flux/∂p_air channel (structurally nonzero, small — it enters only
+  through ℓ_t).
+
 ### Fixed
 
 - `modified_diffusion_coefficient` carried a spurious `p_sat/p_atm` factor
