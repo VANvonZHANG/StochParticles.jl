@@ -26,132 +26,126 @@ Number of jumps with discrete aggregation: 4
 Number of jumps with continuous aggregation: 0
 Number of mass action jumps: 0</span></code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; sol = solve(prob, Tsit5())</code><code class="nohighlight hljs ansi" style="display:block;">retcode: Success
 Interpolation: specialized 4th order &quot;free&quot; interpolation
-t: 35-element Vector{Float64}:
+t: 17-element Vector{Float64}:
  0.0
  9.999999999999999e-5
- 0.12010653192309854
- 0.12010653192309854
- 0.3367760380635812
- 0.3367760380635812
- 0.4257884280300497
- 0.4257884280300497
- 0.5339704147673326
- 0.5339704147673326
- ⋮
- 2.110793834165612
- 2.110793834165612
- 2.3628563930458264
- 2.3628563930458264
- 3.6324235080998872
- 3.6324235080998872
- 4.7290601048504906
- 4.7290601048504906
+ 0.31177488355518923
+ 0.31177488355518923
+ 0.4281643548857357
+ 0.4281643548857357
+ 0.8269920184160842
+ 0.8269920184160842
+ 2.8914387245420095
+ 2.8914387245420095
+ 3.0497232761840483
+ 3.0497232761840483
+ 3.616860239110992
+ 3.616860239110992
+ 3.9827408816185312
+ 3.9827408816185312
  5.0
-u: 35-element Vector{Vector{Float64}}:
+u: 17-element Vector{Vector{Float64}}:
  [1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15  …  1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15, 1.0e-15]
  [9.999990000005e-16, 9.999990000005e-16, 9.999990000005e-16, 9.999990000005e-16, 9.999990000005e-16, 9.999990000005e-16, 9.999990000005e-16, 9.999990000005e-16, 9.999990000005e-16, 9.999990000005e-16  …  9.999990000005e-16, 9.999990000005e-16, 9.999990000005e-16, 9.999990000005e-16, 9.999990000005e-16, 9.999990000005e-16, 9.999990000005e-16, 9.999990000005e-16, 9.999990000005e-16, 9.999990000005e-16]
- [9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16  …  9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16]
- [9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16  …  9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16, 9.987996556710385e-16]
- [9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16  …  9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16, 9.987996556710385e-16]
- [9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16  …  9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16, 9.966379041636281e-16, 1.0e-15]
- [9.957511676570473e-16, 9.957511676570473e-16, 9.957511676570473e-16, 9.957511676570473e-16, 9.957511676570473e-16, 9.957511676570473e-16, 9.957511676570473e-16, 9.957511676570473e-16, 9.957511676570473e-16, 9.957511676570473e-16  …  9.957511676570473e-16, 9.957511676570473e-16, 9.957511676570473e-16, 9.957511676570473e-16, 9.957511676570473e-16, 9.957511676570473e-16, 9.957511676570473e-16, 9.957511676570473e-16, 9.957511676570473e-16, 9.99110272143096e-16]
- [9.957511676570473e-16, 9.957511676570473e-16, 9.957511676570473e-16, 9.957511676570473e-16, 9.957511676570473e-16, 9.957511676570473e-16, 9.957511676570473e-16, 9.957511676570473e-16, 9.957511676570473e-16, 9.957511676570473e-16  …  9.957511676570473e-16, 9.957511676570473e-16, 9.957511676570473e-16, 9.957511676570473e-16, 9.957511676570473e-16, 9.957511676570473e-16, 9.957511676570473e-16, 9.99110272143096e-16, 9.957511676570473e-16, 9.99110272143096e-16]
- [9.946745267316901e-16, 9.946745267316901e-16, 9.946745267316901e-16, 9.946745267316901e-16, 9.946745267316901e-16, 9.946745267316901e-16, 9.946745267316901e-16, 9.946745267316901e-16, 9.946745267316901e-16, 9.946745267316901e-16  …  9.946745267316901e-16, 9.946745267316901e-16, 9.946745267316901e-16, 9.946745267316901e-16, 9.946745267316901e-16, 9.946745267316901e-16, 9.946745267316901e-16, 9.980299992366982e-16, 9.946745267316901e-16, 9.99110272143096e-16]
- [9.946745267316901e-16, 9.946745267316901e-16, 9.946745267316901e-16, 9.946745267316901e-16, 9.946745267316901e-16, 9.946745267316901e-16, 9.946745267316901e-16, 9.946745267316901e-16, 9.946745267316901e-16, 9.946745267316901e-16  …  9.946745267316901e-16, 9.946745267316901e-16, 9.946745267316901e-16, 9.946745267316901e-16, 9.946745267316901e-16, 9.946745267316901e-16, 9.946745267316901e-16, 9.980299992366982e-16, 9.946745267316901e-16, 9.99110272143096e-16]
+ [9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16  …  9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16]
+ [9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16  …  9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16, 9.968871062963442e-16]
+ [9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16  …  9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16, 9.968871062963442e-16]
+ [9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16  …  9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16, 9.957275096186889e-16, 9.968871062963442e-16]
+ [9.91764181534851e-16, 9.91764181534851e-16, 9.91764181534851e-16, 9.91764181534851e-16, 9.91764181534851e-16, 9.91764181534851e-16, 9.91764181534851e-16, 9.91764181534851e-16, 9.91764181534851e-16, 9.91764181534851e-16  …  9.91764181534851e-16, 9.91764181534851e-16, 9.91764181534851e-16, 9.91764181534851e-16, 9.91764181534851e-16, 9.91764181534851e-16, 9.91764181534851e-16, 9.91764181534851e-16, 9.957275096186889e-16, 9.968871062963442e-16]
+ [9.91764181534851e-16, 9.91764181534851e-16, 9.91764181534851e-16, 9.91764181534851e-16, 9.91764181534851e-16, 9.91764181534851e-16, 9.91764181534851e-16, 9.91764181534851e-16, 9.91764181534851e-16, 9.91764181534851e-16  …  9.91764181534851e-16, 9.91764181534851e-16, 9.91764181534851e-16, 9.91764181534851e-16, 9.91764181534851e-16, 9.91764181534851e-16, 9.91764181534851e-16, 9.91764181534851e-16, 9.957275096186889e-16, 9.968871062963442e-16]
+ [9.71499633666097e-16, 9.71499633666097e-16, 9.71499633666097e-16, 9.71499633666097e-16, 9.71499633666097e-16, 9.71499633666097e-16, 9.71499633666097e-16, 9.71499633666097e-16, 9.71499633666097e-16, 9.71499633666097e-16  …  9.71499633666097e-16, 9.71499633666097e-16, 9.71499633666097e-16, 9.71499633666097e-16, 9.71499633666097e-16, 9.71499633666097e-16, 9.71499633666097e-16, 9.91764181534851e-16, 9.957275096186889e-16, 9.968871062963442e-16]
+ [9.71499633666097e-16, 9.71499633666097e-16, 9.71499633666097e-16, 9.71499633666097e-16, 9.71499633666097e-16, 9.71499633666097e-16, 9.71499633666097e-16, 9.71499633666097e-16, 9.71499633666097e-16, 9.71499633666097e-16  …  9.71499633666097e-16, 9.71499633666097e-16, 9.71499633666097e-16, 9.71499633666097e-16, 9.71499633666097e-16, 9.71499633666097e-16, 9.71499633666097e-16, 9.91764181534851e-16, 9.957275096186889e-16, 9.968871062963442e-16]
+ [9.699631161824486e-16, 9.699631161824486e-16, 9.699631161824486e-16, 9.699631161824486e-16, 9.699631161824486e-16, 9.699631161824486e-16, 9.699631161824486e-16, 9.699631161824486e-16, 9.699631161824486e-16, 9.699631161824486e-16  …  9.699631161824486e-16, 9.699631161824486e-16, 9.699631161824486e-16, 9.699631161824486e-16, 9.699631161824486e-16, 9.699631161824486e-16, 9.71499633666097e-16, 9.91764181534851e-16, 9.957275096186889e-16, 9.968871062963442e-16]
+ [9.699631161824486e-16, 9.699631161824486e-16, 9.699631161824486e-16, 9.699631161824486e-16, 9.699631161824486e-16, 9.699631161824486e-16, 9.699631161824486e-16, 9.699631161824486e-16, 9.699631161824486e-16, 9.699631161824486e-16  …  9.699631161824486e-16, 9.699631161824486e-16, 9.699631161824486e-16, 9.699631161824486e-16, 9.699631161824486e-16, 9.699631161824486e-16, 9.71499633666097e-16, 9.91764181534851e-16, 9.957275096186889e-16, 9.968871062963442e-16]
+ [9.644776665331157e-16, 9.644776665331157e-16, 9.644776665331157e-16, 9.644776665331157e-16, 9.644776665331157e-16, 9.644776665331157e-16, 9.644776665331157e-16, 9.644776665331157e-16, 9.644776665331157e-16, 9.644776665331157e-16  …  9.644776665331157e-16, 9.644776665331157e-16, 9.644776665331157e-16, 9.644776665331157e-16, 9.644776665331157e-16, 9.699631161824486e-16, 9.71499633666097e-16, 9.91764181534851e-16, 9.957275096186889e-16, 9.968871062963442e-16]
+ [9.644776665331157e-16, 9.644776665331157e-16, 9.644776665331157e-16, 9.644776665331157e-16, 9.644776665331157e-16, 9.644776665331157e-16, 9.644776665331157e-16, 9.644776665331157e-16, 9.644776665331157e-16, 9.644776665331157e-16  …  9.644776665331157e-16, 9.644776665331157e-16, 9.644776665331157e-16, 9.644776665331157e-16, 9.644776665331157e-16, 9.699631161824486e-16, 9.71499633666097e-16, 9.91764181534851e-16, 9.957275096186889e-16, 9.968871062963442e-16]
+ [9.609552772497116e-16, 9.609552772497116e-16, 9.609552772497116e-16, 9.609552772497116e-16, 9.609552772497116e-16, 9.609552772497116e-16, 9.609552772497116e-16, 9.609552772497116e-16, 9.609552772497116e-16, 9.609552772497116e-16  …  9.609552772497116e-16, 9.609552772497116e-16, 9.609552772497116e-16, 9.609552772497116e-16, 9.644776665331157e-16, 9.699631161824486e-16, 9.71499633666097e-16, 9.91764181534851e-16, 9.957275096186889e-16, 9.968871062963442e-16]
+ [9.609552772497116e-16, 9.609552772497116e-16, 9.609552772497116e-16, 9.609552772497116e-16, 9.609552772497116e-16, 9.609552772497116e-16, 9.609552772497116e-16, 9.609552772497116e-16, 9.609552772497116e-16, 9.609552772497116e-16  …  9.609552772497116e-16, 9.609552772497116e-16, 9.609552772497116e-16, 9.609552772497116e-16, 9.644776665331157e-16, 9.699631161824486e-16, 9.71499633666097e-16, 9.91764181534851e-16, 9.957275096186889e-16, 9.968871062963442e-16]
+ [9.512294245007173e-16, 9.512294245007173e-16, 9.512294245007173e-16, 9.512294245007173e-16, 9.512294245007173e-16, 9.512294245007173e-16, 9.512294245007173e-16, 9.512294245007173e-16, 9.512294245007173e-16, 9.512294245007173e-16  …  9.512294245007173e-16, 9.512294245007173e-16, 9.512294245007173e-16, 9.609552772497116e-16, 9.644776665331157e-16, 9.699631161824486e-16, 9.71499633666097e-16, 9.91764181534851e-16, 9.957275096186889e-16, 9.968871062963442e-16]</code></pre><p>The returned <code>sol</code> is a standard SciML solution object.</p><h2 id="Computing-Diagnostics"><a class="docs-heading-anchor" href="#Computing-Diagnostics">Computing Diagnostics</a><a id="Computing-Diagnostics-1"></a><a class="docs-heading-anchor-permalink" href="#Computing-Diagnostics" title="Permalink"></a></h2><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; sys = prob.prob.p</code><code class="nohighlight hljs ansi" style="display:block;">ParticleSystem{1, Main.var&quot;#14#15&quot;}(43, 1.0, Main.var&quot;#14#15&quot;(), 50, 0.0, 6.685572735208155e-16)</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; A_val = species_val(sys)</code><code class="nohighlight hljs ansi" style="display:block;">Val{1}()</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; u_final = sol.u[end]</code><code class="nohighlight hljs ansi" style="display:block;">50-element Vector{Float64}:
+ 9.512294245007173e-16
+ 9.512294245007173e-16
+ 9.512294245007173e-16
+ 9.512294245007173e-16
+ 9.512294245007173e-16
+ 9.512294245007173e-16
+ 9.512294245007173e-16
+ 9.512294245007173e-16
+ 9.512294245007173e-16
+ 9.512294245007173e-16
  ⋮
- [9.79113275002387e-16, 9.79113275002387e-16, 9.79113275002387e-16, 9.79113275002387e-16, 9.79113275002387e-16, 9.79113275002387e-16, 9.79113275002387e-16, 9.79113275002387e-16, 9.79113275002387e-16, 9.79113275002387e-16  …  9.79113275002387e-16, 9.802641563294678e-16, 9.810820357727772e-16, 9.841570281823897e-16, 9.861112764834126e-16, 9.899690674659511e-16, 9.901452359426482e-16, 9.976323251172608e-16, 9.946745267316901e-16, 9.99110272143096e-16]
- [9.79113275002387e-16, 9.79113275002387e-16, 9.79113275002387e-16, 9.79113275002387e-16, 9.79113275002387e-16, 9.79113275002387e-16, 9.79113275002387e-16, 9.79113275002387e-16, 9.79113275002387e-16, 9.79113275002387e-16  …  9.79113275002387e-16, 1.0e-15, 9.810820357727772e-16, 9.841570281823897e-16, 9.861112764834126e-16, 9.899690674659511e-16, 9.901452359426482e-16, 9.976323251172608e-16, 9.946745267316901e-16, 9.99110272143096e-16]
- [9.766484048395397e-16, 9.766484048395397e-16, 9.766484048395397e-16, 9.766484048395397e-16, 9.766484048395397e-16, 9.766484048395397e-16, 9.766484048395397e-16, 9.766484048395397e-16, 9.766484048395397e-16, 9.766484048395397e-16  …  9.766484048395397e-16, 9.974825485204037e-16, 9.810820357727772e-16, 9.841570281823897e-16, 9.861112764834126e-16, 9.899690674659511e-16, 9.901452359426482e-16, 9.976323251172608e-16, 9.946745267316901e-16, 9.99110272143096e-16]
- [9.766484048395397e-16, 9.766484048395397e-16, 9.766484048395397e-16, 9.766484048395397e-16, 9.766484048395397e-16, 9.766484048395397e-16, 9.766484048395397e-16, 9.766484048395397e-16, 9.766484048395397e-16, 9.766484048395397e-16  …  9.766484048395397e-16, 9.974825485204037e-16, 9.810820357727772e-16, 9.841570281823897e-16, 9.861112764834126e-16, 9.899690674659511e-16, 9.901452359426482e-16, 9.976323251172608e-16, 9.946745267316901e-16, 9.99110272143096e-16]
- [9.64327573959491e-16, 9.64327573959491e-16, 9.64327573959491e-16, 9.64327573959491e-16, 9.64327573959491e-16, 9.64327573959491e-16, 9.64327573959491e-16, 9.64327573959491e-16, 9.64327573959491e-16, 9.64327573959491e-16  …  9.64327573959491e-16, 9.974825485204037e-16, 9.810820357727772e-16, 9.841570281823897e-16, 9.861112764834126e-16, 9.899690674659511e-16, 9.901452359426482e-16, 9.976323251172608e-16, 9.946745267316901e-16, 9.99110272143096e-16]
- [9.64327573959491e-16, 9.64327573959491e-16, 9.64327573959491e-16, 9.64327573959491e-16, 9.64327573959491e-16, 9.64327573959491e-16, 9.64327573959491e-16, 9.64327573959491e-16, 9.64327573959491e-16, 9.64327573959491e-16  …  9.64327573959491e-16, 9.974825485204037e-16, 9.810820357727772e-16, 9.841570281823897e-16, 9.861112764834126e-16, 9.899690674659511e-16, 9.901452359426482e-16, 9.976323251172608e-16, 9.946745267316901e-16, 9.99110272143096e-16]
- [9.538101790742133e-16, 9.538101790742133e-16, 9.538101790742133e-16, 9.538101790742133e-16, 9.538101790742133e-16, 9.538101790742133e-16, 9.538101790742133e-16, 9.538101790742133e-16, 9.538101790742133e-16, 9.538101790742133e-16  …  9.64327573959491e-16, 9.974825485204037e-16, 9.810820357727772e-16, 9.841570281823897e-16, 9.861112764834126e-16, 9.899690674659511e-16, 9.901452359426482e-16, 9.976323251172608e-16, 9.946745267316901e-16, 9.99110272143096e-16]
- [9.538101790742133e-16, 9.538101790742133e-16, 9.538101790742133e-16, 9.538101790742133e-16, 9.538101790742133e-16, 9.538101790742133e-16, 9.538101790742133e-16, 9.538101790742133e-16, 9.538101790742133e-16, 9.538101790742133e-16  …  9.64327573959491e-16, 9.974825485204037e-16, 9.810820357727772e-16, 9.841570281823897e-16, 9.861112764834126e-16, 9.899690674659511e-16, 9.901452359426482e-16, 9.976323251172608e-16, 9.946745267316901e-16, 9.99110272143096e-16]
- [9.512294245007147e-16, 9.512294245007147e-16, 9.512294245007147e-16, 9.512294245007147e-16, 9.512294245007147e-16, 9.512294245007147e-16, 9.512294245007147e-16, 9.512294245007147e-16, 9.512294245007147e-16, 9.512294245007147e-16  …  9.64327573959491e-16, 9.974825485204037e-16, 9.810820357727772e-16, 9.841570281823897e-16, 9.861112764834126e-16, 9.899690674659511e-16, 9.901452359426482e-16, 9.976323251172608e-16, 9.946745267316901e-16, 9.99110272143096e-16]</code></pre><p>The returned <code>sol</code> is a standard SciML solution object.</p><h2 id="Computing-Diagnostics"><a class="docs-heading-anchor" href="#Computing-Diagnostics">Computing Diagnostics</a><a id="Computing-Diagnostics-1"></a><a class="docs-heading-anchor-permalink" href="#Computing-Diagnostics" title="Permalink"></a></h2><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; sys = prob.prob.p</code><code class="nohighlight hljs ansi" style="display:block;">ParticleSystem{1, Main.var&quot;#14#15&quot;}(39, 1.0, Main.var&quot;#14#15&quot;(), 50, 0.0, 6.687570279723375e-16)</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; A_val = species_val(sys)</code><code class="nohighlight hljs ansi" style="display:block;">Val{1}()</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; u_final = sol.u[end]</code><code class="nohighlight hljs ansi" style="display:block;">50-element Vector{Float64}:
- 9.512294245007147e-16
- 9.512294245007147e-16
- 9.512294245007147e-16
- 9.512294245007147e-16
- 9.512294245007147e-16
- 9.512294245007147e-16
- 9.512294245007147e-16
- 9.512294245007147e-16
- 9.512294245007147e-16
- 9.512294245007147e-16
- ⋮
- 9.974825485204037e-16
- 9.810820357727772e-16
- 9.841570281823897e-16
- 9.861112764834126e-16
- 9.899690674659511e-16
- 9.901452359426482e-16
- 9.976323251172608e-16
- 9.946745267316901e-16
- 9.99110272143096e-16</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; n0 = number_concentration(sys)</code><code class="nohighlight hljs ansi" style="display:block;">39.0</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; M = mass_concentration(u_final, A_val, sys)</code><code class="nohighlight hljs ansi" style="display:block;">3.712144836739618e-14</code></pre><ul><li><code>number_concentration(sys)</code> — zeroth moment [particles/m³]</li><li><code>mass_concentration(u, Val(A), sys)</code> — first moment [kg/m³]</li><li><code>species_mass_concentration(u, idx, Val(A), sys)</code> — single-species mass [kg/m³]</li></ul><h2 id="QSSA-Condensation-Simulation"><a class="docs-heading-anchor" href="#QSSA-Condensation-Simulation">QSSA Condensation Simulation</a><a id="QSSA-Condensation-Simulation-1"></a><a class="docs-heading-anchor-permalink" href="#QSSA-Condensation-Simulation" title="Permalink"></a></h2><p>This section demonstrates a multi-species condensation simulation with QSSA (Quasi-Steady State Approximation) pre-equilibration to prevent unphysical negative water masses.</p><h3 id="Physical-Setup"><a class="docs-heading-anchor" href="#Physical-Setup">Physical Setup</a><a id="Physical-Setup-1"></a><a class="docs-heading-anchor-permalink" href="#Physical-Setup" title="Permalink"></a></h3><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; T0 = 293.15</code><code class="nohighlight hljs ansi" style="display:block;">293.15</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; p_sat = saturation_vapor_pressure(T0)</code><code class="nohighlight hljs ansi" style="display:block;">2338.339978450019</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; S_target = 0.003</code><code class="nohighlight hljs ansi" style="display:block;">0.003</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; p_v0 = p_sat * (1.0 + S_target)</code><code class="nohighlight hljs ansi" style="display:block;">2345.3549983853686</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; densities = SVector(1770.0, 1000.0)</code><code class="nohighlight hljs ansi" style="display:block;">2-element StaticArraysCore.SVector{2, Float64} with indices SOneTo(2):
+ 9.512294245007173e-16
+ 9.512294245007173e-16
+ 9.609552772497116e-16
+ 9.644776665331157e-16
+ 9.699631161824486e-16
+ 9.71499633666097e-16
+ 9.91764181534851e-16
+ 9.957275096186889e-16
+ 9.968871062963442e-16</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; n0 = number_concentration(sys)</code><code class="nohighlight hljs ansi" style="display:block;">43.0</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; M = mass_concentration(u_final, A_val, sys)</code><code class="nohighlight hljs ansi" style="display:block;">4.0902865253530854e-14</code></pre><ul><li><code>number_concentration(sys)</code> — zeroth moment [particles/m³]</li><li><code>mass_concentration(u, Val(A), sys)</code> — first moment [kg/m³]</li><li><code>species_mass_concentration(u, idx, Val(A), sys)</code> — single-species mass [kg/m³]</li></ul><h2 id="QSSA-Condensation-Simulation"><a class="docs-heading-anchor" href="#QSSA-Condensation-Simulation">QSSA Condensation Simulation</a><a id="QSSA-Condensation-Simulation-1"></a><a class="docs-heading-anchor-permalink" href="#QSSA-Condensation-Simulation" title="Permalink"></a></h2><p>This section demonstrates a multi-species condensation simulation with QSSA (Quasi-Steady State Approximation) pre-equilibration to prevent unphysical negative water masses.</p><h3 id="Physical-Setup"><a class="docs-heading-anchor" href="#Physical-Setup">Physical Setup</a><a id="Physical-Setup-1"></a><a class="docs-heading-anchor-permalink" href="#Physical-Setup" title="Permalink"></a></h3><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; T0 = 293.15</code><code class="nohighlight hljs ansi" style="display:block;">293.15</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; p_sat = saturation_vapor_pressure(T0)</code><code class="nohighlight hljs ansi" style="display:block;">2338.339978450019</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; S_target = 0.003</code><code class="nohighlight hljs ansi" style="display:block;">0.003</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; p_v0 = p_sat * (1.0 + S_target)</code><code class="nohighlight hljs ansi" style="display:block;">2345.3549983853686</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; densities = SVector(1770.0, 1000.0)</code><code class="nohighlight hljs ansi" style="display:block;">2-element StaticArraysCore.SVector{2, Float64} with indices SOneTo(2):
  1770.0
  1000.0</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; h2o_idx = 2</code><code class="nohighlight hljs ansi" style="display:block;">2</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; avg_thermo = ThermodynamicsParams(
            SVector(0.455, 0.0), 0.072, 1000.0, 18.015e-3,
            2.5e6, 461.5, 2.5e-5, 2.4e-2)</code><code class="nohighlight hljs ansi" style="display:block;">ThermodynamicsParams{2}([0.455, 0.0], 0.072, 1000.0, 0.018015, 2.5e6, 461.5, 2.5e-5, 0.024)</code></pre><h3 id="Create-Particles"><a class="docs-heading-anchor" href="#Create-Particles">Create Particles</a><a id="Create-Particles-1"></a><a class="docs-heading-anchor-permalink" href="#Create-Particles" title="Permalink"></a></h3><p>Generate dry particles with no initial water:</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; particles_dry = lognormal_masses(100, 5.0e-8, 1.6, densities)</code><code class="nohighlight hljs ansi" style="display:block;">100-element Vector{StaticArraysCore.SVector{2, Float64}}:
- [1.5021814796855755e-20, 0.0]
- [5.700963982599445e-20, 0.0]
- [3.4004838161396424e-20, 0.0]
- [5.664374312920988e-20, 0.0]
- [1.734445439441945e-20, 0.0]
- [4.796541439809807e-19, 0.0]
- [2.6174785111593916e-20, 0.0]
- [4.761012169378022e-19, 0.0]
- [1.3719499305402144e-19, 0.0]
- [4.1723767381435773e-19, 0.0]
+ [4.400703023558378e-20, 0.0]
+ [7.912911625507723e-20, 0.0]
+ [1.9601395090563536e-18, 0.0]
+ [6.23866546143927e-20, 0.0]
+ [9.071007803562796e-19, 0.0]
+ [6.036312685841135e-18, 0.0]
+ [9.805713056052084e-19, 0.0]
+ [1.3632430099026033e-19, 0.0]
+ [1.9810445932931448e-19, 0.0]
+ [6.358511358291942e-20, 0.0]
  ⋮
- [5.0130772221008175e-19, 0.0]
- [3.980750706067997e-19, 0.0]
- [6.19934686835784e-20, 0.0]
- [2.4357300843458844e-20, 0.0]
- [7.023659430080663e-20, 0.0]
- [3.2548354179731564e-19, 0.0]
- [8.84352320244467e-20, 0.0]
- [8.927260734649327e-19, 0.0]
- [1.9781630280359204e-20, 0.0]</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; particles = [SVector{2, Float64}(m[1], 0.0) for m in particles_dry]</code><code class="nohighlight hljs ansi" style="display:block;">100-element Vector{StaticArraysCore.SVector{2, Float64}}:
- [1.5021814796855755e-20, 0.0]
- [5.700963982599445e-20, 0.0]
- [3.4004838161396424e-20, 0.0]
- [5.664374312920988e-20, 0.0]
- [1.734445439441945e-20, 0.0]
- [4.796541439809807e-19, 0.0]
- [2.6174785111593916e-20, 0.0]
- [4.761012169378022e-19, 0.0]
- [1.3719499305402144e-19, 0.0]
- [4.1723767381435773e-19, 0.0]
+ [9.509908063962074e-19, 0.0]
+ [2.1611092090491133e-20, 0.0]
+ [2.5534563322863666e-20, 0.0]
+ [4.5969809834960473e-20, 0.0]
+ [2.2618634153900245e-19, 0.0]
+ [1.1108813404524853e-19, 0.0]
+ [4.8553539483837383e-20, 0.0]
+ [7.303107393918788e-20, 0.0]
+ [3.4940554976900793e-19, 0.0]</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; particles = [SVector{2, Float64}(m[1], 0.0) for m in particles_dry]</code><code class="nohighlight hljs ansi" style="display:block;">100-element Vector{StaticArraysCore.SVector{2, Float64}}:
+ [4.400703023558378e-20, 0.0]
+ [7.912911625507723e-20, 0.0]
+ [1.9601395090563536e-18, 0.0]
+ [6.23866546143927e-20, 0.0]
+ [9.071007803562796e-19, 0.0]
+ [6.036312685841135e-18, 0.0]
+ [9.805713056052084e-19, 0.0]
+ [1.3632430099026033e-19, 0.0]
+ [1.9810445932931448e-19, 0.0]
+ [6.358511358291942e-20, 0.0]
  ⋮
- [5.0130772221008175e-19, 0.0]
- [3.980750706067997e-19, 0.0]
- [6.19934686835784e-20, 0.0]
- [2.4357300843458844e-20, 0.0]
- [7.023659430080663e-20, 0.0]
- [3.2548354179731564e-19, 0.0]
- [8.84352320244467e-20, 0.0]
- [8.927260734649327e-19, 0.0]
- [1.9781630280359204e-20, 0.0]</code></pre><h3 id="Pre-Equilibrate-(QSSA)"><a class="docs-heading-anchor" href="#Pre-Equilibrate-(QSSA)">Pre-Equilibrate (QSSA)</a><a id="Pre-Equilibrate-(QSSA)-1"></a><a class="docs-heading-anchor-permalink" href="#Pre-Equilibrate-(QSSA)" title="Permalink"></a></h3><p>Set non-activated particles to their Köhler equilibrium before the ODE solve:</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; pre_equilibrate!(particles, avg_thermo, densities, T0, p_v0; h2o_idx = h2o_idx)</code><code class="nohighlight hljs ansi" style="display:block;">100-element Vector{StaticArraysCore.SVector{2, Float64}}:
- [1.5021814796855755e-20, 1.2403214938866397e-19]
- [5.700963982599445e-20, 1.0685043589704513e-18]
- [3.4004838161396424e-20, 4.558693327592303e-19]
- [5.664374312920988e-20, 1.0570152876839886e-18]
- [1.734445439441945e-20, 1.5550977398246737e-19]
- [4.796541439809807e-19, 0.0]
- [2.6174785111593916e-20, 2.9900228939577843e-19]
- [4.761012169378022e-19, 0.0]
- [1.3719499305402144e-19, 5.056631338094967e-18]
- [4.1723767381435773e-19, 0.0]
+ [9.509908063962074e-19, 0.0]
+ [2.1611092090491133e-20, 0.0]
+ [2.5534563322863666e-20, 0.0]
+ [4.5969809834960473e-20, 0.0]
+ [2.2618634153900245e-19, 0.0]
+ [1.1108813404524853e-19, 0.0]
+ [4.8553539483837383e-20, 0.0]
+ [7.303107393918788e-20, 0.0]
+ [3.4940554976900793e-19, 0.0]</code></pre><h3 id="Pre-Equilibrate-(QSSA)"><a class="docs-heading-anchor" href="#Pre-Equilibrate-(QSSA)">Pre-Equilibrate (QSSA)</a><a id="Pre-Equilibrate-(QSSA)-1"></a><a class="docs-heading-anchor-permalink" href="#Pre-Equilibrate-(QSSA)" title="Permalink"></a></h3><p>Set non-activated particles to their Köhler equilibrium before the ODE solve:</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; pre_equilibrate!(particles, avg_thermo, densities, T0, p_v0; h2o_idx = h2o_idx)</code><code class="nohighlight hljs ansi" style="display:block;">100-element Vector{StaticArraysCore.SVector{2, Float64}}:
+ [4.400703023558378e-20, 6.947784326559308e-19]
+ [7.912911625507723e-20, 1.8690625323919882e-18]
+ [1.9601395090563536e-18, 0.0]
+ [6.23866546143927e-20, 1.2438606313177622e-18]
+ [9.071007803562796e-19, 0.0]
+ [6.036312685841135e-18, 0.0]
+ [9.805713056052084e-19, 0.0]
+ [1.3632430099026033e-19, 4.995702484165387e-18]
+ [1.9810445932931448e-19, 1.0622913439603174e-17]
+ [6.358511358291942e-20, 1.2846136686650639e-18]
  ⋮
- [5.0130772221008175e-19, 0.0]
- [3.980750706067997e-19, 0.0]
- [6.19934686835784e-20, 1.2306233588403842e-18]
- [2.4357300843458844e-20, 2.664976249925202e-19]
- [7.023659430080663e-20, 1.5219319055310086e-18]
- [3.2548354179731564e-19, 0.0]
- [8.84352320244467e-20, 2.269776467239608e-18]
- [8.927260734649327e-19, 0.0]
- [1.9781630280359204e-20, 1.9142294875021042e-19]</code></pre><h3 id="Solve-with-H2OCondensationProcess"><a class="docs-heading-anchor" href="#Solve-with-H2OCondensationProcess">Solve with H2OCondensationProcess</a><a id="Solve-with-H2OCondensationProcess-1"></a><a class="docs-heading-anchor-permalink" href="#Solve-with-H2OCondensationProcess" title="Permalink"></a></h3><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; gas_fn = t -&gt; SVector(T0, p_v0)</code><code class="nohighlight hljs ansi" style="display:block;">#20 (generic function with 1 method)</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; cond = H2OCondensationProcess(avg_thermo, densities; h2o_idx = h2o_idx, w = 0.0)</code><code class="nohighlight hljs ansi" style="display:block;">CondensationProcess{StochParticles.var&quot;#22#23&quot;{H2OCondensationFlux{2}}}(StochParticles.var&quot;#22#23&quot;{H2OCondensationFlux{2}}(H2OCondensationFlux{2}(ThermodynamicsParams{2}([0.455, 0.0], 0.072, 1000.0, 0.018015, 2.5e6, 461.5, 2.5e-5, 0.024), 2, [1770.0, 1000.0], 0.0, 1.0, 1.0)))</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; prob = ParticleProblem(particles, 1.0e-6, gas_fn, (cond,);
+ [9.509908063962074e-19, 0.0]
+ [2.1611092090491133e-20, 2.2026163658515868e-19]
+ [2.5534563322863666e-20, 2.8738113162621766e-19]
+ [4.5969809834960473e-20, 7.466371724027707e-19]
+ [2.2618634153900245e-19, 1.4344309973128177e-17]
+ [1.1108813404524853e-19, 3.4135388084744416e-18]
+ [4.8553539483837383e-20, 8.173741316659033e-19]
+ [7.303107393918788e-20, 1.627308630967945e-18]
+ [3.4940554976900793e-19, 0.0]</code></pre><h3 id="Solve-with-H2OCondensationProcess"><a class="docs-heading-anchor" href="#Solve-with-H2OCondensationProcess">Solve with H2OCondensationProcess</a><a id="Solve-with-H2OCondensationProcess-1"></a><a class="docs-heading-anchor-permalink" href="#Solve-with-H2OCondensationProcess" title="Permalink"></a></h3><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; gas_fn = t -&gt; SVector(T0, p_v0)</code><code class="nohighlight hljs ansi" style="display:block;">#20 (generic function with 1 method)</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; cond = H2OCondensationProcess(avg_thermo, densities; h2o_idx = h2o_idx, w = 0.0)</code><code class="nohighlight hljs ansi" style="display:block;">CondensationProcess{StochParticles.var&quot;#22#23&quot;{H2OCondensationFlux{2}}}(StochParticles.var&quot;#22#23&quot;{H2OCondensationFlux{2}}(H2OCondensationFlux{2}(ThermodynamicsParams{2}([0.455, 0.0], 0.072, 1000.0, 0.018015, 2.5e6, 461.5, 2.5e-5, 0.024), 2, [1770.0, 1000.0], 0.0, 1.0, 1.0)))</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; prob = ParticleProblem(particles, 1.0e-6, gas_fn, (cond,);
            tspan = (0.0, 600.0), n_sim = 100)</code><code class="nohighlight hljs ansi" style="display:block;"><span class="sgr38_2" style="color:#56b6c2">JumpProblem</span> with problem <span class="sgr38_2" style="color:#56b6c2">ODEProblem</span> with aggregator <span class="sgr38_2" style="color:#56b6c2">JumpProcesses.Direct
 Number of jumps with discrete aggregation: 0
 Number of jumps with continuous aggregation: 0
@@ -160,4 +154,4 @@ The object of type `H2OCondensationFlux{2}` exists, but no method is defined for
 
 Closest candidates are:
   (::H2OCondensationFlux{A})(::StaticArraysCore.SVector{A, &lt;:Real}, <span class="sgr91">::StaticArraysCore.SVector{3, &lt;:Real}</span>, ::Any, ::Any) where A
-<span class="sgr90">   @</span> <span class="sgr35">StochParticles</span> <span class="sgr90">~/work/StochParticles.jl/StochParticles.jl/src/processes/<span class="sgr4">condensation.jl:111</span></span></code></pre><p>During integration, <code>H2OCondensationProcess</code> automatically freezes non-activated particles (zero flux) while allowing activated particles to condense normally.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../api/core/">Core Types »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.19.0 on <span class="colophon-date" title="Wednesday 14 October 2026 11:04">Wednesday 14 October 2026</span>. Using Julia version 1.13.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+<span class="sgr90">   @</span> <span class="sgr35">StochParticles</span> <span class="sgr90">~/work/StochParticles.jl/StochParticles.jl/src/processes/<span class="sgr4">condensation.jl:111</span></span></code></pre><p>During integration, <code>H2OCondensationProcess</code> automatically freezes non-activated particles (zero flux) while allowing activated particles to condense normally.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../api/core/">Core Types »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.19.0 on <span class="colophon-date" title="Wednesday 14 October 2026 11:14">Wednesday 14 October 2026</span>. Using Julia version 1.13.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
