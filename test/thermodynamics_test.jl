@@ -55,8 +55,8 @@ end
         R_u = thermo.R_v * thermo.M_w
         ρ_sat = p_sat * thermo.M_w / (R_u * T)
         expected = 1.0 / (1.0 / thermo.D_v +
-            thermo.L_v / thermo.k_a * ρ_sat / T *
-            (thermo.L_v * thermo.M_w / (R_u * T) - 1.0))
+                    thermo.L_v / thermo.k_a * ρ_sat / T *
+                    (thermo.L_v * thermo.M_w / (R_u * T) - 1.0))
         @test modified_diffusion_coefficient(thermo, T, p_sat) ≈ expected rtol = 1e-12
     end
 
