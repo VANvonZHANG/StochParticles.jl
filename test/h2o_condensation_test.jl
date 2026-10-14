@@ -19,7 +19,7 @@ using Test
     # Environment: T=293K, p_v slightly below saturation
     T = 293.15
     p_v = saturation_vapor_pressure(T) * 0.99  # 99% RH
-    env = SVector(T, p_v)
+    env = SVector(T, p_v, 101325.0)
 
     # Dummy sys and t (not used in basic flux)
     sys = nothing
@@ -47,7 +47,7 @@ end
     # Environment: supersaturated (105% RH)
     T = 293.15
     p_v = saturation_vapor_pressure(T) * 1.05
-    env = SVector(T, p_v)
+    env = SVector(T, p_v, 101325.0)
 
     dμ = flux(m_dry, env, nothing, 0.0)
 
@@ -70,7 +70,7 @@ end
     @test provides_drift(proc) == true
 
     # Test that it produces flux
-    sys = ParticleSystem(Val(2), 10, 1.0e-6, t -> SVector(293.15, 1000.0))
+    sys = ParticleSystem(Val(2), 10, 1.0e-6, t -> SVector(293.15, 1000.0, 101325.0))
     μ = SVector(1e-18, 1e-18)
     dμ = apply_drift(proc, μ, sys.gas_phase(0.0), 0.0)
     @test dμ isa SVector{2, Float64}
@@ -110,7 +110,7 @@ end
         SVector(0.455, 0.0), 0.072, 1000.0, 18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2)
 
     flux = H2OCondensationFlux(thermo, 2, densities, 0.0)
-    env = SVector(T, p_v)
+    env = SVector(T, p_v, 101325.0)
 
     # Non-activated particle at equilibrium: flux should be zero
     m_small = SVector{2, Float64}((π/6.0)*(20e-9)^3*1770.0, 0.0)

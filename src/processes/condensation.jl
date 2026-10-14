@@ -95,7 +95,9 @@ Compute H2O condensation flux for particle with composition μ.
 
 # Arguments
 - `μ::SVector{A}` — particle masses [kg]
-- `env::SVector{2}` — environment [T, p_v] (temperature [K], vapor pressure [Pa])
+- `env::SVector{3}` — environment [T, p_v, p_air] (temperature [K], vapor
+  pressure [Pa], total air pressure [Pa]; the third slot feeds the air
+  density of the heat-side transition-regime correction)
 - `sys` — ParticleSystem (unused in basic flux, reserved for future parcel coupling)
 - `t` — time [s]
 
@@ -104,7 +106,7 @@ Compute H2O condensation flux for particle with composition μ.
 """
 function (flux::H2OCondensationFlux{A})(
         μ::SVector{A, <:Real},
-        env::SVector{2, <:Real},
+        env::SVector{3, <:Real},
         sys,
         t
 ) where {A}
@@ -114,6 +116,7 @@ function (flux::H2OCondensationFlux{A})(
 
     T = env[1]
     p_v = env[2]
+    p_air = env[3]
 
     # output eltype: μ and env can carry independent Dual seeds (∂/∂state vs
     # ∂/∂env probing); every output path must use the promoted type or the
@@ -197,11 +200,12 @@ function (flux::H2OCondensationFlux{A})(
     # Wet particle radius
     R = particle_wet_radius(m_dry, m_w, densities)
 
-    # Effective diffusivity: latent-heat (thermal) resistance x Fuchs
-    # transition-regime factor (per-particle, size-dependent; pyrcel-aligned
-    # lambda-form with alpha=1.0 — see the 2026-10-08 primer note)
-    D_v_prime = modified_diffusion_coefficient(thermo, T, p_sat) *
-                fuchs_transition_factor(R, T, thermo.D_v, thermo.M_w)
+    # Effective diffusivity: Ghan (2011) split transition-regime assembly —
+    # vapor branch corrected with accom_c, heat branch with accom_T (Eqs.
+    # A2-A3). Supersedes the single-factor form (continuum × one Fuchs),
+    # which the 2026-10-08 primer documented; at accom_c = accom_T = 1 the
+    # two agree to ≲3% (ℓ_v ≈ 0.17 µm vs ℓ_t ≈ 0.19 µm at 285 K).
+    D_v_prime = modified_diffusion_coefficient(thermo, T, p_sat, R, p_air)
 
     # Condensation mass rate [kg/s] — Mason flux with the modified
     # (latent-heat-corrected) diffusivity:
