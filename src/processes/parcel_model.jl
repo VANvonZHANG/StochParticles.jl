@@ -22,6 +22,7 @@ end
 const R_DRY_AIR = 287.05
 const CP_DRY_AIR = 1005.0
 const EPSILON_MA = 0.622
+const M_DRY_AIR = 0.02897  # dry-air molar mass [kg/mol] — heat-side Fuchs (Ghan A3)
 
 """
     parcel_supersaturation(parcel) -> Float64
