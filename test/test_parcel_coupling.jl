@@ -126,9 +126,13 @@ function _closed_loop_run(particles, n_sim, N_total)
             threshold = 1.0e-6, densities = DENS5),
         S = parcel_supersaturation(extract_parcel(u, sys.n_sim, 5))
     )
-    return solve_split(particles, V, ParcelCoupled(pp.parcel), (cond, pp), Tsit5();
+    # QNDF + sparse prototype: the kinetic flux (haze in the vapor budget)
+    # makes the closed loop stiff — Tsit5 was the suite's hot spot
+    # (campaign economics: 70.5 s/replica vs >=4.3 h, bench_ki_implicit.jl)
+    return solve_split(particles, V, ParcelCoupled(pp.parcel), (cond, pp), QNDF();
         tspan = (0.0, 600.0), n_sim = n_sim, dt_split = 10.0, saveat = 60.0,
-        record_func = record, abstol = 1.0e-24, reltol = 1.0e-5)
+        record_func = record, abstol = 1.0e-24, reltol = 1.0e-5,
+        jac_prototype = rhs_jac_prototype(n_sim, 5))
 end
 
 @testset "M3-3: water conservation (linear invariant, RK-exact)" begin
