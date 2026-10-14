@@ -45,13 +45,36 @@ end
         2.4e-2                    # k_a [W/m/K]
     )
 
-    T = 293.15
-    p_sat = saturation_vapor_pressure(T)
-    D_v_prime = modified_diffusion_coefficient(thermo, T, p_sat)
+    # Anchor 1 — first principles (same derivation written out independently;
+    # guards against transcription errors in the coefficient assembly):
+    #   1/D′ = 1/D_v + (L_v/k_a)·(ρ_sat/T)·(L_v·M_w/(R_u·T) − 1),  ρ_sat = p_sat·M_w/(R_u·T)
+    # (exact Clausius-Clapeyron differential; the −1 matches Ghan 2011 A1 /
+    # Pruppacher & Klett / pyrcel G_b.)
+    for T in (273.15, 285.0, 293.15, 303.15)
+        p_sat = saturation_vapor_pressure(T)
+        R_u = thermo.R_v * thermo.M_w
+        ρ_sat = p_sat * thermo.M_w / (R_u * T)
+        expected = 1.0 / (1.0 / thermo.D_v +
+                    thermo.L_v / thermo.k_a * ρ_sat / T *
+                    (thermo.L_v * thermo.M_w / (R_u * T) - 1.0))
+        @test modified_diffusion_coefficient(thermo, T, p_sat) ≈ expected rtol = 1e-12
+    end
 
-    # D_v' should be slightly less than D_v due to latent heat resistance
-    @test D_v_prime < thermo.D_v
-    @test D_v_prime > 0.5 * thermo.D_v  # not too small
+    # Anchor 2 — physical magnitude at 293.15 K: latent-heat conduction must
+    # dominate the total resistance (D′ ≈ 0.27·D_v). The pre-fix assembly
+    # (spurious p_sat/p_atm factor, thermal term ~40× too weak) returned
+    # ≈ 0.94·D_v — regression guard against reintroduction.
+    T = 293.15
+    D_v_prime = modified_diffusion_coefficient(thermo, T, saturation_vapor_pressure(T))
+    @test 0.15 * thermo.D_v < D_v_prime < 0.5 * thermo.D_v
+
+    # Anchor 3 — pyrcel cross-check at the M4 campaign point (285 K).
+    # Corrected continuum D′ with library constants ≈ 9.13e-6 m²/s. pyrcel's
+    # own G-form (L_v = 2.25e6 J/kg, Magnus e_s, ka = 1e-3·(4.39+0.071·T))
+    # gives ≈ 1.06e-5 — a ~16% constant-level gap (their L_v is 9% low),
+    # documented here rather than absorbed into a tolerance.
+    D_285 = modified_diffusion_coefficient(thermo, 285.0, saturation_vapor_pressure(285.0))
+    @test D_285 ≈ 9.13e-6 rtol = 0.05
 end
 
 @testset "Equilibrium vapor pressure" begin
