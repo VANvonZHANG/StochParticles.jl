@@ -199,19 +199,31 @@ function solve_case(cfg::GcviClosureConfig, particles)
     saveat = cfg.probe ? 1.0 : cfg.saveat
     # probe samples S every 1 s -> sub-steps must match (saveat % dt_split == 0)
     dt_split = cfg.probe ? 1.0 : cfg.dt_split
+    # solver selection for the closed loop (real-spectrum ki stiffness:
+    # explicit Tsit5 is stability-bound by the ~20 nm haze tail — measured
+    # 70.5 s/rep (qndf-sparse) vs >4 h/rep (tsit5) on the C-prime campaign
+    # spectrum; see examples/bench_ki_implicit.jl and bench_real_probe.jl)
+    solver_tag = get(ENV, "M3_SOLVER", "tsit5")
+    solver_tag in ("tsit5", "qndf", "rodas5") ||
+        error("bad M3_SOLVER $solver_tag (tsit5|qndf|rodas5)")
+    solver_obj = solver_tag == "qndf" ? QNDF() :
+                 (solver_tag == "rodas5" ? Rodas5() : Tsit5())
+    jac = solver_tag == "tsit5" ? nothing :
+          rhs_jac_prototype(cfg.n_sim, length(cfg.densities))
     if cfg.env_mode === :parcel
         return solve_split(particles, volume(cfg), ParcelCoupled(pp.parcel),
-            (condensation, pp), Tsit5();
+            (condensation, pp), solver_obj;
             tspan = cfg.tspan, n_sim = cfg.n_sim, dt_split = dt_split,
             saveat = saveat, record_func = record_func,
             abstol = 1.0e-24, reltol = rtol, reequil = reequil,
-            clamp_h2o_idx = cfg.h2o_idx)
+            clamp_h2o_idx = cfg.h2o_idx, jac_prototype = jac)
     end
     return solve_split(particles, volume(cfg), env_profile(cfg),
-        (condensation,), Tsit5();
+        (condensation,), solver_obj;
         tspan = cfg.tspan, n_sim = cfg.n_sim, dt_split = dt_split,
         saveat = saveat, record_func = record_func,
-        abstol = 1.0e-24, reltol = rtol, clamp_h2o_idx = cfg.h2o_idx)
+        abstol = 1.0e-24, reltol = rtol, clamp_h2o_idx = cfg.h2o_idx,
+        jac_prototype = jac)
 end
 
 function write_twin_obs(path, cfg::GcviClosureConfig, truth_records, chis_true)
@@ -259,7 +271,13 @@ function main()
         gcvi = (d50 = tryparse(Float64, get(ENV, "M3_D50_UM", "7.0"));
             GCVIResponse(D50 = (d50 === nothing ? 7.0 : d50) * 1.0e-6,
                 width = 0.1 * (d50 === nothing ? 7.0 : d50) * 1.0e-6)),
-        probe = get(ENV, "M3_PROBE", "0") == "1")
+        probe = get(ENV, "M3_PROBE", "0") == "1",
+        # campaign knob: trajectory sampling stride [s] (default 60, legacy).
+        # 10 matches pyrcel's output_dt — the S peak lands at ~15 s, so the
+        # legacy 60-s grid records the post-peak relaxed S, not S_max. Must
+        # stay a multiple of dt_split (10 s).
+        saveat = (sa = tryparse(Float64, get(ENV, "M3_SAVEAT", "60"));
+            sa === nothing || sa <= 0 ? 60.0 : sa))
     cfg.activation_gate in (:sc_threshold, :branch_aware, :kinetic) ||
         error("bad M3_GATE_MODE $(cfg.activation_gate)")
     cfg.env_mode in (:open, :parcel) || error("bad M3_ENV_MODE $(cfg.env_mode)")
@@ -287,6 +305,7 @@ function main()
     recreate_h5(h5_path; scene_name = base, n_replicates = n_replicates,
         notes = "GCVI closure M3: env_mode=$(cfg.env_mode) gate=$(cfg.activation_gate)" *
                 " w=$(cfg.w), T0=$(cfg.parcel_T0), P0=$(cfg.parcel_P0), RH0=$(cfg.RH0)" *
+                ", solver=$(get(ENV, "M3_SOLVER", "tsit5")), saveat=$(cfg.saveat)" *
                 (cfg.probe ? ", chatter probe (chi_true only, saveat=1)" : ""))
 
     truth_records = []
