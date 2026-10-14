@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `M3_SAVEAT` env knob in the GCVI closure example driver: trajectory
+  sampling stride (default 60 s, unchanged). 10 s matches pyrcel's
+  `output_dt` and resolves the ~15 s supersaturation peak that the legacy
+  60-s grid recorded post-peak only.
 - `modified_diffusion_coefficient(thermo, T, p_sat, R, p_air; accom_c, accom_T)`:
   the full Ghan (2011) split transition-regime assembly — the vapor branch
   carries its own kinetic correction (condensation coefficient `a_c`,

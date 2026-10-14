@@ -259,7 +259,13 @@ function main()
         gcvi = (d50 = tryparse(Float64, get(ENV, "M3_D50_UM", "7.0"));
             GCVIResponse(D50 = (d50 === nothing ? 7.0 : d50) * 1.0e-6,
                 width = 0.1 * (d50 === nothing ? 7.0 : d50) * 1.0e-6)),
-        probe = get(ENV, "M3_PROBE", "0") == "1")
+        probe = get(ENV, "M3_PROBE", "0") == "1",
+        # campaign knob: trajectory sampling stride [s] (default 60, legacy).
+        # 10 matches pyrcel's output_dt — the S peak lands at ~15 s, so the
+        # legacy 60-s grid records the post-peak relaxed S, not S_max. Must
+        # stay a multiple of dt_split (10 s).
+        saveat = (sa = tryparse(Float64, get(ENV, "M3_SAVEAT", "60"));
+            sa === nothing || sa <= 0 ? 60.0 : sa))
     cfg.activation_gate in (:sc_threshold, :branch_aware, :kinetic) ||
         error("bad M3_GATE_MODE $(cfg.activation_gate)")
     cfg.env_mode in (:open, :parcel) || error("bad M3_ENV_MODE $(cfg.env_mode)")
@@ -287,6 +293,7 @@ function main()
     recreate_h5(h5_path; scene_name = base, n_replicates = n_replicates,
         notes = "GCVI closure M3: env_mode=$(cfg.env_mode) gate=$(cfg.activation_gate)" *
                 " w=$(cfg.w), T0=$(cfg.parcel_T0), P0=$(cfg.parcel_P0), RH0=$(cfg.RH0)" *
+                ", saveat=$(cfg.saveat)" *
                 (cfg.probe ? ", chatter probe (chi_true only, saveat=1)" : ""))
 
     truth_records = []
