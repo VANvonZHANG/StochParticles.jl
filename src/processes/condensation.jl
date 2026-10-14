@@ -75,16 +75,23 @@ struct H2OCondensationFlux{A}
     densities::SVector{A, Float64}
     w::Float64
     activation_gate::Symbol
+    accom_c::Float64   # mass condensation coefficient (vapor-side Fuchs, Ghan A2)
+    accom_T::Float64   # thermal accommodation coefficient (heat-side Fuchs, Ghan A3)
 
     # explicit inner constructor with defaults: defining it suppresses the
     # auto-generated constructors, so an outer convenience method would not
     # collide during precompilation; validation lives at this single point
     function H2OCondensationFlux(thermo::ThermodynamicsParams{A}, h2o_idx::Int,
             densities::SVector{A, Float64}, w::Float64 = 0.0,
-            activation_gate::Symbol = :sc_threshold) where {A}
+            activation_gate::Symbol = :sc_threshold,
+            accom_c::Float64 = 1.0, accom_T::Float64 = 1.0) where {A}
         activation_gate in (:sc_threshold, :branch_aware, :kinetic) ||
             throw(ArgumentError("activation_gate must be :sc_threshold, :branch_aware or :kinetic, got $activation_gate"))
-        return new{A}(thermo, h2o_idx, densities, w, activation_gate)
+        0.0 < accom_c <= 1.0 ||
+            throw(ArgumentError("accom_c must be in (0, 1], got $accom_c"))
+        0.0 < accom_T <= 1.0 ||
+            throw(ArgumentError("accom_T must be in (0, 1], got $accom_T"))
+        return new{A}(thermo, h2o_idx, densities, w, activation_gate, accom_c, accom_T)
     end
 end
 
@@ -205,7 +212,8 @@ function (flux::H2OCondensationFlux{A})(
     # A2-A3). Supersedes the single-factor form (continuum × one Fuchs),
     # which the 2026-10-08 primer documented; at accom_c = accom_T = 1 the
     # two agree to ≲3% (ℓ_v ≈ 0.17 µm vs ℓ_t ≈ 0.19 µm at 285 K).
-    D_v_prime = modified_diffusion_coefficient(thermo, T, p_sat, R, p_air)
+    D_v_prime = modified_diffusion_coefficient(thermo, T, p_sat, R, p_air;
+        accom_c = flux.accom_c, accom_T = flux.accom_T)
 
     # Condensation mass rate [kg/s] — Mason flux with the modified
     # (latent-heat-corrected) diffusivity:
@@ -250,9 +258,12 @@ function H2OCondensationProcess(
         densities::SVector{A, Float64};
         h2o_idx::Int = A,
         w::Float64 = 1.0,
-        activation_gate::Symbol = :sc_threshold
+        activation_gate::Symbol = :sc_threshold,
+        accom_c::Float64 = 1.0,
+        accom_T::Float64 = 1.0
 ) where {A}
-    flux = H2OCondensationFlux(thermo, h2o_idx, densities, w, activation_gate)
+    flux = H2OCondensationFlux(thermo, h2o_idx, densities, w, activation_gate,
+        accom_c, accom_T)
     return CondensationProcess((μ, g, t) -> flux(μ, g, nothing, t))
 end
 
