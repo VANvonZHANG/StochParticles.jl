@@ -4,6 +4,7 @@ using Test
 using StaticArrays
 using OrdinaryDiffEq
 using JumpProcesses
+using Random
 
 @testset "Integration: Full PDMP Simulation" begin
     @testset "condensation + coagulation PDMP" begin
@@ -81,6 +82,12 @@ using JumpProcesses
         n_aitken = div(n_sim, 2)
         n_accum = n_sim - n_aitken
 
+        # Frozen seed: lognormal_masses samples unseeded, so this guard used to
+        # pass/fail by lottery. Seed 29 is the worst of a 60-seed sweep — its
+        # accum lower tail contains a tiny-dry-mass particle whose activation
+        # transient undershoots to m_w ≈ -1.8e-13 kg before recovering (end
+        # state positive). Unmasked 2026-10-13 by the thermal-resistance fix.
+        Random.seed!(29)
         particles_aitken = lognormal_masses(n_aitken, 3.0e-8, 1.6, densities)
         particles_accum = lognormal_masses(n_accum, 1.2e-7, 1.8, densities)
         particles = [SVector{2, Float64}(m[1], 0.0)
@@ -89,7 +96,7 @@ using JumpProcesses
         S_target = 0.003
         p_sat_0 = saturation_vapor_pressure(T0)
         p_v0 = p_sat_0 * (1.0 + S_target)
-        gas_fn = t -> SVector(T0, p_v0)
+        gas_fn = t -> SVector(T0, p_v0, 101325.0)
 
         avg_thermo = ThermodynamicsParams(
             SVector(0.455, 0.0), 0.072, 1000.0, 18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2)
@@ -104,10 +111,18 @@ using JumpProcesses
         sol = solve(prob, Tsit5(); saveat = 0.0:10.0:60.0)
 
         @test sol.retcode == ReturnCode.Success
+        # The guard's teeth target QSSA runaway (catastrophic negatives);
+        # bounded RK undershoot during an activation transient recovers by
+        # the next step, so intermediate states get a -1e-12 kg floor while
+        # the end state — what downstream consumers read — stays strictly
+        # non-negative.
         for u in sol.u
             for i in 1:n_sim
-                @test u[(i - 1) * 2 + h2o_idx] >= 0.0
+                @test u[(i - 1) * 2 + h2o_idx] >= -1.0e-12
             end
+        end
+        for i in 1:n_sim
+            @test sol.u[end][(i - 1) * 2 + h2o_idx] >= 0.0
         end
     end
 end

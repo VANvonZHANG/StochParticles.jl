@@ -30,7 +30,7 @@ end
 @testset "H2O flux ∂dm/dt/∂m_w: kinetic (smooth) and active-gate regimes" begin
     T = 285.0
     p_sat = saturation_vapor_pressure(T)
-    env = SVector(T, p_sat * 1.0004)
+    env = SVector(T, p_sat * 1.0004, 9.0e4)
     f_ki = H2OCondensationFlux(THERMO_AD, 2, DENS_AD, 0.0, :kinetic)
     fdk(mw) = f_ki(SVector(M_AS_AD, mw), env, nothing, 0.0)[2]
     h = 1e-6 * M_W_AD
@@ -40,38 +40,48 @@ end
     # gated mode in the ACTIVE region (S_env > Sc) is flux-identical to
     # kinetic — its derivative must match too
     Sc, _ = critical_point(SVector(M_AS_AD, 0.0), THERMO_AD, DENS_AD, T)
-    env_act = SVector(T, p_sat * (1 + Sc + 1e-3))
+    env_act = SVector(T, p_sat * (1 + Sc + 1e-3), 9.0e4)
     f_sc = H2OCondensationFlux(THERMO_AD, 2, DENS_AD, 0.0, :sc_threshold)
     fda(mw) = f_sc(SVector(M_AS_AD, mw), env_act, nothing, 0.0)[2]
     @test ForwardDiff.derivative(fda, M_W_AD) ≈
           (fda(M_W_AD + h) - fda(M_W_AD - h)) / (2h) rtol = 1e-5
 end
 
-@testset "H2O flux gradient w.r.t. env (T, p_v) — the channel the box truncates" begin
+@testset "H2O flux gradient w.r.t. env (T, p_v, p_air) — the channel the box truncates" begin
     T = 285.0
     p_sat = saturation_vapor_pressure(T)
-    env = SVector(T, p_sat * 1.0004)
+    env = SVector(T, p_sat * 1.0004, 9.0e4)
     f_ki = H2OCondensationFlux(THERMO_AD, 2, DENS_AD, 0.0, :kinetic)
     ge(e) = f_ki(SVector(M_AS_AD, M_W_AD), e, nothing, 0.0)[2]
     grad = ForwardDiff.gradient(ge, env)
-    hT, hP = 1e-4, 1e-2
-    @test grad[1] ≈ (ge(SVector(T + hT, env[2])) - ge(SVector(T - hT, env[2]))) / (2hT) rtol = 1e-5
+    hT, hP, hA = 1e-4, 1e-2, 1.0
+    @test grad[1] ≈
+          (ge(SVector(T + hT, env[2], env[3])) - ge(SVector(T - hT, env[2], env[3]))) /
+          (2hT) rtol = 1e-5
     @test grad[2] ≈
-          (ge(SVector(env[1], env[2] + hP)) - ge(SVector(env[1], env[2] - hP))) /
+          (ge(SVector(env[1], env[2] + hP, env[3])) -
+           ge(SVector(env[1], env[2] - hP, env[3]))) /
           (2hP) rtol = 1e-5
+    # p_air channel (split-Fuchs): enters via the heat-branch correction
+    # length ℓ_t ∝ 1/ρ_a — small but structurally nonzero, must differentiate
+    @test abs(grad[3]) > 0.0
+    @test grad[3] ≈
+          (ge(SVector(env[1], env[2], env[3] + hA)) -
+           ge(SVector(env[1], env[2], env[3] - hA))) /
+          (2hA) rtol = 1e-4
 end
 
 @testset "drift interface passes Duals through unchanged" begin
     T = 285.0
     p_sat = saturation_vapor_pressure(T)
-    env = SVector(T, p_sat * 1.0004)
+    env = SVector(T, p_sat * 1.0004, 9.0e4)
     cond = H2OCondensationProcess(THERMO_AD, DENS_AD; h2o_idx = 2, w = 0.0,
         activation_gate = :kinetic)
     sys = ParticleSystem(Val(2), 1, 1.0, t -> env)
     μ0 = SVector(M_AS_AD, M_W_AD)
-    @inferred apply_drift(cond, μ0, sys, 0.0)          # type-stable on Float64
+    @inferred apply_drift(cond, μ0, sys.gas_phase(0.0), 0.0)  # type-stable
     via_drift = ForwardDiff.derivative(
-        mw -> apply_drift(cond, SVector(M_AS_AD, mw), sys, 0.0)[2], M_W_AD)
+        mw -> apply_drift(cond, SVector(M_AS_AD, mw), env, 0.0)[2], M_W_AD)
     f_ki = H2OCondensationFlux(THERMO_AD, 2, DENS_AD, 0.0, :kinetic)
     direct = ForwardDiff.derivative(
         mw -> f_ki(SVector(M_AS_AD, mw), env, nothing, 0.0)[2], M_W_AD)

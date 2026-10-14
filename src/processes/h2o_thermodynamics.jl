@@ -41,36 +41,96 @@ function saturation_vapor_pressure(T::Real)
 end
 
 """
-    modified_diffusion_coefficient(thermo, T, p_sat) -> Float64
+    modified_diffusion_coefficient(thermo, T, p_sat) -> Real
 
-Effective mass transfer coefficient accounting for latent heat release.
-Formula from Seinfeld & Pandis (Eq. 13.58).
+Effective vapor diffusivity coupling molecular diffusion with latent-heat
+conduction (Mason 1971; Pruppacher & Klett; Seinfeld & Pandis Eq. 13.58;
+Ghan 2011 Eq. A1 recast from G-form to D′-form):
 
-D_v' = [1/D_v + (L_v / (k_a·T)) · (L_v/(R_v·T) - 1) · p_sat / p_v ]^(-1)
+    1/D_v' = 1/D_v + (L_v/k_a)·(dρ_sat/dT),
+    dρ_sat/dT = (ρ_sat/T)·(L_v·M_w/(R_u·T) − 1)      [exact Clausius-Clapeyron]
 
-For the limit p_v → p_sat (near equilibrium), we use p_v ≈ p_sat.
+with ρ_sat = p_sat·M_w/(R_u·T) and R_u = R_v·M_w. Term-by-term equivalent
+to the Ghan(2011)/pyrcel growth coefficient: multiplying the resistances
+by ρ_w·R·T/(e_s·M_w) maps 1/D_v → G_a and the thermal term →
+G_b = (L_v·ρ_w/(k_a·T))·(L_v·M_w/(R·T) − 1). The thermal resistance
+reduces D_v' by a factor ≈3-4 at cloud temperatures (293.15 K:
+D_v' ≈ 0.27·D_v with library constants).
+
+Transition-regime note: this is the R → ∞ (continuum) limit. The
+radius-dependent form with Ghan 2011's SPLIT corrections (vapor branch
+with condensation coefficient a_c, heat branch with thermal accommodation
+a_T — Eqs. A2-A3) is the 5-argument method below; the H2O flux calls that
+one. At a_c = a_T = 1 the split vs a single vapor-side factor on the
+combined D_v' agree to ≲3% (ℓ_v ≈ 0.17 µm vs ℓ_t ≈ 0.19 µm at 285 K),
+but the split is required for a_c ≠ 1 sensitivity studies.
+
+Audit note 2026-10-13: the previous assembly carried a spurious
+`p_sat/p_atm` factor (p_atm hardwired to 101325 Pa) in the thermal term,
+shrinking the thermal resistance ~40× and making the condensation sink
+2.5-2.8× too strong — the root cause of the S_max 2× offset vs pyrcel
+found in M4 leg 1. The form above is assembled from first principles;
+the `−1` in dρ_sat/dT is kept exact (dropping it overstates the thermal
+resistance by L_v·M_w/(R·T)/(L_v·M_w/(R·T)−1) ≈ 5.6% at 285 K).
+Library constants are kept (Buck e_s, T-dependent L_v); pyrcel's
+L_v = 2.25e6 J/kg is 9% low and is NOT adopted (M3 audit 2026-10-08).
 """
 function modified_diffusion_coefficient(
         thermo::ThermodynamicsParams,
         T::Real,
         p_sat::Real
 )
-    D_v = thermo.D_v
-    L_v = thermo.L_v
-    k_a = thermo.k_a
-    R_v = thermo.R_v
-
-    # Thermal resistance term (latent heat correction)
-    # L_v must be in J/mol for unit consistency; convert from J/kg using M_w
-    L_v_mol = L_v * thermo.M_w
-    thermal_resistance = (L_v_mol / (k_a * T)) * (L_v / (R_v * T) - 1.0)
-
-    # Total resistance: 1/D_v' = 1/D_v + thermal_resistance · p_sat / p_atm
-    # Using standard atmospheric pressure p_atm = 101325 Pa
-    p_atm = 101325.0
-    total_resistance = 1.0 / D_v + thermal_resistance * (p_sat / p_atm)
-
+    R_u = thermo.R_v * thermo.M_w
+    ρ_sat = p_sat * thermo.M_w / (R_u * T)
+    dρ_sat_dT = ρ_sat * (thermo.L_v * thermo.M_w / (R_u * T) - 1.0) / T
+    total_resistance = 1.0 / thermo.D_v + thermo.L_v * dρ_sat_dT / thermo.k_a
     return 1.0 / total_resistance
+end
+
+"""
+    modified_diffusion_coefficient(thermo, T, p_sat, R, p_air;
+                                   accom_c = 1.0, accom_T = 1.0) -> Real
+
+Full Ghan (2011) assembly with SPLIT transition-regime corrections
+(Seinfeld & Pandis / Duan et al. 2018 Eqs. A1-A3; the pyrcel form):
+
+    1/D̃' = (1 + ℓ_v/(a_c·R))/D_v + (1 + ℓ_t/(a_T·R))·(L_v/k_a)·(dρ_sat/dT)
+
+Each resistance branch carries its own kinetic correction — vapor transport
+with the mass condensation coefficient `a_c` (correction length
+`ℓ_v = D_v·√(2π·M_w/(R_u·T))`), heat conduction with the thermal
+accommodation coefficient `a_T` (`ℓ_t = (k_a/(ρ_a·c_p))·√(2π·M_a/(R_u·T))`,
+air density `ρ_a = p_air/(R_d·T)`). The 3-argument form is the R → ∞
+(continuum) limit of this one. At `a_c = a_T = 1` the split and the
+legacy single-factor form agree to ≲3% (ℓ_v ≈ 0.17 µm vs ℓ_t ≈ 0.19 µm
+at 285 K); for `a_c ≠ 1` sensitivity studies the split is required —
+applying one vapor-side factor to the combined D′ wrongly scales the
+thermal branch too.
+"""
+function modified_diffusion_coefficient(
+        thermo::ThermodynamicsParams,
+        T::Real,
+        p_sat::Real,
+        R::Real,
+        p_air::Real;
+        accom_c::Real = 1.0,
+        accom_T::Real = 1.0
+)
+    R_u = thermo.R_v * thermo.M_w
+    ρ_sat = p_sat * thermo.M_w / (R_u * T)
+    dρ_sat_dT = ρ_sat * (thermo.L_v * thermo.M_w / (R_u * T) - 1.0) / T
+
+    # vapor branch: Ghan A2 (same λ-form as fuchs_transition_factor)
+    ℓ_v = thermo.D_v * sqrt(2π * thermo.M_w / (R_u * T))
+    vapor_resistance = (1.0 + ℓ_v / (accom_c * R)) / thermo.D_v
+
+    # heat branch: Ghan A3 — thermal-accommodation Fuchs on conductivity
+    ρ_a = p_air / (R_DRY_AIR * T)
+    ℓ_t = (thermo.k_a / (ρ_a * CP_DRY_AIR)) * sqrt(2π * M_DRY_AIR / (R_u * T))
+    thermal_resistance = (1.0 + ℓ_t / (accom_T * R)) *
+                         thermo.L_v * dρ_sat_dT / thermo.k_a
+
+    return 1.0 / (vapor_resistance + thermal_resistance)
 end
 
 """

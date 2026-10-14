@@ -189,7 +189,7 @@ using StaticArrays
         gas_fn = t -> SVector(0.0, 0.0)
         sys = ParticleSystem(Val(2), 10, 1.0, gas_fn)
 
-        dμ = @inferred apply_drift(proc, μ, sys, 0.0)
+        dμ = @inferred apply_drift(proc, μ, sys.gas_phase(0.0), 0.0)
         @test dμ ≈ rates
         @test provides_drift(proc) == true
     end

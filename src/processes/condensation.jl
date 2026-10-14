@@ -16,12 +16,13 @@ end
 provides_drift(::CondensationProcess) = true
 
 """
-    apply_drift(proc::CondensationProcess, μ, sys, t) -> SVector
+    apply_drift(proc::CondensationProcess, μ, g, t) -> SVector
 
-Compute the condensation drift for particle state μ.
+Compute the condensation drift for particle state μ given the precomputed
+environment `g` (see `interface.jl` — the RHS evaluates `g` once per
+evaluation and passes it through).
 """
-function apply_drift(proc::CondensationProcess, μ::SVector{A, <:Real}, sys::ParticleSystem{A}, t) where {A}
-    g = sys.gas_phase(t)
+function apply_drift(proc::CondensationProcess, μ::SVector{A, <:Real}, g, t) where {A}
     return proc.flux(μ, g, t)
 end
 
@@ -44,7 +45,7 @@ provides_drift(::SpeciesDependentCondensation) = true
 
 function apply_drift(
         proc::SpeciesDependentCondensation{A}, μ::SVector{A, <:Real},
-        sys::ParticleSystem{A}, t) where {A}
+        g, t) where {A}
     return proc.rates
 end
 
@@ -74,16 +75,23 @@ struct H2OCondensationFlux{A}
     densities::SVector{A, Float64}
     w::Float64
     activation_gate::Symbol
+    accom_c::Float64   # mass condensation coefficient (vapor-side Fuchs, Ghan A2)
+    accom_T::Float64   # thermal accommodation coefficient (heat-side Fuchs, Ghan A3)
 
     # explicit inner constructor with defaults: defining it suppresses the
     # auto-generated constructors, so an outer convenience method would not
     # collide during precompilation; validation lives at this single point
     function H2OCondensationFlux(thermo::ThermodynamicsParams{A}, h2o_idx::Int,
             densities::SVector{A, Float64}, w::Float64 = 0.0,
-            activation_gate::Symbol = :sc_threshold) where {A}
+            activation_gate::Symbol = :sc_threshold,
+            accom_c::Float64 = 1.0, accom_T::Float64 = 1.0) where {A}
         activation_gate in (:sc_threshold, :branch_aware, :kinetic) ||
             throw(ArgumentError("activation_gate must be :sc_threshold, :branch_aware or :kinetic, got $activation_gate"))
-        return new{A}(thermo, h2o_idx, densities, w, activation_gate)
+        0.0 < accom_c <= 1.0 ||
+            throw(ArgumentError("accom_c must be in (0, 1], got $accom_c"))
+        0.0 < accom_T <= 1.0 ||
+            throw(ArgumentError("accom_T must be in (0, 1], got $accom_T"))
+        return new{A}(thermo, h2o_idx, densities, w, activation_gate, accom_c, accom_T)
     end
 end
 
@@ -94,7 +102,9 @@ Compute H2O condensation flux for particle with composition μ.
 
 # Arguments
 - `μ::SVector{A}` — particle masses [kg]
-- `env::SVector{2}` — environment [T, p_v] (temperature [K], vapor pressure [Pa])
+- `env::SVector{3}` — environment [T, p_v, p_air] (temperature [K], vapor
+  pressure [Pa], total air pressure [Pa]; the third slot feeds the air
+  density of the heat-side transition-regime correction)
 - `sys` — ParticleSystem (unused in basic flux, reserved for future parcel coupling)
 - `t` — time [s]
 
@@ -103,7 +113,7 @@ Compute H2O condensation flux for particle with composition μ.
 """
 function (flux::H2OCondensationFlux{A})(
         μ::SVector{A, <:Real},
-        env::SVector{2, <:Real},
+        env::SVector{3, <:Real},
         sys,
         t
 ) where {A}
@@ -113,6 +123,7 @@ function (flux::H2OCondensationFlux{A})(
 
     T = env[1]
     p_v = env[2]
+    p_air = env[3]
 
     # output eltype: μ and env can carry independent Dual seeds (∂/∂state vs
     # ∂/∂env probing); every output path must use the promoted type or the
@@ -196,11 +207,13 @@ function (flux::H2OCondensationFlux{A})(
     # Wet particle radius
     R = particle_wet_radius(m_dry, m_w, densities)
 
-    # Effective diffusivity: latent-heat (thermal) resistance x Fuchs
-    # transition-regime factor (per-particle, size-dependent; pyrcel-aligned
-    # lambda-form with alpha=1.0 — see the 2026-10-08 primer note)
-    D_v_prime = modified_diffusion_coefficient(thermo, T, p_sat) *
-                fuchs_transition_factor(R, T, thermo.D_v, thermo.M_w)
+    # Effective diffusivity: Ghan (2011) split transition-regime assembly —
+    # vapor branch corrected with accom_c, heat branch with accom_T (Eqs.
+    # A2-A3). Supersedes the single-factor form (continuum × one Fuchs),
+    # which the 2026-10-08 primer documented; at accom_c = accom_T = 1 the
+    # two agree to ≲3% (ℓ_v ≈ 0.17 µm vs ℓ_t ≈ 0.19 µm at 285 K).
+    D_v_prime = modified_diffusion_coefficient(thermo, T, p_sat, R, p_air;
+        accom_c = flux.accom_c, accom_T = flux.accom_T)
 
     # Condensation mass rate [kg/s] — Mason flux with the modified
     # (latent-heat-corrected) diffusivity:
@@ -245,9 +258,12 @@ function H2OCondensationProcess(
         densities::SVector{A, Float64};
         h2o_idx::Int = A,
         w::Float64 = 1.0,
-        activation_gate::Symbol = :sc_threshold
+        activation_gate::Symbol = :sc_threshold,
+        accom_c::Float64 = 1.0,
+        accom_T::Float64 = 1.0
 ) where {A}
-    flux = H2OCondensationFlux(thermo, h2o_idx, densities, w, activation_gate)
+    flux = H2OCondensationFlux(thermo, h2o_idx, densities, w, activation_gate,
+        accom_c, accom_T)
     return CondensationProcess((μ, g, t) -> flux(μ, g, nothing, t))
 end
 

@@ -6,17 +6,106 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Added
+
+- `modified_diffusion_coefficient(thermo, T, p_sat, R, p_air; accom_c, accom_T)`:
+  the full Ghan (2011) split transition-regime assembly — the vapor branch
+  carries its own kinetic correction (condensation coefficient `a_c`,
+  `ℓ_v = D_v·√(2πM_w/(R_uT))`) and the heat branch its own (thermal
+  accommodation `a_T`, `ℓ_t = (k_a/(ρ_a·c_p))·√(2πM_a/(R_uT))` with
+  `ρ_a = p_air/(R_d·T)`). The H2O flux now uses this form. The legacy
+  single-factor form (continuum D′ × one vapor-side Fuchs) agreed to ≲3%
+  at `a_c = a_T = 1` (`ℓ_v ≈ 0.17 µm` vs `ℓ_t ≈ 0.19 µm` at 285 K) but
+  could not express `a_c ≠ 1` — one vapor-side factor wrongly scaled the
+  thermal branch too. `H2OCondensationProcess`/`H2OCondensationFlux` gain
+  `accom_c`/`accom_T` kwargs (default 1.0): the `a_c` sensitivity axis
+  for M4 identifiability scans (literature: `a_c` ∈ [0.002, 0.06] moves
+  predicted CDNC by ±30%).
+
 ### Changed
+
+- **Breaking**: the H2O flux environment is now `SVector{3}(T, p_v, p_air)`
+  — the third slot (total air pressure) feeds the heat-branch correction's
+  air density. `parcel_env` and `ParcelCoupled` return the parcel pressure
+  directly; `PrescribedProfile(times, T, S, p_air = 101325.0)` gains a
+  constant-pressure fourth argument (existing 3-argument call sites are
+  unchanged). `rhs_jac_prototype` already marked particle×tail-pressure
+  structural entries, so sparse-coloring Jacobians pick up the new p_air
+  coupling with no pattern change. Flux gradient tests gain the
+  ∂flux/∂p_air channel (structurally nonzero, small — it enters only
+  through ℓ_t).
+
+### Fixed
+
+- `modified_diffusion_coefficient` carried a spurious `p_sat/p_atm` factor
+  (p_atm hardwired to 101325 Pa) in its thermal-resistance term, shrinking
+  the thermal resistance ~40× and making the condensation sink 2.5-2.8×
+  too strong at cloud temperatures. Replaced with the first-principles
+  Mason/Ghan assembly: `1/D′ = 1/D_v + (L_v/k_a)·(dρ_sat/dT)` with the
+  exact Clausius-Clapeyron differential
+  `dρ_sat/dT = (ρ_sat/T)·(L_v·M_w/(R_u·T) − 1)` and `R_u = R_v·M_w` —
+  term-by-term equivalent to the Ghan (2011) Eq. A1 growth coefficient
+  (1/D_v ↔ G_a, thermal term ↔ G_b) and to pyrcel's assembly; no new
+  constants, Buck `e_s` and the T-dependent `L_v` are kept (pyrcel's
+  L_v = 2.25e6 J/kg stays rejected, 9% low). This was the root cause of
+  the S_max 2× low bias vs pyrcel found in M4 leg 1 (ours 0.059-0.060%
+  vs pyrcel 0.116-0.126%); the remaining ~16% constant-level D′ gap
+  traces to pyrcel's own L_v/ka formulas. Tests: three-anchor unit test
+  (independent first-principles algebra at 4 temperatures, regression
+  band `0.15·D_v < D′ < 0.5·D_v` at 293.15 K against the old
+  `≈0.94·D_v`, pyrcel cross-check 9.13e-6 m²/s at 285 K). All M3-era
+  campaign data, three-trigger adjudication, and twin 2×2 results
+  predate this fix and must be re-run.
+
+## [0.12.0] - 2026-10-12
+
+M4 ki-enabler: AD-transparent parcel RHS — implicit solvers (Rodas5/QNDF)
+unlocked for the `:kinetic` arm, which runs a full n=1000/600-s campaign
+window in ~1 minute (was 20 h+/OOM at M3). Breaking for custom drift
+processes: the legacy `apply_drift(proc, μ, sys, t)` form is removed
+(see Changed).
+
+### Added
+
+- Implicit-solver support for the parcel-coupled RHS: the RHS is now
+  AD-transparent end to end — `parcel_drift` takes the tail scalars
+  directly and the `Ref{ParcelState}` box is out of the evaluation path —
+  so `Rodas5`/`QNDF` with ForwardDiff Jacobians reproduce `Tsit5` to
+  ~1e-9 on the `:kinetic` scenario. `solve_split` gains a
+  `jac_prototype` kwarg; `rhs_jac_prototype(n_sim, A)` returns the
+  block-diagonal + arrowhead sparsity pattern (sparse-coloring Jacobian:
+  ~(A+3) RHS evaluations per update instead of dense N). Benchmark:
+  `examples/bench_ki_implicit.jl` — at n=1000/120 s kinetic: Tsit5
+  137.9 s, Rodas5-dense 919.9 s (dense-Jacobian blow-up, as predicted),
+  Rodas5-sparse 109.8 s, QNDF-sparse 21.3 s (**6.5× vs explicit**, all
+  four agreeing on S_max/Σm_w to ~1e-9). At the full 600-s campaign
+  window: **QNDF-sparse 78.6 s** (Rodas5-sparse 3860 s, same S_max to 4
+  digits).
+- `parcel_env(T, p, qv)` — pure eltype-generic `(T, p_v)` diagnosis
+  (blueprint contract ①); the RHS evaluates the environment ONCE per
+  evaluation straight from the parcel tail instead of routing it through
+  the `Ref{ParcelState}` box via `ParcelCoupled` (also removes ~1000
+  redundant `gas_phase` calls per evaluation in open-loop runs).
+- AD-vs-finite-difference tests for the flux functor, thermo helpers and
+  the full parcel-coupled Jacobian (`test/ad_flux_test.jl`,
+  `test/ad_rhs_test.jl`; `ForwardDiff` added to the test deps).
+
+### Changed
+
 - RHS-path signatures loosened from `::Float64` to `::Real` /
   `SVector{A,<:Real}` / `Vector{<:Real}` (`get_particle`/`set_particle!`,
   the H2O condensation flux functor and all thermodynamic helpers,
   `apply_drift` methods, `parcel_drift`). Values are unchanged for
   `Float64` callers (per-type specialization); automatic differentiation
-  can now penetrate the flux layer — prerequisite for implicit solvers
-  on the `:kinetic` arm (M4).
-### Added
-- AD-vs-finite-difference tests for the flux functor and thermo helpers
-  (`test/ad_flux_test.jl`; `ForwardDiff` added to the test deps).
+  can now penetrate the flux layer.
+- `apply_drift` interface: processes implement the direct
+  `(proc, μ, g, t)` form with a precomputed environment. The legacy
+  `(proc, μ, sys, t)` form is REMOVED — kept as a wrapper it is
+  dispatch-ambiguous against per-process g-form methods (Aqua), and under
+  AD every internal env evaluation is a derivative-truncation risk.
+  Callers holding a `sys` evaluate `g = sys.gas_phase(t)` themselves.
+  `ParcelCoupled` remains as a public open-loop env source.
 ## [0.11.0] - 2026-10-10
 
 Milestone release (M3 of the GCVI closure blueprint): closed-loop air-parcel
@@ -379,4 +468,5 @@ changes — the minor bump marks the milestone.
 [0.9.1]: https://github.com/VANvonZHANG/StochParticles.jl/releases/tag/v0.9.1
 [0.10.0]: https://github.com/VANvonZHANG/StochParticles.jl/compare/v0.9.1...v0.10.0
 [0.11.0]: https://github.com/VANvonZHANG/StochParticles.jl/compare/v0.10.0...v0.11.0
-[unreleased]: https://github.com/VANvonZHANG/StochParticles.jl/compare/v0.11.0...HEAD
+[0.12.0]: https://github.com/VANvonZHANG/StochParticles.jl/compare/v0.11.0...v0.12.0
+[unreleased]: https://github.com/VANvonZHANG/StochParticles.jl/compare/v0.12.0...HEAD

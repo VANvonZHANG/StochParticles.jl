@@ -22,6 +22,7 @@ end
 const R_DRY_AIR = 287.05
 const CP_DRY_AIR = 1005.0
 const EPSILON_MA = 0.622
+const M_DRY_AIR = 0.02897  # dry-air molar mass [kg/mol] — heat-side Fuchs (Ghan A3)
 
 """
     parcel_supersaturation(parcel) -> Float64
@@ -33,9 +34,29 @@ function parcel_supersaturation(parcel::ParcelState)
 end
 
 """
-    parcel_drift(parcel, total_cond_rate, w, m_air; thermo, g = 9.81) -> SVector{3}
+    parcel_env(T, p, qv) -> SVector{3}
 
-Parcel tendencies `[dT, dp, dqv]` (spec §2.2):
+Environment triple `(T, p_v, p_air)` diagnosed from the parcel state —
+blueprint contract ① (3-slot form, split-Fuchs): `p_v = p_sat(T)·(1+S)`
+with S = qv·p/(ε·p_sat(T)) − 1; `p_air` is the parcel total pressure (the
+H2O flux needs it for the air density in the heat-side transition-regime
+correction). Pure function of scalars: the RHS evaluates it once per
+evaluation straight from the state-vector tail, and the eltype follows
+the inputs so Dual seeds flow through during Jacobian assembly (the
+`Ref{ParcelState}` indirection would truncate them).
+"""
+function parcel_env(T::Real, p::Real, qv::Real)
+    p_sat = saturation_vapor_pressure(T)
+    S = qv * p / (EPSILON_MA * p_sat) - 1.0
+    return SVector(T, p_sat * (1.0 + S), p)
+end
+
+"""
+    parcel_drift(T, p, total_cond_rate, w, m_air; thermo, g = 9.81) -> SVector{3}
+
+Parcel tendencies `[dT, dp, dqv]` (spec §2.2) as a PURE function of
+scalars — the RHS reads the tail values straight from the state vector,
+so Dual seeds flow through during Jacobian assembly:
 - `dT = −g·w/c_p + L_v·Σṁ_w / (m_air·c_p)` (adiabatic cooling + latent heat)
 - `dp = −ρ_a·g·w` with **diagnosed** ρ_a = p/(R_d·T) (live density, not fixed)
 - `dqv = −Σṁ_w / m_air`
@@ -45,13 +66,25 @@ invariant of a Lagrangian parcel); `total_cond_rate` is the summed H2O
 condensation rate [kg/s] over all active particles (positive = condensation
 onto particles).
 """
-function parcel_drift(parcel::ParcelState, total_cond_rate::Real, w::Real,
+function parcel_drift(T::Real, p::Real, total_cond_rate::Real, w::Real,
         m_air::Real; thermo::ThermodynamicsParams, g::Real = 9.81)
-    rho_a = parcel.p / (R_DRY_AIR * parcel.T)
+    rho_a = p / (R_DRY_AIR * T)
     dT = -g / CP_DRY_AIR * w + thermo.L_v * total_cond_rate / (m_air * CP_DRY_AIR)
     dp = -rho_a * g * w
     dqv = -total_cond_rate / m_air
     return SVector{3}(dT, dp, dqv)
+end
+
+"""
+    parcel_drift(parcel::ParcelState, total_cond_rate, w, m_air; thermo, g) -> SVector{3}
+
+Convenience form over a `ParcelState` (driver-side; values identical to
+the scalar form).
+"""
+function parcel_drift(parcel::ParcelState, total_cond_rate::Real, w::Real,
+        m_air::Real; thermo::ThermodynamicsParams, g::Real = 9.81)
+    return parcel_drift(parcel.T, parcel.p, total_cond_rate, w, m_air;
+        thermo = thermo, g = g)
 end
 
 """
@@ -112,8 +145,10 @@ Per-particle drift contribution is zero — the parcel block is written after
 the particle loop using the accumulated Σ dm_w at `h2o_idx`.
 
 Shares the `RefValue{ParcelState}` with the `ParcelCoupled` environment
-source, which is synced from `u` at the TOP of each RHS evaluation (before
-the particle loop — the flux layer reads it during the loop).
+source. The ref is synced from `u` at the TOP of each RHS evaluation to
+feed `parcel_drift` after the particle loop; the particle flux itself
+reads the live tail directly via `parcel_env` (once per evaluation —
+dual-transparent, unlike the box indirection).
 """
 struct ParcelProcess{P} <: PhysicsProcess
     parcel::Base.RefValue{ParcelState}
@@ -131,4 +166,4 @@ end
 # accepted by solve_split's drift filter; per-particle drift contribution is
 # zero (the parcel block is assembled by make_ode_func after the particle loop)
 provides_drift(::ParcelProcess) = true
-apply_drift(::ParcelProcess, μ::SVector{A, <:Real}, sys, t) where {A} = zero(μ)
+apply_drift(::ParcelProcess, μ::SVector{A, <:Real}, g, t) where {A} = zero(μ)
