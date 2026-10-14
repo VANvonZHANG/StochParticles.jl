@@ -23,8 +23,7 @@ function kinetic_setup(; sizes_nm = (50.0, 80.0, 120.0))
         h2o_idx = 2)
     qv0 = (1.0 + S0) * (0.622 * p_sat) / p0    # S0-consistent qv from S = qv·p/(ε·p_sat) − 1
     pp = ParcelProcess(1.0, 2, 1.0e-10, THERMO_RHS, T0, p0, qv0)
-    cond = H2OCondensationProcess(THERMO_RHS, DENS_RHS; h2o_idx = 2, w = 0.0,
-        activation_gate = :kinetic)
+    cond = H2OCondensationProcess(THERMO_RHS, DENS_RHS; h2o_idx = 2, w = 0.0)
     return particles, pp, cond
 end
 

@@ -60,7 +60,7 @@ end
     thermo = ThermodynamicsParams(SVector(0.61, 0.0), 0.072, 1000.0,
         18.015e-3, 2.5e6, 461.5, 2.5e-5, 2.4e-2)
     cond = H2OCondensationProcess(thermo, SVector(1770.0, 1000.0);
-        h2o_idx = 2, w = 0.0, activation_gate = :kinetic)
+        h2o_idx = 2, w = 0.0)
     sys = ParticleSystem(Val(2), 1, 1.0, t -> env)
     m_as = 4.0 / 3.0 * π * (50.0e-9)^3 * 1770.0
     m_w = 4.0 / 3.0 * π * (80.0e-9)^3 * 1000.0 - m_as

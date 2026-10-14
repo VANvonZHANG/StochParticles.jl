@@ -31,7 +31,7 @@ end
     include("test_env_source.jl")
     include("test_gcvi.jl")
     include("test_synthetic_population.jl")
-    include("test_activation_gate.jl")
+    include("test_kohler_critical_point.jl")
     include("test_parcel_coupling.jl")
     include("test_activation_comparison_example_config.jl")
     include("test_plotting.jl")

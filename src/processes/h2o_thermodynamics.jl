@@ -285,7 +285,7 @@ end
 Numerically maximize the exact κ-Köhler curve; return the critical
 supersaturation Sc and the critical wet diameter D_crit [m] at the peak.
 Shared golden-section search — `critical_supersaturation` is a thin wrapper
-(both `activation_gate` modes consult this single search, spec §3.1).
+(the kinetic flux and the activation diagnostics consult this single search, spec §3.1).
 """
 function critical_point(
         m_dry::SVector{A, <:Real},
