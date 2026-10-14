@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `examples/bench_real_probe.jl`: solver timing probe on the campaign
+  population (seed-identical to the shards) — wall-clock profile per
+  saveat plus a Tsit5/QNDF/Rodas5P sparse comparison. The instrument
+  behind the M3_SOLVER economics numbers.
 - `M3_SOLVER` env knob in the GCVI closure example driver
   (`tsit5`|`qndf`|`rodas5`, default `tsit5` — unchanged): the implicit
   options wire the sparse AD Jacobian prototype into the closed-loop
