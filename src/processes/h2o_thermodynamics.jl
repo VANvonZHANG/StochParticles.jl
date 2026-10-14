@@ -41,35 +41,50 @@ function saturation_vapor_pressure(T::Real)
 end
 
 """
-    modified_diffusion_coefficient(thermo, T, p_sat) -> Float64
+    modified_diffusion_coefficient(thermo, T, p_sat) -> Real
 
-Effective mass transfer coefficient accounting for latent heat release.
-Formula from Seinfeld & Pandis (Eq. 13.58).
+Effective vapor diffusivity coupling molecular diffusion with latent-heat
+conduction (Mason 1971; Pruppacher & Klett; Seinfeld & Pandis Eq. 13.58;
+Ghan 2011 Eq. A1 recast from G-form to D′-form):
 
-D_v' = [1/D_v + (L_v / (k_a·T)) · (L_v/(R_v·T) - 1) · p_sat / p_v ]^(-1)
+    1/D_v' = 1/D_v + (L_v/k_a)·(dρ_sat/dT),
+    dρ_sat/dT = (ρ_sat/T)·(L_v·M_w/(R_u·T) − 1)      [exact Clausius-Clapeyron]
 
-For the limit p_v → p_sat (near equilibrium), we use p_v ≈ p_sat.
+with ρ_sat = p_sat·M_w/(R_u·T) and R_u = R_v·M_w. Term-by-term equivalent
+to the Ghan(2011)/pyrcel growth coefficient: multiplying the resistances
+by ρ_w·R·T/(e_s·M_w) maps 1/D_v → G_a and the thermal term →
+G_b = (L_v·ρ_w/(k_a·T))·(L_v·M_w/(R·T) − 1). The thermal resistance
+reduces D_v' by a factor ≈3-4 at cloud temperatures (293.15 K:
+D_v' ≈ 0.27·D_v with library constants).
+
+Transition-regime note: Ghan 2011 (via Seinfeld & Pandis, Duan et al. 2018
+Eqs. A2-A3, pyrcel) applies SEPARATE Fuchs corrections inside each branch
+(vapor side with condensation coefficient a_c, heat side with thermal
+accommodation a_T). The caller applies a single vapor-side factor
+(`fuchs_transition_factor`) to the combined D_v' — at a_c = a_T = 1 the two
+correction lengths differ ~10% (ℓ_v ≈ 0.17 µm vs ℓ_t ≈ 0.19 µm at 285 K),
+so this is a ≲3% transition-regime approximation; an exact split is
+deferred until a_c ≠ 1 sensitivity studies.
+
+Audit note 2026-10-13: the previous assembly carried a spurious
+`p_sat/p_atm` factor (p_atm hardwired to 101325 Pa) in the thermal term,
+shrinking the thermal resistance ~40× and making the condensation sink
+2.5-2.8× too strong — the root cause of the S_max 2× offset vs pyrcel
+found in M4 leg 1. The form above is assembled from first principles;
+the `−1` in dρ_sat/dT is kept exact (dropping it overstates the thermal
+resistance by L_v·M_w/(R·T)/(L_v·M_w/(R·T)−1) ≈ 5.6% at 285 K).
+Library constants are kept (Buck e_s, T-dependent L_v); pyrcel's
+L_v = 2.25e6 J/kg is 9% low and is NOT adopted (M3 audit 2026-10-08).
 """
 function modified_diffusion_coefficient(
         thermo::ThermodynamicsParams,
         T::Real,
         p_sat::Real
 )
-    D_v = thermo.D_v
-    L_v = thermo.L_v
-    k_a = thermo.k_a
-    R_v = thermo.R_v
-
-    # Thermal resistance term (latent heat correction)
-    # L_v must be in J/mol for unit consistency; convert from J/kg using M_w
-    L_v_mol = L_v * thermo.M_w
-    thermal_resistance = (L_v_mol / (k_a * T)) * (L_v / (R_v * T) - 1.0)
-
-    # Total resistance: 1/D_v' = 1/D_v + thermal_resistance · p_sat / p_atm
-    # Using standard atmospheric pressure p_atm = 101325 Pa
-    p_atm = 101325.0
-    total_resistance = 1.0 / D_v + thermal_resistance * (p_sat / p_atm)
-
+    R_u = thermo.R_v * thermo.M_w
+    ρ_sat = p_sat * thermo.M_w / (R_u * T)
+    dρ_sat_dT = ρ_sat * (thermo.L_v * thermo.M_w / (R_u * T) - 1.0) / T
+    total_resistance = 1.0 / thermo.D_v + thermo.L_v * dρ_sat_dT / thermo.k_a
     return 1.0 / total_resistance
 end
 

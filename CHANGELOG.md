@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Fixed
+
+- `modified_diffusion_coefficient` carried a spurious `p_sat/p_atm` factor
+  (p_atm hardwired to 101325 Pa) in its thermal-resistance term, shrinking
+  the thermal resistance ~40× and making the condensation sink 2.5-2.8×
+  too strong at cloud temperatures. Replaced with the first-principles
+  Mason/Ghan assembly: `1/D′ = 1/D_v + (L_v/k_a)·(dρ_sat/dT)` with the
+  exact Clausius-Clapeyron differential
+  `dρ_sat/dT = (ρ_sat/T)·(L_v·M_w/(R_u·T) − 1)` and `R_u = R_v·M_w` —
+  term-by-term equivalent to the Ghan (2011) Eq. A1 growth coefficient
+  (1/D_v ↔ G_a, thermal term ↔ G_b) and to pyrcel's assembly; no new
+  constants, Buck `e_s` and the T-dependent `L_v` are kept (pyrcel's
+  L_v = 2.25e6 J/kg stays rejected, 9% low). This was the root cause of
+  the S_max 2× low bias vs pyrcel found in M4 leg 1 (ours 0.059-0.060%
+  vs pyrcel 0.116-0.126%); the remaining ~16% constant-level D′ gap
+  traces to pyrcel's own L_v/ka formulas. Tests: three-anchor unit test
+  (independent first-principles algebra at 4 temperatures, regression
+  band `0.15·D_v < D′ < 0.5·D_v` at 293.15 K against the old
+  `≈0.94·D_v`, pyrcel cross-check 9.13e-6 m²/s at 285 K). All M3-era
+  campaign data, three-trigger adjudication, and twin 2×2 results
+  predate this fix and must be re-run.
+
 ## [0.12.0] - 2026-10-12
 
 M4 ki-enabler: AD-transparent parcel RHS — implicit solvers (Rodas5/QNDF)
