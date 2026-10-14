@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-10-14
+
+Physics-correct H2O condensation. The thermal-resistance fix removes a
+spurious `p_sat/p_atm` factor that made the condensation sink 2.5-2.8×
+too strong at cloud temperatures — the root cause of the S_max 2× low
+bias vs pyrcel found in M4 leg 1 — and the Ghan (2011) split
+transition-regime assembly gives the vapor and heat branches independent
+kinetic corrections (`a_c`/`a_T`), the M4 sensitivity axis. Breaking:
+the H2O flux environment is now `SVector{3}(T, p_v, p_air)`. Validated
+against constant-harmonized pyrcel on the C-prime campaign scenario:
+q_liq agrees to 0.01%, the S_max residual is 15% (structural layer),
+N_act ranges overlap. Campaign driver gains M3_SOLVER/M3_SAVEAT knobs
+(real-spectrum economics: QNDF-sparse 70.5 s/replicate vs >4 h explicit).
+
 ### Added
 
 - `examples/bench_real_probe.jl`: solver timing probe on the campaign
