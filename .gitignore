@@ -35,3 +35,4 @@ examples/*.csv
 
 # Documenter build output
 docs/build/
+__pycache__/
