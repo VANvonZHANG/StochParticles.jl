@@ -305,7 +305,7 @@ function main()
     recreate_h5(h5_path; scene_name = base, n_replicates = n_replicates,
         notes = "GCVI closure M3: env_mode=$(cfg.env_mode) gate=$(cfg.activation_gate)" *
                 " w=$(cfg.w), T0=$(cfg.parcel_T0), P0=$(cfg.parcel_P0), RH0=$(cfg.RH0)" *
-                ", saveat=$(cfg.saveat)" *
+                ", solver=$(get(ENV, "M3_SOLVER", "tsit5")), saveat=$(cfg.saveat)" *
                 (cfg.probe ? ", chatter probe (chi_true only, saveat=1)" : ""))
 
     truth_records = []
