@@ -219,10 +219,11 @@ function solve_case(cfg::GcviClosureConfig, particles)
             clamp_h2o_idx = cfg.h2o_idx, jac_prototype = jac)
     end
     return solve_split(particles, volume(cfg), env_profile(cfg),
-        (condensation,), Tsit5();
+        (condensation,), solver_obj;
         tspan = cfg.tspan, n_sim = cfg.n_sim, dt_split = dt_split,
         saveat = saveat, record_func = record_func,
-        abstol = 1.0e-24, reltol = rtol, clamp_h2o_idx = cfg.h2o_idx)
+        abstol = 1.0e-24, reltol = rtol, clamp_h2o_idx = cfg.h2o_idx,
+        jac_prototype = jac)
 end
 
 function write_twin_obs(path, cfg::GcviClosureConfig, truth_records, chis_true)
