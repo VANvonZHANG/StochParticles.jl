@@ -47,14 +47,14 @@ end
           (fda(M_W_AD + h) - fda(M_W_AD - h)) / (2h) rtol = 1e-5
 end
 
-@testset "H2O flux gradient w.r.t. env (T, p_v) — the channel the box truncates" begin
+@testset "H2O flux gradient w.r.t. env (T, p_v, p_air) — the channel the box truncates" begin
     T = 285.0
     p_sat = saturation_vapor_pressure(T)
     env = SVector(T, p_sat * 1.0004, 9.0e4)
     f_ki = H2OCondensationFlux(THERMO_AD, 2, DENS_AD, 0.0, :kinetic)
     ge(e) = f_ki(SVector(M_AS_AD, M_W_AD), e, nothing, 0.0)[2]
     grad = ForwardDiff.gradient(ge, env)
-    hT, hP = 1e-4, 1e-2
+    hT, hP, hA = 1e-4, 1e-2, 1.0
     @test grad[1] ≈
           (ge(SVector(T + hT, env[2], env[3])) - ge(SVector(T - hT, env[2], env[3]))) /
           (2hT) rtol = 1e-5
@@ -62,6 +62,13 @@ end
           (ge(SVector(env[1], env[2] + hP, env[3])) -
            ge(SVector(env[1], env[2] - hP, env[3]))) /
           (2hP) rtol = 1e-5
+    # p_air channel (split-Fuchs): enters via the heat-branch correction
+    # length ℓ_t ∝ 1/ρ_a — small but structurally nonzero, must differentiate
+    @test abs(grad[3]) > 0.0
+    @test grad[3] ≈
+          (ge(SVector(env[1], env[2], env[3] + hA)) -
+           ge(SVector(env[1], env[2], env[3] - hA))) /
+          (2hA) rtol = 1e-4
 end
 
 @testset "drift interface passes Duals through unchanged" begin
