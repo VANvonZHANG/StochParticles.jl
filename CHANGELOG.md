@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `M3_SOLVER` env knob in the GCVI closure example driver
+  (`tsit5`|`qndf`|`rodas5`, default `tsit5` — unchanged): the implicit
+  options wire the sparse AD Jacobian prototype into the closed-loop
+  solve. On the real campaign spectrum (n = 1000, C-prime, 600-s window)
+  the kinetic arm measures 70.5 s/replicate under QNDF-sparse vs >4 h
+  under explicit Tsit5: the ~20 nm haze tail (relaxation ~40 µs) is
+  stability-bound for explicit steppers.
 - `M3_SAVEAT` env knob in the GCVI closure example driver: trajectory
   sampling stride (default 60 s, unchanged). 10 s matches pyrcel's
   `output_dt` and resolves the ~15 s supersaturation peak that the legacy
