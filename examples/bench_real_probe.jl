@@ -26,7 +26,7 @@ const SOLVERS = split(get(ENV, "SOLVERS", "tsit5,qndf,rodas5p"), ',')
 
 # campaign replica: parcel mode, kinetic gate, w=1.0, C-prime loading
 cfg = GcviClosureConfig(n_sim = N_SIM, env_mode = :parcel,
-    activation_gate = :kinetic, w = 1.0)
+    w = 1.0)
 case_spec = population_spec(cfg, CHI)
 case_nu = nu_for_chi(case_spec.spectrum, case_spec.fbar, CHI;
     densities = cfg.densities, chi_species = DRY_SPECIES)
@@ -42,15 +42,7 @@ meta = synthesize_population(case_spec;
 function run_one(solver, tag; jac = nothing)
     pp = parcel_setup(cfg)
     cond = H2OCondensationProcess(thermo(cfg), cfg.densities;
-        h2o_idx = cfg.h2o_idx, w = 0.0, activation_gate = :kinetic)
-    reequil = (u,
-        sys,
-        t) -> begin
-        pr = extract_parcel(u, sys.n_sim, 5)
-        reequilibrate_haze!(u, sys, thermo(cfg), cfg.densities;
-            h2o_idx = cfg.h2o_idx, T = pr.T,
-            S = parcel_supersaturation(pr), m_air = pp.m_air)
-    end
+        h2o_idx = cfg.h2o_idx, w = 0.0)
     t_wall = Ref(time())
     n_rec = Ref(0)
     rec = (t,
@@ -68,7 +60,7 @@ function run_one(solver, tag; jac = nothing)
     recs = solve_split(parts, volume(cfg), ParcelCoupled(pp.parcel),
         (cond, pp), solver; tspan = (0.0, T_END), n_sim = N_SIM,
         dt_split = 10.0, saveat = 10.0, record_func = rec,
-        abstol = 1.0e-24, reltol = 1.0e-5, reequil = reequil,
+        abstol = 1.0e-24, reltol = 1.0e-5,
         clamp_h2o_idx = cfg.h2o_idx, jac_prototype = jac)
     wall = time() - t_wall[]
     @printf("%-14s wall=%8.1f s  ret=%s\n", tag, wall, string(sol.retcode))

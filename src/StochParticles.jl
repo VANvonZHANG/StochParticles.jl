@@ -36,7 +36,7 @@ export water_activity, ThermodynamicsParams, saturation_vapor_pressure,
 export ParcelState, parcel_drift, parcel_supersaturation, parcel_env,
        ParcelProcess,
        ParcelCoupled, extract_parcel, set_parcel_state!, set_parcel_drift!,
-       critical_point, reequilibrate_haze!, rhs_jac_prototype
+       critical_point, rhs_jac_prototype
 export number_concentration, mass_concentration, species_mass_concentration,
        species_fractions,
        mixing_state_index, particle_mixing_entropy, shannon_entropy

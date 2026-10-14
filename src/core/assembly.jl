@@ -194,7 +194,7 @@ end
 """
     solve_split(particles, volume, gas_phase_fn, processes, solver;
                 tspan, n_sim, dt_split, saveat, record_func,
-                abstol = nothing, reltol = nothing, reequil = nothing)
+                abstol = nothing, reltol = nothing)
             -> (sol, records)
 
 Lie-Trotter operator-splitting driver: per sub-step of length `dt_split`,
@@ -213,10 +213,6 @@ Optional `abstol`/`reltol` are forwarded to each internal `solve` call. Set
 them explicitly for kilogram-scale particle states, where the solver defaults
 (abstol = 1e-6) exceed the state magnitudes by many orders of magnitude.
 
-`reequil::Function(u, sys, t)`, when supplied, is invoked after each
-sub-step's ODE segment (before the coagulation jump phase) — e.g. the
-water-conserving `reequilibrate_haze!` split-step hook (spec §3.2).
-
 `jac_prototype` (e.g. `rhs_jac_prototype(n_sim, A)`), when supplied, is
 attached to the internal `ODEFunction` — REQUIRED for implicit solvers
 (Rodas5/QNDF/FBDF) at realistic `n_sim`: with the sparse prototype,
@@ -229,7 +225,6 @@ function solve_split(particles::Vector{SVector{A, Float64}},
         tspan = (0.0, 3600.0), n_sim = length(particles),
         dt_split::Real, saveat::Real, record_func,
         abstol = nothing, reltol = nothing,
-        reequil::Union{Nothing, Function} = nothing,
         clamp_h2o_idx::Union{Nothing, Int} = nothing,
         jac_prototype = nothing) where {A}
     dt_split > 0.0 || throw(ArgumentError("dt_split must be positive, got $dt_split"))
@@ -296,9 +291,6 @@ function solve_split(particles::Vector{SVector{A, Float64}},
                     set_particle!(u, i, Val(A), setindex(μ, 0.0, hi))
                 end
             end
-        end
-        if reequil !== nothing
-            reequil(u, sys, t_next)
         end
         if coag !== nothing
             step_coagulation!(u, sys, coag, t_next - t_prev)
